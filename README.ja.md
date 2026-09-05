@@ -16,7 +16,7 @@ App Store Connect / GA4 / AdMob の観測データを集め、数字の要約で
 2. Data Grounding 用の契約（期間・母集団・欠損・推測禁止）を入力に埋め込む
 3. 観測に基づく **Top 3 Actions** を返す（未確認の分析機能は提案しない）
 
-複数ダッシュボードを一つの要約にまとめることが目的ではありません。接続できた事実から、**今日どこから手を付けるべきか**を優先順位付きで提示することが価値です。
+複数ダッシュボードを一つの要約にまとめることが目的ではありません。接続できた事実から、**次にどこから手を付けるべきか**を優先順位付きで提示することが価値です。
 
 ## Data Grounding
 
@@ -46,7 +46,10 @@ LLM 出力はプロンプト / Data Contract で制約していますが、生�
 
 ```
 indie-growth-agent/
-├── agent.py              # エントリポイント（取得 → 入力整形 → Bedrock Agent）
+├── agent.py              # 共有分析エントリ（取得 → 入力整形 → Bedrock）
+├── api_server.py         # Web UI 向けローカル FastAPI
+├── analysis_schema.py    # Agent / API の構造化レスポンスモデル
+├── report_builder.py     # 観測 metrics + 分析結果 → UI 用 JSON
 ├── format_input.py       # Data Contract / FACTS テキスト生成
 ├── config.py             # .env 読み込み（秘密情報はハードコードしない）
 ├── event_definitions.json# GA4 イベントの開発者宣言定義
@@ -55,6 +58,7 @@ indie-growth-agent/
 ├── asc/                  # App Store Connect 取得
 ├── ga4/                  # GA4 Data API 取得
 ├── admob/                # AdMob Network Report 取得
+├── web/                  # Next.js Web UI（ローカルデモ）
 ├── scripts/              # 接続確認・OAuth 補助
 │   ├── verify_ga4.py
 │   ├── verify_admob.py
@@ -123,6 +127,7 @@ python agent.py
 - Missing data ≠ zero
 - 優先順位付き Top 3 Actions
 - Next.js Web UI（ローカル）
+- Web UI から Python Agent を実行するローカル API
 - 日本語 / English UI
 
 ### Future Roadmap（未実装）
