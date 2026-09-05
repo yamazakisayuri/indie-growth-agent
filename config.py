@@ -17,14 +17,30 @@ DEFAULT_EVENT_DEFINITIONS_FILENAME = "event_definitions.json"
 class AppStoreConnectCredentials:
     issuer_id: str
     key_id: str
-    private_key_path: Path
+    private_key_path: Path | None = None
+    private_key_pem_inline: str | None = None
 
     def private_key_pem(self) -> str:
+        if self.private_key_pem_inline:
+            return self.private_key_pem_inline
+        if self.private_key_path is None:
+            raise ValueError(
+                "App Store Connect private key missing: set "
+                "APP_STORE_CONNECT_PRIVATE_KEY or APP_STORE_CONNECT_PRIVATE_KEY_PATH"
+            )
         if not self.private_key_path.is_file():
             raise FileNotFoundError(
                 f"App Store Connect private key not found: {self.private_key_path}"
             )
         return self.private_key_path.read_text(encoding="utf-8")
+
+
+def _normalize_pem(raw: str) -> str:
+    """Accept PEM with real newlines or escaped \\n (common in Secrets Manager)."""
+    text = raw.strip()
+    if "\\n" in text and "\n" not in text:
+        text = text.replace("\\n", "\n")
+    return text.strip()
 
 
 @dataclass(frozen=True)
@@ -88,6 +104,7 @@ def get_app_store_connect_credentials() -> AppStoreConnectCredentials:
 
     issuer_id = os.getenv("APP_STORE_CONNECT_ISSUER_ID", "").strip()
     key_id = os.getenv("APP_STORE_CONNECT_KEY_ID", "").strip()
+    key_pem_raw = os.getenv("APP_STORE_CONNECT_PRIVATE_KEY", "").strip()
     key_path_raw = os.getenv("APP_STORE_CONNECT_PRIVATE_KEY_PATH", "").strip()
 
     missing = [
@@ -95,7 +112,6 @@ def get_app_store_connect_credentials() -> AppStoreConnectCredentials:
         for name, value in (
             ("APP_STORE_CONNECT_ISSUER_ID", issuer_id),
             ("APP_STORE_CONNECT_KEY_ID", key_id),
-            ("APP_STORE_CONNECT_PRIVATE_KEY_PATH", key_path_raw),
         )
         if not value
     ]
@@ -104,6 +120,21 @@ def get_app_store_connect_credentials() -> AppStoreConnectCredentials:
             "Missing required environment variables: "
             + ", ".join(missing)
             + ". Copy .env.example to .env and fill in your credentials."
+        )
+
+    if key_pem_raw:
+        return AppStoreConnectCredentials(
+            issuer_id=issuer_id,
+            key_id=key_id,
+            private_key_pem_inline=_normalize_pem(key_pem_raw),
+        )
+
+    if not key_path_raw:
+        raise ValueError(
+            "Missing App Store Connect private key: set "
+            "APP_STORE_CONNECT_PRIVATE_KEY (PEM body, for containers) or "
+            "APP_STORE_CONNECT_PRIVATE_KEY_PATH (local file). "
+            "Copy .env.example to .env and fill in your credentials."
         )
 
     return AppStoreConnectCredentials(

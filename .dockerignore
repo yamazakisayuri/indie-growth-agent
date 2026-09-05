@@ -1,0 +1,37 @@
+# Secrets and local env — never bake into images
+.env
+.env.*
+!.env.example
+secrets/
+*.p8
+*.pem
+*.key
+credentials.json
+*-service-account.json
+client_secret*.json
+token.json
+.aws/
+
+# Python / venv
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Frontend (served separately via Amplify)
+web/
+
+# Git / IDE / OS
+.git/
+.cursor/
+.DS_Store
+
+# Docs (not required at runtime)
+README.md
+README.ja.md
+LICENSE

@@ -113,7 +113,7 @@ function DashboardApp() {
 
 /**
  * Entry: mock report until Analyze succeeds.
- * Analyze posts { language } to /api/analyze → local Python Agent.
+ * Analyze posts { language } to NEXT_PUBLIC_AGENT_API_URL /api/analyze.
  */
 export default function Home() {
   return (
