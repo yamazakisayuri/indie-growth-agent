@@ -2,9 +2,9 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-Indie app 向けの成長分析 Agent（バックエンド MVP）。
+Indie app 向けの成長分析 Agent（ハッカソン MVP）。
 
-App Store Connect / GA4 / AdMob の観測データを集め、数字の要約ではなく **優先すべき Top 3 Actions** を返します。実行ランタイムは **Strands Agents SDK + Amazon Bedrock** です。
+App Store Connect / GA4 / AdMob の観測データを集め、数字の要約ではなく **優先すべき Top 3 Actions** を返します。実行ランタイムは **Strands Agents SDK + Amazon Bedrock** で、ローカルの **Next.js Web UI**（日本語 / English）も含まれます。
 
 ## 解決する課題
 
@@ -107,14 +107,51 @@ python agent.py
 
 標準出力に Agent 入力（Data Contract + FACTS）と、Bedrock 経由の回答（Most important finding / Why it matters / Top 3 actions）が流れます。
 
-## Roadmap（未実装）
+## Roadmap
 
-以下は **このリポジトリの MVP には含まれません**。将来候補です。
+### ハッカソン MVP（実装済み）
 
-- Web / モバイル UI
-- 将来 UI での Agent 回答言語選択（**日本語 / English**）
-- Google Play 統合
-- AgentCore やその他のホスト基盤へのデプロイ
+このリポジトリにすでに含まれているもの:
+
+- App Store Connect 分析データの取得
+- GA4 取得（設定時のみ）
+- AdMob Network Report 取得（設定時のみ）
+- Strands Agents SDK + Amazon Bedrock による分析
+- Facts / Speculation grounding
+- Reporting period alignment
+- Population scope
+- Missing data ≠ zero
+- 優先順位付き Top 3 Actions
+- Next.js Web UI（ローカル）
+- 日本語 / English UI
+
+### Future Roadmap（未実装）
+
+#### Next
+
+- Google Play / Android 対応
+- アプリ選択 UI
+- App Store レビュー
+- IAP / サブスクリプション
+- RevenueCat 連携
+
+#### Later
+
+- 複数アプリ横断のポートフォリオ分析
+- プロアクティブな成長アラート
+- 過去の提案と結果からの学習
+
+#### Long-term vision
+
+Indie Growth Agent は、設定された1アプリの分析から、インディー開発者の限られた時間を「次にどのアプリへ使うべきか」まで一緒に決める成長パートナーへ進化することを目指します。
+
+```
+Acquisition → Usage → Feedback → Revenue → Prioritized action
+```
+
+現時点では次も未実装です:
+
+- AgentCore やその他ホスト基盤へのデプロイ
 - 生成後の機械的な grounding 検証（スキーマ検証・出典チェック等）
 - AdMob メトリクス欠損の明示的ハンドリング（部分欠損を missing として区別する等）
 

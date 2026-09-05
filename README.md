@@ -2,9 +2,9 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-Growth-analysis agent for indie apps (backend MVP).
+Growth-analysis agent for indie apps (Hackathon MVP).
 
-It pulls observed metrics from App Store Connect, GA4, and AdMob, then returns **prioritized Top 3 Actions**—not a bare metric summary. The runtime is **Strands Agents SDK + Amazon Bedrock**.
+It pulls observed metrics from App Store Connect, GA4, and AdMob, then returns **prioritized Top 3 Actions**—not a bare metric summary. The runtime is **Strands Agents SDK + Amazon Bedrock**, with a local **Next.js Web UI** (Japanese / English).
 
 ## Problem it solves
 
@@ -107,13 +107,50 @@ python agent.py
 
 Stdout prints the agent input (Data Contract + FACTS) and the Bedrock response (Most important finding / Why it matters / Top 3 actions).
 
-## Roadmap (not implemented)
+## Roadmap
 
-These are **not part of this repository’s MVP**. Future candidates only:
+### Hackathon MVP (implemented)
 
-- Web / mobile UI
-- Agent response language selection in the future UI (**Japanese / English**)
-- Google Play integration
+Already in this repository:
+
+- App Store Connect analytics fetch
+- GA4 fetch (optional when configured)
+- AdMob Network Report fetch (optional when configured)
+- Strands Agents SDK + Amazon Bedrock analysis
+- Facts / Speculation grounding
+- Reporting period alignment
+- Population scope
+- Missing data ≠ zero
+- Prioritized Top 3 Actions
+- Next.js Web UI (local)
+- Japanese / English UI
+
+### Future Roadmap (not implemented)
+
+#### Next
+
+- Google Play / Android support
+- App selector
+- App Store reviews
+- IAP / subscriptions
+- RevenueCat integration
+
+#### Later
+
+- Portfolio analysis across multiple apps
+- Proactive growth alerts
+- Historical learning from previous recommendations and outcomes
+
+#### Long-term vision
+
+Indie Growth Agent should evolve from analyzing one configured app into a growth partner for indie developers that helps decide not only what action to take, but which app deserves the developer's limited time next.
+
+```
+Acquisition → Usage → Feedback → Revenue → Prioritized action
+```
+
+Also still out of scope for now:
+
 - Deploy to AgentCore or other hosting
 - Post-generation machine grounding checks (schema / citation validation, etc.)
 - Explicit AdMob partial-metric missing handling (distinguish missing vs zero)
