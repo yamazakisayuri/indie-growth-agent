@@ -1,11 +1,22 @@
+from __future__ import annotations
+
+import json
+import logging
+import sys
 from datetime import date
 
 from strands import Agent
 
 from admob import try_fetch_admob_snapshot
+from admob.snapshot import AdMobGrowthSnapshot
+from analysis_schema import AnalyzeResponse, StructuredAnalysis
 from asc import AscGrowthSnapshot, fetch_growth_snapshot
 from format_input import format_agent_input
 from ga4 import try_fetch_ga4_snapshot
+from ga4.snapshot import Ga4GrowthSnapshot
+from report_builder import build_analyze_response
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
 You are Indie Growth Agent, an AI growth advisor for indie app developers.
@@ -68,20 +79,32 @@ Hard rules:
     confirmed facts and allowed listing actions.
 - Prioritize actions. Do not merely restate the metrics.
 
-Always return exactly this shape, keeping the Facts / Speculation frames:
-
-1. Most important finding
-   - Facts: only what the provided numbers state.
-   - Speculation: inference beyond the data. Write "none" if you have none.
-2. Why it matters
-   - Facts: ...
-   - Speculation: ...
-3. Top 3 actions to take today
-   - For each action add "Basis:" naming the specific fact or event definition
-     it rests on. If you cannot name one, drop the action.
+Always keep the Facts / Speculation frames:
+1. Most important finding — Facts only from provided numbers; Speculation separate.
+2. Why it matters — Facts / Speculation separated.
+3. Top 3 actions to take today — each with Basis naming the grounding fact or
+   event definition. Drop any action you cannot ground.
 
 Never leave a Facts or Speculation frame empty, and never put speculation
 inside a Facts frame.
+"""
+
+STRUCTURED_OUTPUT_PROMPT = """
+Fill the structured analysis model using the same grounding rules as the system
+prompt and the DATA CONTRACT in the input.
+
+Field mapping:
+- most_important_finding: one concise sentence for the top finding
+- facts: only observations directly confirmable from the provided numbers
+- speculation: inferences beyond the data; use an empty list if you have none
+- actions: up to 3 prioritized actions (rank 1–3) with title, reason, and basis
+
+Language: follow the RESPONSE LANGUAGE section in the input for all prose fields.
+Do not change numerical conclusions, priority order, or grounding based on language.
+
+Do NOT invent UI headings such as "Next actions" / "次にやるべきこと",
+"What should I do today?", or "今日、何をすればいいですか?".
+Those labels are owned by the client UI. Only fill analysis content fields.
 """
 
 agent = Agent(system_prompt=SYSTEM_PROMPT)
@@ -94,19 +117,90 @@ def _asc_anchor_date(snapshot: AscGrowthSnapshot) -> date | None:
         return None
 
 
-def build_prompt_from_sources() -> str:
+def _normalize_language(language: str | None) -> str:
+    if language and language.lower().startswith("ja"):
+        return "ja"
+    return "en"
+
+
+def _language_instruction(language: str) -> str:
+    if language == "ja":
+        return """
+
+RESPONSE LANGUAGE: Japanese (ja)
+
+Write ONLY these prose fields in Japanese:
+most_important_finding, facts, speculation, action titles, reasons, and basis.
+
+Japanese writing rules:
+- Use natural, concise Japanese a solo indie developer can act on immediately.
+- Do NOT write English word-for-word calques (逐語訳調を避ける).
+- Action titles should normally end with 「〜する」.
+- Do not invent vague coined phrases (例: 「検索なんとか性」).
+- Keep proper service names in their official form:
+  App Store / App Store Connect / GA4 / Google Analytics 4 / AdMob / Google AdMob.
+- Keep GA4 event names and metric identifiers EXACTLY as in the input
+  (例: record_saved, first_open, ad_impression, IMPRESSIONS, eCPM).
+  Never translate them into Japanese (禁止例: 「レコードが保存されました」).
+- Do not paraphrase identifiers into natural language; quote the identifier as-is
+  and explain around it if needed.
+- Good action titles: 「App Storeでの検索表示を確認する」,
+  「record_saved フローを調査する」, 「AdMobの収益低下を調べる」.
+- Bad action titles: 「App Storeの検索可視性を見直す」,
+  「App Storeの検索なんとか性を考える」,
+  「レコードが保存されましたフロー」, 「今日、何かいいですか？」,
+  「収益低下を確認する」(数字はすでに確認済みなので、次の調査行動にする).
+Do not change numerical conclusions, priority order, or grounding based on language —
+only the display language of the analysis prose changes.
+Do not generate UI chrome / section headings; the client owns those labels.
+"""
+    return """
+
+RESPONSE LANGUAGE: English (en)
+
+Write ONLY these prose fields in clear English:
+most_important_finding, facts, speculation, action titles, reasons, and basis.
+
+English writing rules:
+- Keep proper service names unchanged (App Store Connect, GA4, AdMob).
+- Keep GA4 event names and metric identifiers EXACTLY as in the input
+  (e.g. record_saved, first_open, ad_impression). Never rewrite them into
+  prose substitutes.
+- Action titles should be concrete and imperative (e.g. "Investigate the
+  record_saved flow").
+- Do not generate UI chrome / section headings; the client owns those labels.
+
+Do not change numerical conclusions, priority order, or grounding based on language —
+only the display language of the analysis prose changes.
+"""
+
+
+def fetch_source_snapshots() -> tuple[
+    AscGrowthSnapshot,
+    Ga4GrowthSnapshot | None,
+    str | None,
+    AdMobGrowthSnapshot | None,
+    str | None,
+]:
+    """Fetch ASC (required) + optional GA4 / AdMob. Shared by CLI and Web API."""
     # Anchor GA4 and AdMob to the newest ASC date so all sources compare the same windows.
     asc = fetch_growth_snapshot()
     as_of = _asc_anchor_date(asc)
     ga4, ga4_status = try_fetch_ga4_snapshot(as_of=as_of)
     admob, admob_status = try_fetch_admob_snapshot(as_of=as_of)
-    return format_agent_input(
+    return asc, ga4, ga4_status, admob, admob_status
+
+
+def build_prompt_from_sources(*, language: str | None = None) -> str:
+    asc, ga4, ga4_status, admob, admob_status = fetch_source_snapshots()
+    prompt = format_agent_input(
         asc,
         ga4=ga4,
         ga4_status=ga4_status,
         admob=admob,
         admob_status=admob_status,
     )
+    return prompt + _language_instruction(_normalize_language(language))
 
 
 # Backward-compatible alias
@@ -114,8 +208,55 @@ def build_prompt_from_asc() -> str:
     return build_prompt_from_sources()
 
 
+def run_analysis(language: str | None = "en") -> AnalyzeResponse:
+    """
+    Shared analysis entry for CLI and Web API.
+
+    1) Fetch ASC / GA4 / AdMob with existing grounding windows
+    2) Format agent input (unchanged contract)
+    3) Run Strands / Bedrock with structured output
+    4) Attach observed metrics + analysis into AnalyzeResponse
+    """
+    lang = _normalize_language(language)
+    asc, ga4, ga4_status, admob, admob_status = fetch_source_snapshots()
+    prompt = format_agent_input(
+        asc,
+        ga4=ga4,
+        ga4_status=ga4_status,
+        admob=admob,
+        admob_status=admob_status,
+    ) + _language_instruction(lang)
+
+    logger.info(
+        "Running Indie Growth Agent analysis language=%s app=%s period=%s→%s",
+        lang,
+        asc.app.name,
+        asc.current.start,
+        asc.current.end,
+    )
+
+    result = agent(
+        prompt,
+        structured_output_model=StructuredAnalysis,
+        structured_output_prompt=STRUCTURED_OUTPUT_PROMPT,
+    )
+    structured = result.structured_output
+    if structured is None:
+        raise RuntimeError("Agent returned no structured analysis")
+
+    return build_analyze_response(
+        language=lang,
+        asc=asc,
+        ga4=ga4,
+        ga4_status=ga4_status,
+        admob=admob,
+        admob_status=admob_status,
+        analysis=structured,
+    )
+
+
 if __name__ == "__main__":
-    prompt = build_prompt_from_sources()
-    print(prompt)
-    print("\n--- Agent response ---\n")
-    agent(prompt)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    lang_arg = sys.argv[1] if len(sys.argv) > 1 else "en"
+    report = run_analysis(language=lang_arg)
+    print(json.dumps(report.model_dump(by_alias=True), ensure_ascii=False, indent=2))

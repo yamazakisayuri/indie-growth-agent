@@ -13,3 +13,6 @@ __pycache__/
 credentials.json
 *-service-account.json
 .aws/
+web/node_modules/
+web/.next/
+web/out/
