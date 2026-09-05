@@ -1,0 +1,16 @@
+{
+  "_comment": "Developer-declared meaning of GA4 events. Only events listed here may be interpreted by the agent; every other event name stays an opaque label. Keys must match GA4_KEY_EVENTS in .env. State only what triggers the event and what it records. Do not state why it fires beyond the trigger, and do not rate its importance (no 'core value action', 'key engagement signal'); the agent must reach any such judgement as Speculation.",
+
+  "first_open": {
+    "source": "GA4 automatic event",
+    "definition": "Fires the first time the app is launched on a device after installation or reinstallation. It counts app launches, not App Store downloads, and it is collected across every platform and country in this GA4 property."
+  },
+  "record_saved": {
+    "source": "developer-declared custom event",
+    "definition": "Fires when the user saves a match/game record in the app. This event represents a saved performance record."
+  },
+  "ad_impression": {
+    "source": "GA4 automatic event from the AdMob SDK",
+    "definition": "An ad was rendered to the user inside the app. This is GA4's count of ad impressions only. It carries no revenue, eCPM, fill rate, or any other AdMob monetization figure, and it must not be used to estimate earnings."
+  }
+}
