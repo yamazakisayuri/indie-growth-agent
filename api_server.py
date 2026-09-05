@@ -1,4 +1,4 @@
-"""Local HTTP API for the Indie Growth Agent Web UI.
+"""HTTP API for the Indie Growth Agent Web UI.
 
 Secrets stay on this Python process. The browser never receives credentials.
 """
@@ -6,6 +6,7 @@ Secrets stay on this Python process. The browser never receives credentials.
 from __future__ import annotations
 
 import logging
+import os
 import traceback
 from typing import Literal
 
@@ -18,19 +19,33 @@ from analysis_schema import AnalyzeResponse
 
 logger = logging.getLogger("indie_growth_api")
 
+# Local Next.js defaults. Add production Amplify origins via CORS_ALLOWED_ORIGINS.
+_DEFAULT_CORS_ORIGINS = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+)
+
+
+def _cors_allowed_origins() -> list[str]:
+    origins: list[str] = list(_DEFAULT_CORS_ORIGINS)
+    raw = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+    if raw:
+        for part in raw.split(","):
+            origin = part.strip().rstrip("/")
+            if origin and origin not in origins:
+                origins.append(origin)
+    return origins
+
+
 app = FastAPI(title="Indie Growth Agent API", version="0.1.0")
 
-# Local Next.js only. Do not widen this for production without an auth layer.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://localhost:3002",
-        "http://127.0.0.1:3002",
-    ],
+    allow_origins=_cors_allowed_origins(),
     allow_credentials=False,
     allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["Content-Type"],
@@ -97,11 +112,17 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    # Bind localhost only — never expose this process publicly without auth.
+    host = os.getenv("HOST", "0.0.0.0").strip() or "0.0.0.0"
+    port_raw = os.getenv("PORT", "8000").strip() or "8000"
+    try:
+        port = int(port_raw)
+    except ValueError as exc:
+        raise ValueError(f"PORT must be an integer, got {port_raw!r}") from exc
+
     uvicorn.run(
         "api_server:app",
-        host="127.0.0.1",
-        port=8000,
+        host=host,
+        port=port,
         reload=False,
     )
 

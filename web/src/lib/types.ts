@@ -53,7 +53,7 @@ export interface GrowthReport {
   mostImportantFinding?: string;
 }
 
-/** Raw JSON from POST /api/analyze (Python → Next proxy). */
+/** Raw JSON from POST /api/analyze (Python Agent API). */
 export interface AnalyzeApiResponse {
   language: Language;
   app: {

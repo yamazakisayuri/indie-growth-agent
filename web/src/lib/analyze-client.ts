@@ -7,15 +7,23 @@ export class AnalyzeRequestError extends Error {
   }
 }
 
+const DEFAULT_AGENT_API_URL = "http://127.0.0.1:8000";
+
+function agentApiBaseUrl(): string {
+  const raw =
+    process.env.NEXT_PUBLIC_AGENT_API_URL?.trim() || DEFAULT_AGENT_API_URL;
+  return raw.replace(/\/$/, "");
+}
+
 /**
- * Call the Next.js proxy → local Python Agent API.
+ * Call the Python Agent API directly (Browser → FastAPI).
  * Never send secrets from the browser; only language is posted.
  */
 export async function requestAnalyze(
   language: Language,
   signal?: AbortSignal,
 ): Promise<AnalyzeApiResponse> {
-  const response = await fetch("/api/analyze", {
+  const response = await fetch(`${agentApiBaseUrl()}/api/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ language }),
