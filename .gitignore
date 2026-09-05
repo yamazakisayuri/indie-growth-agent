@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 secrets/
 __pycache__/
@@ -6,3 +8,8 @@ __pycache__/
 .Python
 *.egg-info/
 .DS_Store
+*.p8
+*.pem
+credentials.json
+*-service-account.json
+.aws/
