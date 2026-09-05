@@ -59,6 +59,19 @@ class Ga4Settings:
     refresh_token: str | None
 
 
+@dataclass(frozen=True)
+class AdMobSettings:
+    """AdMob Network report settings. OAuth client is shared with GA4; refresh token is separate."""
+
+    account_resource: str
+    app_ids: tuple[str, ...]
+    lookback_days: int
+    currency_code: str
+    oauth_client_id: str
+    oauth_client_secret: str
+    refresh_token: str
+
+
 def load_env() -> None:
     load_dotenv(ROOT_DIR / ".env")
 
@@ -251,4 +264,71 @@ def get_ga4_settings() -> Ga4Settings | None:
         oauth_client_id=client_id if use_oauth else None,
         oauth_client_secret=client_secret if use_oauth else None,
         refresh_token=refresh_token if use_oauth else None,
+    )
+
+
+def _normalize_admob_account(raw: str) -> str:
+    value = raw.strip()
+    if value.startswith("accounts/"):
+        return value
+    if value.startswith("pub-"):
+        return f"accounts/{value}"
+    raise ValueError(
+        "ADMOB_ACCOUNT_ID must be pub-… or accounts/pub-… "
+        f"(got {raw!r})"
+    )
+
+
+def get_admob_settings() -> AdMobSettings | None:
+    """Return AdMob settings when configured; otherwise None (treated as not connected)."""
+    load_env()
+
+    account_raw = os.getenv("ADMOB_ACCOUNT_ID", "").strip()
+    refresh_token = os.getenv("ADMOB_REFRESH_TOKEN", "").strip() or None
+    refresh_token_path_raw = os.getenv("ADMOB_REFRESH_TOKEN_PATH", "").strip()
+    if not refresh_token and refresh_token_path_raw:
+        refresh_token_path = _resolve_path(refresh_token_path_raw)
+        if refresh_token_path.is_file():
+            refresh_token = refresh_token_path.read_text(encoding="utf-8").strip() or None
+
+    # Not connected until both account and refresh token exist.
+    if not account_raw and not refresh_token:
+        return None
+    if not account_raw or not refresh_token:
+        # Partial config (e.g. token obtained, account not chosen yet) → not connected.
+        return None
+
+    client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+    client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+    if not client_id or not client_secret:
+        raise ValueError(
+            "AdMob needs GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET "
+            "(same OAuth client as GA4)."
+        )
+
+    lookback_raw = os.getenv("ADMOB_LOOKBACK_DAYS", "").strip()
+    if not lookback_raw:
+        lookback_raw = os.getenv("APP_STORE_CONNECT_LOOKBACK_DAYS", "7").strip() or "7"
+    try:
+        lookback_days = int(lookback_raw)
+    except ValueError as exc:
+        raise ValueError("ADMOB_LOOKBACK_DAYS must be an integer") from exc
+    if lookback_days < 1:
+        raise ValueError("ADMOB_LOOKBACK_DAYS must be >= 1")
+
+    app_ids_raw = os.getenv("ADMOB_APP_IDS", "").strip()
+    if not app_ids_raw:
+        app_ids_raw = os.getenv("ADMOB_APP_ID", "").strip()
+    app_ids = tuple(part.strip() for part in app_ids_raw.split(",") if part.strip())
+
+    currency = os.getenv("ADMOB_CURRENCY_CODE", "JPY").strip().upper() or "JPY"
+
+    return AdMobSettings(
+        account_resource=_normalize_admob_account(account_raw),
+        app_ids=app_ids,
+        lookback_days=lookback_days,
+        currency_code=currency,
+        oauth_client_id=client_id,
+        oauth_client_secret=client_secret,
+        refresh_token=refresh_token,
     )
