@@ -16,7 +16,7 @@ This agent:
 2. Embeds a Data Grounding contract (periods, populations, missing data, no unstated causes)
 3. Returns observation-based **Top 3 Actions** (and does not propose unconfirmed analytics features)
 
-The point is not to summarize several dashboards into one narrative. It is to decide **where to start today**, with an explicit priority order, from the facts that are actually connected.
+The point is not to summarize several dashboards into one narrative. It is to decide **where to start next**, with an explicit priority order, from the facts that are actually connected.
 
 ## Data Grounding
 
@@ -46,7 +46,10 @@ Unset sources are marked `not connected`; values are never invented.
 
 ```
 indie-growth-agent/
-├── agent.py              # Entry point (fetch → format input → Bedrock agent)
+├── agent.py              # Shared analysis entry (fetch → format → Bedrock)
+├── api_server.py         # Local FastAPI for the Web UI
+├── analysis_schema.py    # Structured Agent / API response models
+├── report_builder.py     # Observed metrics + analysis → JSON for the UI
 ├── format_input.py       # Data Contract / FACTS text builder
 ├── config.py             # Loads .env (no hardcoded secrets)
 ├── event_definitions.json# Developer-declared GA4 event meanings
@@ -55,6 +58,7 @@ indie-growth-agent/
 ├── asc/                  # App Store Connect fetch
 ├── ga4/                  # GA4 Data API fetch
 ├── admob/                # AdMob Network Report fetch
+├── web/                  # Next.js Web UI (local demo)
 ├── scripts/              # Connection checks / OAuth helpers
 │   ├── verify_ga4.py
 │   ├── verify_admob.py
@@ -123,6 +127,7 @@ Already in this repository:
 - Missing data ≠ zero
 - Prioritized Top 3 Actions
 - Next.js Web UI (local)
+- Local Python API that runs the Agent for the Web UI
 - Japanese / English UI
 
 ### Future Roadmap (not implemented)
