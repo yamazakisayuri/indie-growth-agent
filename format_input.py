@@ -1,7 +1,8 @@
-"""Format ASC (+ optional GA4) facts into Indie Growth Agent input text."""
+"""Format ASC (+ optional GA4 / AdMob) facts into Indie Growth Agent input text."""
 
 from __future__ import annotations
 
+from admob.snapshot import AdMobAppComparison, AdMobGrowthSnapshot
 from asc.snapshot import AscGrowthSnapshot, PeriodTotals
 from ga4.snapshot import Ga4GrowthSnapshot, Ga4PeriodTotals
 
@@ -21,6 +22,10 @@ def _fmt_rate(rate: float | None) -> str:
     if rate is None:
         return "n/a"
     return f"{rate * 100:.2f}%"
+
+
+def _fmt_money(value: float, currency: str) -> str:
+    return f"{value:,.2f} {currency}"
 
 
 def _source_line(label: str, values: dict[str, int], total: int) -> str:
@@ -73,7 +78,10 @@ def _ga4_key_event_changes(ga4: Ga4GrowthSnapshot) -> list[str]:
     for name in ga4.key_event_names:
         cur = ga4.current.key_event_counts.get(name, 0)
         prev = ga4.previous.key_event_counts.get(name, 0)
-        lines.append(f"- {name}: {_fmt_pct(_pct_change(cur, prev))} (current={_fmt_int(cur)}, previous={_fmt_int(prev)})")
+        lines.append(
+            f"- {name}: {_fmt_pct(_pct_change(cur, prev))} "
+            f"(current={_fmt_int(cur)}, previous={_fmt_int(prev)})"
+        )
     return lines
 
 
@@ -81,6 +89,118 @@ def _pct_change(current: int, previous: int) -> float | None:
     if previous <= 0:
         return None
     return (current - previous) / previous * 100.0
+
+
+def _admob_app_period_block(
+    title: str,
+    app: AdMobAppComparison,
+    *,
+    which: str,
+    currency: str,
+) -> list[str]:
+    period = app.current if which == "current" else app.previous
+    if not period.has_data:
+        unavailable = "n/a (AdMob returned no rows for this period — data unavailable, NOT a measured 0)"
+        return [
+            f"{title} ({period.start} → {period.end}):",
+            f"- Estimated earnings (ESTIMATED_EARNINGS): {unavailable}",
+            f"- Impressions (IMPRESSIONS): {unavailable}",
+            f"- Impression RPM / eCPM (IMPRESSION_RPM): {unavailable}",
+            f"- Clicks (CLICKS): {unavailable}",
+        ]
+    return [
+        f"{title} ({period.start} → {period.end}):",
+        f"- Estimated earnings (ESTIMATED_EARNINGS): {_fmt_money(period.estimated_earnings, currency)}",
+        f"- Impressions (IMPRESSIONS): {_fmt_int(period.impressions)}",
+        f"- Impression RPM / eCPM (IMPRESSION_RPM): {_fmt_money(period.impression_rpm, currency)}",
+        f"- Clicks (CLICKS): {_fmt_int(period.clicks)}",
+    ]
+
+
+def _admob_app_changes(app: AdMobAppComparison) -> list[str]:
+    header = (
+        "AdMob period-over-period change "
+        "(fact, from the two AdMob periods above only; do not assert why a metric moved):"
+    )
+    if not app.both_periods_have_data:
+        if not app.current.has_data and not app.previous.has_data:
+            which = "both periods"
+        elif not app.current.has_data:
+            which = "the current period"
+        else:
+            which = "the previous period"
+        return [
+            header,
+            f"- Not computable: AdMob returned no rows for {which}.",
+            "- Estimated earnings / Impressions / Impression RPM / Clicks: n/a",
+            "- A missing period is NOT a drop to zero. Do not state or imply that any",
+            "  AdMob metric fell, rose, or reached 0 for this app.",
+        ]
+    return [
+        header,
+        f"- Estimated earnings: {_fmt_pct(app.change_estimated_earnings_pct())}",
+        f"- Impressions: {_fmt_pct(app.change_impressions_pct())}",
+        f"- Impression RPM / eCPM: {_fmt_pct(app.change_impression_rpm_pct())}",
+        f"- Clicks: {_fmt_pct(app.change_clicks_pct())}",
+    ]
+
+
+def _admob_facts_block(admob: AdMobGrowthSnapshot) -> list[str]:
+    lines = [
+        "ADMOB — FACTS",
+        f"- Account: {admob.account_resource}",
+        f"- Currency: {admob.currency_code}",
+    ]
+    if not admob.apps:
+        lines.append("- No AdMob app rows returned for the configured filter.")
+        return lines
+
+    for app in admob.apps:
+        title = app.app_label or app.app_id
+        lines.append(f"- App: {title}")
+        lines.append(f"- AdMob app ID: {app.app_id}")
+        lines.append("")
+        lines.extend(
+            _admob_app_period_block(
+                "Current period",
+                app,
+                which="current",
+                currency=admob.currency_code,
+            )
+        )
+        lines.append("")
+        lines.extend(
+            _admob_app_period_block(
+                "Previous period",
+                app,
+                which="previous",
+                currency=admob.currency_code,
+            )
+        )
+        lines.append("")
+        lines.extend(_admob_app_changes(app))
+        lines.append("")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def _admob_confirmed_capabilities(admob: AdMobGrowthSnapshot) -> list[str]:
+    app_ids = ", ".join(app.app_id for app in admob.apps) or "(none returned)"
+    return [
+        "- AdMob Network report metrics fetched into the facts below (period-scoped,",
+        "  APP dimension / filter only):",
+        "  ESTIMATED_EARNINGS, IMPRESSIONS, IMPRESSION_RPM (UI eCPM), CLICKS,",
+        "  and period-over-period % change for those four metrics.",
+        f"- AdMob rows in this run are limited to configured app ID(s): {app_ids}.",
+        "- AdMob IMPRESSIONS is NOT the same metric as GA4 ad_impression. Do not",
+        "  treat them as matching, corresponding, or interchangeable series.",
+        "- Do not assert why estimated earnings, impressions, IMPRESSION_RPM / eCPM,",
+        "  or clicks rose or fell. Observed % changes are Facts; causes (demand,",
+        "  geography, format, fill, mediation, etc.) are NOT in this input.",
+        "- No other AdMob surfaces, reports, dimensions, or mediation breakdowns",
+        "  are confirmed available in this input.",
+    ]
 
 
 def _asc_coverage_notes(snapshot: AscGrowthSnapshot) -> list[str]:
@@ -106,9 +226,19 @@ def _asc_coverage_notes(snapshot: AscGrowthSnapshot) -> list[str]:
     return notes
 
 
+def _windows_match(
+    a_start: str,
+    a_end: str,
+    b_start: str,
+    b_end: str,
+) -> bool:
+    return a_start == b_start and a_end == b_end
+
+
 def _period_alignment_notes(
     asc: AscGrowthSnapshot,
     ga4: Ga4GrowthSnapshot | None,
+    admob: AdMobGrowthSnapshot | None,
 ) -> list[str]:
     notes = [
         f"- ASC current period: {asc.current.start} → {asc.current.end}",
@@ -116,29 +246,71 @@ def _period_alignment_notes(
     ]
     if ga4 is None:
         notes.append("- GA4 periods: not available (GA4 not connected).")
+    else:
+        notes.extend(
+            [
+                f"- GA4 current period: {ga4.current.start} → {ga4.current.end}",
+                f"- GA4 previous period: {ga4.previous.start} → {ga4.previous.end}",
+            ]
+        )
+
+    if admob is None:
+        notes.append("- AdMob periods: not available (AdMob not connected).")
+    else:
+        notes.extend(
+            [
+                f"- AdMob current period: {admob.current_start} → {admob.current_end}",
+                f"- AdMob previous period: {admob.previous_start} → {admob.previous_end}",
+            ]
+        )
+
+    sources: list[tuple[str, str, str, str, str]] = [
+        ("ASC", asc.current.start, asc.current.end, asc.previous.start, asc.previous.end),
+    ]
+    if ga4 is not None:
+        sources.append(
+            (
+                "GA4",
+                ga4.current.start,
+                ga4.current.end,
+                ga4.previous.start,
+                ga4.previous.end,
+            )
+        )
+    if admob is not None:
+        sources.append(
+            (
+                "AdMob",
+                admob.current_start,
+                admob.current_end,
+                admob.previous_start,
+                admob.previous_end,
+            )
+        )
+
+    if len(sources) == 1:
         return notes
 
-    notes.extend(
-        [
-            f"- GA4 current period: {ga4.current.start} → {ga4.current.end}",
-            f"- GA4 previous period: {ga4.previous.start} → {ga4.previous.end}",
-        ]
-    )
-    same_current = (
-        asc.current.start == ga4.current.start and asc.current.end == ga4.current.end
-    )
-    same_previous = (
-        asc.previous.start == ga4.previous.start and asc.previous.end == ga4.previous.end
-    )
-    if same_current and same_previous:
+    anchor = sources[0]
+    all_match = True
+    for name, c_start, c_end, p_start, p_end in sources[1:]:
+        if not (
+            _windows_match(anchor[1], anchor[2], c_start, c_end)
+            and _windows_match(anchor[3], anchor[4], p_start, p_end)
+        ):
+            all_match = False
+            break
+
+    connected_names = " / ".join(s[0] for s in sources)
+    if all_match:
         notes.append(
-            "- ASC and GA4 comparison windows match on calendar dates for this run."
+            f"- {connected_names} comparison windows match on calendar dates for this run."
         )
     else:
         notes.append(
-            "- ASC and GA4 comparison windows DO NOT match. Treat each source's "
-            "numbers only within that source's stated periods. Do not combine, "
-            "ratio, or narrate them as the same time window."
+            f"- {connected_names} comparison windows DO NOT all match. Treat each "
+            "source's numbers only within that source's stated periods. Do not "
+            "combine, ratio, or narrate them as the same time window."
         )
     return notes
 
@@ -146,6 +318,7 @@ def _period_alignment_notes(
 def _population_scope_notes(
     asc: AscGrowthSnapshot,
     ga4: Ga4GrowthSnapshot | None,
+    admob: AdMobGrowthSnapshot | None,
 ) -> list[str]:
     """State what each source actually counts. Matching dates != matching populations."""
     territory = (
@@ -154,28 +327,61 @@ def _population_scope_notes(
         else f"territory {asc.territory} only"
     )
     notes = [
-        "- App Store Connect counts App Store activity for this one app record on",
-        f"  Apple platforms, restricted to {territory}.",
+        "- ASC = the Apple App Store (iOS/iPadOS) record for this one app.",
+        f"  Territory filter applied to every ASC number below: {territory}.",
     ]
+
     if ga4 is None:
         notes.append("- GA4: not connected for this run.")
-        return notes
+    else:
+        notes.extend(
+            [
+                f"- GA4 = the whole property {ga4.property_resource}.",
+                "  This run applies NO country filter and NO platform filter, so GA4",
+                "  numbers cover every platform that property receives (iOS, Android,",
+                "  web) and every country — including traffic that never touches the",
+                "  App Store.",
+            ]
+        )
 
-    notes.extend(
-        [
-            f"- GA4 counts everything reported into property {ga4.property_resource}.",
-            "  This run sends NO country filter and NO platform filter, so GA4 numbers",
-            "  cover every platform (iOS, Android, web — whatever that property receives)",
-            "  and every country, including traffic that never touches the App Store.",
-            "- The two sources therefore describe DIFFERENT populations. GA4 is not a",
-            "  superset or subset of ASC in any stated way, and this input does NOT",
-            "  establish that they match.",
-            "- Therefore: do NOT divide, ratio, subtract, or funnel one source's numbers",
-            "  into the other's. first_open vs first-time downloads is not an",
-            "  install-to-open rate here. Do not describe ASC and GA4 metrics as stages",
-            "  of one funnel, even when the calendar windows are identical.",
-        ]
-    )
+    if admob is None:
+        notes.append("- AdMob: not connected for this run.")
+    else:
+        app_bits: list[str] = []
+        for app in admob.apps:
+            label = f" ({app.app_label})" if app.app_label else ""
+            app_bits.append(f"{app.app_id}{label}")
+        app_list = ", ".join(app_bits) if app_bits else "(no app rows)"
+        notes.extend(
+            [
+                f"- AdMob = the configured AdMob app(s) only: {app_list}.",
+                "  This run applies NO country/region filter, so AdMob numbers are",
+                "  WORLDWIDE — they are not restricted to the ASC territory above.",
+                "  An AdMob app ID covers one platform's ad inventory; the same product",
+                "  on another platform is a separate AdMob app and is excluded here",
+                "  unless it is listed above.",
+                "- AdMob IMPRESSIONS counts AdMob ad impressions. GA4 ad_impression",
+                "  (when present) is a separate GA4 event count over a wider platform",
+                "  and country scope. Do NOT assume they match, correspond, or measure",
+                "  the same population.",
+            ]
+        )
+
+    connected = [name for name, obj in (("ASC", True), ("GA4", ga4), ("AdMob", admob)) if obj]
+    if len(connected) >= 2:
+        notes.extend(
+            [
+                f"- {' / '.join(connected)} therefore describe DIFFERENT populations even",
+                "  when calendar windows match. They differ on BOTH platform coverage",
+                "  and territory coverage, as stated per source above. None is",
+                "  established as a subset or superset of another in this input.",
+                "- Therefore: do NOT divide, ratio, subtract, or funnel one source's",
+                "  numbers into another's. Examples of disallowed cross-source math:",
+                "  first_open vs first-time downloads, GA4 ad_impression vs AdMob",
+                "  IMPRESSIONS, AdMob earnings vs ASC downloads. Do not describe them",
+                "  as stages of one funnel.",
+            ]
+        )
     return notes
 
 
@@ -241,6 +447,7 @@ def _ga4_confirmed_capabilities(ga4: Ga4GrowthSnapshot) -> list[str]:
                 "  without a definition there stay opaque labels.",
                 "- Do not assert why an eventCount rose or fell unless the provided",
                 "  numbers alone support a purely observational statement.",
+                "- GA4 ad_impression (when fetched) is NOT AdMob IMPRESSIONS.",
             ]
         )
     else:
@@ -265,6 +472,8 @@ def format_agent_input(
     *,
     ga4: Ga4GrowthSnapshot | None = None,
     ga4_status: str | None = None,
+    admob: AdMobGrowthSnapshot | None = None,
+    admob_status: str | None = None,
 ) -> str:
     date_span = (
         f"{snapshot.daily[0].date} → {snapshot.daily[-1].date}"
@@ -272,6 +481,7 @@ def format_agent_input(
         else "n/a"
     )
     ga4_connected = ga4 is not None
+    admob_connected = admob is not None
 
     confirmed = [
         "CONFIRMED CAPABILITIES (from this run)",
@@ -292,25 +502,30 @@ def format_agent_input(
         confirmed.append(
             f"- {ga4_status or 'GA4: not connected yet (do not invent values).'}"
         )
+    if admob_connected and admob is not None:
+        confirmed.extend(_admob_confirmed_capabilities(admob))
+    else:
+        confirmed.append(
+            f"- {admob_status or 'AdMob: not connected yet (do not invent values).'}"
+        )
 
     lines = [
         "DATA CONTRACT",
         "- Connected sources for this run are listed under CONFIRMED CAPABILITIES.",
-        "- AdMob: not connected yet (do not invent values).",
         "- Facts: only what is directly confirmable from the provided data below.",
         "- Speculation: label every inference beyond that data as Speculation.",
         "- Causality: if cause/effect is not proven by the data, do not assert it.",
         "  Prefer 'largest observed change' / 'appears associated with' over",
         "  'primary cause' / 'did not cause' / 'this proves'.",
-        "- Period alignment: ASC and GA4 may cover different calendar windows.",
+        "- Period alignment: ASC / GA4 / AdMob may cover different calendar windows.",
         "  Use PERIOD ALIGNMENT below. Never treat misaligned sources as the same period.",
-        "- Population scope: even with identical dates, ASC and GA4 count different",
-        "  populations. Use POPULATION SCOPE below. Never ratio or funnel one source",
-        "  into the other unless that section states the populations match.",
+        "- Population scope: even with identical dates, ASC / GA4 / AdMob count",
+        "  different populations. Use POPULATION SCOPE below. Never ratio or funnel",
+        "  one source into another unless that section states the populations match.",
         "- Platform capabilities: propose ONLY items listed under CONFIRMED",
-        "  CAPABILITIES or ALLOWED LISTING ACTIONS below. Do not propose other ASC",
-        "  or GA4 analytics features/reports/tiers/thresholds/dimensions even with",
-        "  'if available' / '可能なら'. Omit unconfirmed capabilities entirely.",
+        "  CAPABILITIES or ALLOWED LISTING ACTIONS below. Do not propose other ASC,",
+        "  GA4, or AdMob analytics features/reports/tiers/thresholds/dimensions even",
+        "  with 'if available' / '可能なら'. Omit unconfirmed capabilities entirely.",
         "- Do not invent industry averages, benchmarks, or unstated causal explanations.",
         "",
         *confirmed,
@@ -323,10 +538,14 @@ def format_agent_input(
         "- keyword-level analytics, analytics tiers, minimum threshold rules,",
         "- GA4 retention/cohorts, user attributes, demographics, device splits,",
         "  individual/unlisted events, funnels, paths, audiences, explorations,",
+        "- AdMob mediation breakdowns, ad-unit / format / country / fill / demand",
+        "  reports, or any AdMob dimension/metric not listed under CONFIRMED",
+        "  CAPABILITIES,",
+        "- Treating GA4 ad_impression and AdMob IMPRESSIONS as the same or matching,",
         "- Interpreting a GA4 event that has no entry under GA4 EVENT DEFINITIONS,",
-        "  asserting a cause for any eventCount change, treating the ASC",
-        "  'unattributed' remainder as a channel, and any other unlisted ASC/GA4",
-        "  analytics feature or data-fetch method.",
+        "  asserting a cause for any GA4 eventCount or AdMob metric change, treating",
+        "  the ASC 'unattributed' remainder as a channel, and any other unlisted",
+        "  ASC/GA4/AdMob analytics feature or data-fetch method.",
         "",
         "APP",
         f"- Name: {snapshot.app.name}",
@@ -345,15 +564,31 @@ def format_agent_input(
                 f"- GA4 configured lookback: {ga4.lookback_days} days vs previous {ga4.lookback_days} days",
             ]
         )
+    if admob_connected and admob is not None:
+        lines.extend(
+            [
+                f"- AdMob account: {admob.account_resource}",
+                f"- AdMob configured lookback: {admob.lookback_days} days vs previous {admob.lookback_days} days",
+                f"- AdMob currency: {admob.currency_code}",
+            ]
+        )
 
     lines.extend(
         [
             "",
             "PERIOD ALIGNMENT",
-            *_period_alignment_notes(snapshot, ga4 if ga4_connected else None),
+            *_period_alignment_notes(
+                snapshot,
+                ga4 if ga4_connected else None,
+                admob if admob_connected else None,
+            ),
             "",
             "POPULATION SCOPE (what each source counts)",
-            *_population_scope_notes(snapshot, ga4 if ga4_connected else None),
+            *_population_scope_notes(
+                snapshot,
+                ga4 if ga4_connected else None,
+                admob if admob_connected else None,
+            ),
             "",
             "DATA QUALITY NOTES (facts about coverage)",
             *_asc_coverage_notes(snapshot),
@@ -361,6 +596,8 @@ def format_agent_input(
     )
     if ga4_connected and ga4 is not None:
         lines.extend(f"- {note}" for note in ga4.notes)
+    if admob_connected and admob is not None:
+        lines.extend(f"- {note}" for note in admob.notes)
 
     lines.extend(
         [
@@ -405,6 +642,17 @@ def format_agent_input(
             ]
         )
 
+    if admob_connected and admob is not None:
+        lines.extend(["", *_admob_facts_block(admob)])
+    else:
+        lines.extend(
+            [
+                "",
+                "ADMOB — FACTS",
+                f"- {admob_status or 'AdMob: not connected yet (do not invent values).'}",
+            ]
+        )
+
     lines.extend(
         [
             "",
@@ -413,15 +661,21 @@ def format_agent_input(
             "and what the developer should prioritize next.",
             "Keep Facts and Speculation clearly separated.",
             "Describe relationships with observation-based language when causality is unproven.",
-            "If ASC and GA4 periods differ, analyze each source in its own window;",
+            "If ASC / GA4 / AdMob periods differ, analyze each source in its own window;",
             "do not present them as one shared period.",
-            "Regardless of the periods, keep ASC and GA4 numbers in their own",
+            "Regardless of the periods, keep ASC / GA4 / AdMob numbers in their own",
             "populations per POPULATION SCOPE: no cross-source ratios or funnels.",
             "For GA4 key events: interpret an event only through GA4 EVENT DEFINITIONS,",
             "report observed counts/changes, and never assert why a count changed.",
-            "For Top 3 actions: use ALLOWED LISTING ACTIONS, GA4 EVENT DEFINITIONS, and",
-            "conclusions from CONFIRMED CAPABILITIES / facts only. Do not mention",
-            "unconfirmed ASC/GA4 analytics features, even conditionally.",
+            "For AdMob: report observed ESTIMATED_EARNINGS / IMPRESSIONS /",
+            "IMPRESSION_RPM / CLICKS and their % changes only. Do not invent causes",
+            "for eCPM or earnings moves (demand, geo, format, fill, etc.) — those",
+            "dimensions are not in this input.",
+            "Never equate GA4 ad_impression with AdMob IMPRESSIONS.",
+            "For Top 3 actions: prioritize across ASC / GA4 / AdMob using ALLOWED",
+            "LISTING ACTIONS, GA4 EVENT DEFINITIONS, and conclusions from CONFIRMED",
+            "CAPABILITIES / facts only. Do not mention unconfirmed ASC/GA4/AdMob",
+            "analytics features, even conditionally.",
             "Return exactly this shape:",
             "1. Most important finding",
             "   - Facts: only what the numbers above state.",
