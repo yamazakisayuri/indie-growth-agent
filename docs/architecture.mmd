@@ -1,0 +1,36 @@
+%%{init: {"theme": "neutral"}}%%
+flowchart TB
+  user([Indie developer])
+
+  subgraph aws ["AWS"]
+    amplify["AWS Amplify Hosting<br/>Next.js 16 static export<br/>ja / en UI"]
+    ecr["Amazon ECR"]
+    ecs["Amazon ECS Express Mode<br/>AWS Fargate + ALB HTTPS<br/>FastAPI"]
+    secrets["AWS Secrets Manager"]
+    strands["Strands Agents SDK"]
+    bedrock["Amazon Bedrock<br/>Claude"]
+  end
+
+  subgraph external ["External data sources<br/>separate populations — not one funnel"]
+    asc["App Store Connect Analytics"]
+    ga4["Google Analytics 4"]
+    admob["Google AdMob"]
+  end
+
+  github["GitHub"] -.->|deploy UI| amplify
+  github -.->|container image| ecr
+  ecr -.-> ecs
+  secrets -.->|Task Execution Role| ecs
+
+  user -->|Open UI / Analyze| amplify
+  amplify -->|"Browser CORS · POST /api/analyze<br/>body: language only"| ecs
+
+  ecs --> asc
+  ecs --> ga4
+  ecs --> admob
+
+  ecs --> grounding["Data Contract / Grounding<br/>periods · populations · missing ≠ zero"]
+  grounding --> strands
+  strands -->|ECS Task Role| bedrock
+  bedrock --> result["Facts / Speculation<br/>prioritized Top 3 Actions"]
+  result -->|JSON response| amplify

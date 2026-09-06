@@ -4,7 +4,7 @@
 
 Indie app 向けの成長分析 Agent（ハッカソン MVP）。
 
-App Store Connect / GA4 / AdMob の観測データを集め、数字の要約ではなく **優先すべき Top 3 Actions** を返します。実行ランタイムは **Strands Agents SDK + Amazon Bedrock** で、ローカルの **Next.js Web UI**（日本語 / English）も含まれます。
+App Store Connect / GA4 / AdMob の観測データを集め、数字の要約ではなく **優先すべき Top 3 Actions** を返します。実行ランタイムは **Strands Agents SDK + Amazon Bedrock** で、**Next.js の静的 Web UI**（日本語 / English）も含まれます。
 
 ## 解決する課題
 
@@ -47,18 +47,20 @@ LLM 出力はプロンプト / Data Contract で制約していますが、生�
 ```
 indie-growth-agent/
 ├── agent.py              # 共有分析エントリ（取得 → 入力整形 → Bedrock）
-├── api_server.py         # Web UI 向けローカル FastAPI
+├── api_server.py         # Web UI 向け FastAPI（ローカル / コンテナ）
 ├── analysis_schema.py    # Agent / API の構造化レスポンスモデル
 ├── report_builder.py     # 観測 metrics + 分析結果 → UI 用 JSON
 ├── format_input.py       # Data Contract / FACTS テキスト生成
 ├── config.py             # .env 読み込み（秘密情報はハードコードしない）
 ├── event_definitions.json# GA4 イベントの開発者宣言定義
 ├── requirements.txt
+├── Dockerfile            # バックエンド用コンテナイメージ
+├── .dockerignore
 ├── .env.example
 ├── asc/                  # App Store Connect 取得
 ├── ga4/                  # GA4 Data API 取得
 ├── admob/                # AdMob Network Report 取得
-├── web/                  # Next.js Web UI（ローカルデモ）
+├── web/                  # Next.js 16 静的エクスポート Web UI
 ├── scripts/              # 接続確認・OAuth 補助
 │   ├── verify_ga4.py
 │   ├── verify_admob.py
@@ -66,6 +68,69 @@ indie-growth-agent/
 │   └── list_ga4_events.py
 └── secrets/              # ローカル専用（gitignored）。.p8 / refresh token など
 ```
+
+## Architecture
+
+詳細な Architecture Diagram（Mermaid）とリクエストフローは **[docs/architecture.md](docs/architecture.md)** を参照してください。
+
+```mermaid
+%%{init: {"theme": "neutral"}}%%
+flowchart TB
+  user([Indie developer])
+
+  subgraph aws ["AWS"]
+    amplify["AWS Amplify Hosting<br/>Next.js 16 static export<br/>ja / en UI"]
+    ecr["Amazon ECR"]
+    ecs["Amazon ECS Express Mode<br/>AWS Fargate + ALB HTTPS<br/>FastAPI"]
+    secrets["AWS Secrets Manager"]
+    strands["Strands Agents SDK"]
+    bedrock["Amazon Bedrock<br/>Claude"]
+  end
+
+  subgraph external ["External data sources<br/>separate populations — not one funnel"]
+    asc["App Store Connect Analytics"]
+    ga4["Google Analytics 4"]
+    admob["Google AdMob"]
+  end
+
+  github["GitHub"] -.->|deploy UI| amplify
+  github -.->|container image| ecr
+  ecr -.-> ecs
+  secrets -.->|Task Execution Role| ecs
+
+  user -->|Open UI / Analyze| amplify
+  amplify -->|"Browser CORS · POST /api/analyze<br/>body: language only"| ecs
+
+  ecs --> asc
+  ecs --> ga4
+  ecs --> admob
+
+  ecs --> grounding["Data Contract / Grounding<br/>periods · populations · missing ≠ zero"]
+  grounding --> strands
+  strands -->|ECS Task Role| bedrock
+  bedrock --> result["Facts / Speculation<br/>prioritized Top 3 Actions"]
+  result -->|JSON response| amplify
+```
+
+**3 data sources → grounded analysis → 1 priority list.** 秘密情報はバックエンド側に留め、ブラウザが送るのは `{ language }` のみです。
+
+Mermaid 単体ファイル: [`docs/architecture.mmd`](docs/architecture.mmd)
+
+## Deployment
+
+| 層 | 採用 |
+|----|------|
+| Frontend | Next.js 16 **static export** → **AWS Amplify Hosting** |
+| Backend | FastAPI コンテナ → **Amazon ECS Express Mode**（AWS Fargate） |
+| Image | **Amazon ECR** |
+| 公開 API URL | ECS Express Mode が提供する HTTPS endpoint |
+| Secrets | **AWS Secrets Manager** → タスク環境変数 |
+| Bedrock | **ECS Task Role**（アプリに長期 AWS アクセスキーを置かない） |
+| ECR / Secrets（起動時） | **ECS Task Execution Role** |
+
+Frontend のビルド環境変数: `NEXT_PUBLIC_AGENT_API_URL=<ECS の HTTPS URL>`。Backend の CORS は `CORS_ALLOWED_ORIGINS` に Amplify オリジンを設定します（localhost 既定値はローカル用に残しています）。
+
+使わない構成: App Runner、Amplify SSR、Next.js API Route プロキシ。
 
 ## セットアップ
 
@@ -89,12 +154,12 @@ cp .env.example .env
 
 最低限必要なもの:
 
-- **App Store Connect**: Issuer ID / Key ID / `.p8` 秘密鍵パス、対象アプリ、テリトリー
-- **Amazon Bedrock（Strands 既定）**: 実行環境から Bedrock を呼べる AWS 認証（例: `AWS_REGION` とプロファイル / 環境変数）。認証情報自体はリポジトリに置かない
+- **App Store Connect**: Issuer ID / Key ID、対象アプリ、テリトリー。ローカルは `APP_STORE_CONNECT_PRIVATE_KEY_PATH`（`.p8`）、コンテナ / Secrets Manager は `APP_STORE_CONNECT_PRIVATE_KEY`（PEM 本文）
+- **Amazon Bedrock（Strands 既定）**: ローカルでは Bedrock を呼べる認証（例: `AWS_REGION` とプロファイル / 環境変数）。ECS では **Task Role** を使い、アクセスキーをリポジトリに置かない
 - **GA4（任意）**: Property ID + OAuth（`GOOGLE_OAUTH_*` と refresh token）またはサービスアカウント
 - **AdMob（任意）**: Account ID + 別スコープの refresh token（`scripts/oauth_admob.py`）+ 必要なら `ADMOB_APP_IDS`
 
-詳細なキー名は `.env.example` を参照してください。
+詳細なキー名は `.env.example` を参照してください。Web UI は `web/.env.local` の `NEXT_PUBLIC_AGENT_API_URL` を設定します（`web/README.md` 参照）。
 
 ### 3. 動作確認（任意）
 
@@ -105,11 +170,27 @@ python scripts/verify_admob.py
 
 ## 実行方法
 
+CLI:
+
 ```bash
 python agent.py
 ```
 
 標準出力に Agent 入力（Data Contract + FACTS）と、Bedrock 経由の回答（Most important finding / Why it matters / Top 3 actions）が流れます。
+
+Web UI（ローカル）:
+
+```bash
+# Terminal 1 — API
+python api_server.py
+
+# Terminal 2 — 静的エクスポート対応の Next.js
+cd web
+cp .env.example .env.local   # NEXT_PUBLIC_AGENT_API_URL=http://127.0.0.1:8000
+npm install && npm run dev
+```
+
+ブラウザは FastAPI の `/api/analyze` を直接呼びます（Next.js API Route プロキシは使いません）。
 
 ## Roadmap
 
@@ -126,9 +207,10 @@ python agent.py
 - Population scope
 - Missing data ≠ zero
 - 優先順位付き Top 3 Actions
-- Next.js Web UI（ローカル）
-- Web UI から Python Agent を実行するローカル API
+- Next.js 16 静的エクスポート Web UI（Amplify 向け）
+- Web UI 向け FastAPI（ローカル / コンテナ）
 - 日本語 / English UI
+- コンテナ + Amplify / ECS Express Mode デプロイ対応
 
 ### Future Roadmap（未実装）
 
@@ -156,7 +238,7 @@ Acquisition → Usage → Feedback → Revenue → Prioritized action
 
 現時点では次も未実装です:
 
-- AgentCore やその他ホスト基盤へのデプロイ
+- Amazon Bedrock AgentCore（本プロジェクトは Amplify Hosting + ECS Express Mode を使用）
 - 生成後の機械的な grounding 検証（スキーマ検証・出典チェック等）
 - AdMob メトリクス欠損の明示的ハンドリング（部分欠損を missing として区別する等）
 
@@ -165,6 +247,7 @@ Acquisition → Usage → Feedback → Revenue → Prioritized action
 - **Source populations may differ** — カレンダーが揃っていても ASC / GA4 / AdMob は同一母集団ではない
 - **AdMob partial metric missing handling is not implemented** — レスポンス欠落時に「未取得」と「ゼロ」を厳密には区別しない
 - **LLM output is grounded by prompt / data contract but not machine-validated after generation** — 出力の事後検証はない
+- **Public analyze API** — ECS の HTTPS endpoint はブラウザから直接呼べるため、本番では保護が必要（例: WAF / レート制限）。長時間の Analyze には ALB idle timeout を既定の 60 秒より長くする必要があります
 
 ## License
 
