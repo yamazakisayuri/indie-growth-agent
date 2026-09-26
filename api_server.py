@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from agent import run_analysis
 from analysis_schema import AnalyzeResponse
+from draft_generator import run_draft_generator
 
 logger = logging.getLogger("indie_growth_api")
 
@@ -56,6 +57,57 @@ class AnalyzeRequest(BaseModel):
     language: Literal["ja", "en"] = Field(default="en")
 
 
+class DraftExperimentBody(BaseModel):
+    title: str
+    hypothesis: str = ""
+    why: str = ""
+    action: str = ""
+    targetMetric: str = ""
+    expectedSignal: str = ""
+    suggestedDuration: str = ""
+    evidence: str = ""
+    playbookReference: str = ""
+    analysisRunId: str | None = None
+
+
+class UserScreenshotInput(BaseModel):
+    """Ephemeral App Store screenshot for Screenshot Drafts (request only).
+
+    Not persisted to disk, Known Events, or the repository.
+    """
+
+    position: int | None = None
+    fileName: str | None = None
+    mimeType: str | None = None
+    description: str | None = None
+    dataBase64: str | None = None
+
+
+class DraftPeriodBody(BaseModel):
+    start: str | None = None
+    end: str | None = None
+    lookbackDays: int | None = None
+    label: str | None = None
+    comparisonLabel: str | None = None
+    latestProcessingDate: str | None = None
+
+
+class DraftRequest(BaseModel):
+    """Human-selected experiment only — never auto-draft all experiments."""
+
+    language: Literal["ja", "en"] = Field(default="en")
+    experiment: DraftExperimentBody
+    mostImportantFinding: str = ""
+    facts: list[str] = Field(default_factory=list)
+    playbooksConsulted: list[str] = Field(default_factory=list)
+    app: dict = Field(default_factory=dict)
+    userScreenshots: list[UserScreenshotInput] = Field(default_factory=list)
+    period: DraftPeriodBody | None = None
+    metrics: dict = Field(default_factory=dict)
+    analysisRunId: str | None = None
+    dataSource: Literal["live", "mock"] | None = None
+
+
 class ErrorBody(BaseModel):
     error: str
     code: str = "analyze_failed"
@@ -65,6 +117,48 @@ def _public_error_message(language: str) -> str:
     if language == "ja":
         return "分析を完了できませんでした。データ接続を確認してください。"
     return "Could not complete the analysis. Please check your data connections."
+
+
+def _public_draft_error_message(language: str) -> str:
+    if language == "ja":
+        return "草案を生成できませんでした。しばらくしてから再度お試しください。"
+    return "Could not generate the draft. Please try again later."
+
+
+def _assert_draft_analysis_context(body: DraftRequest) -> None:
+    """Fail fast when Experiment and report Analysis Context disagree."""
+    report_run = (body.analysisRunId or "").strip() or None
+    exp_run = (body.experiment.analysisRunId or "").strip() or None
+    data_source = body.dataSource
+
+    if report_run and exp_run and report_run != exp_run:
+        raise HTTPException(
+            status_code=409,
+            detail=ErrorBody(
+                error="Analysis context mismatch",
+                code="analysis_context_mismatch",
+            ).model_dump(),
+        )
+
+    if data_source == "live":
+        if not report_run or not exp_run:
+            raise HTTPException(
+                status_code=409,
+                detail=ErrorBody(
+                    error="Analysis context mismatch",
+                    code="analysis_context_mismatch",
+                ).model_dump(),
+            )
+
+    if data_source == "mock" and exp_run and report_run and not exp_run.startswith("mock"):
+        # Live experiment must never be drafted against mock Facts.
+        raise HTTPException(
+            status_code=409,
+            detail=ErrorBody(
+                error="Analysis context mismatch",
+                code="analysis_context_mismatch",
+            ).model_dump(),
+        )
 
 
 def _log_failure(exc: BaseException) -> None:
@@ -88,10 +182,16 @@ def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
     try:
         report = run_analysis(language=body.language)
         logger.info(
-            "Analyze completed language=%s app=%s actions=%s",
+            "Analyze completed language=%s app=%s actions=%s experiments=%s "
+            "planner=%s analysisRunId=%s period=%s→%s",
             body.language,
             report.app.get("name"),
             len(report.analysis.get("actions") or []),
+            len(report.growth_experiments or []),
+            (report.planner_status or "")[:120],
+            report.analysis_run_id,
+            (report.period or {}).get("start"),
+            (report.period or {}).get("end"),
         )
         return report
     except Exception as exc:  # noqa: BLE001 — map all failures to a safe client message
@@ -101,6 +201,61 @@ def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
             detail=ErrorBody(
                 error=_public_error_message(body.language),
                 code="analyze_failed",
+            ).model_dump(),
+        ) from None
+
+
+@app.post("/api/draft")
+def create_draft(body: DraftRequest) -> dict:
+    """Generate a production draft for one explicitly selected Growth Experiment."""
+    _assert_draft_analysis_context(body)
+    period = body.period.model_dump() if body.period is not None else {}
+    logger.info(
+        "Draft requested language=%s experiment=%s user_screenshots=%s "
+        "analysisRunId=%s dataSource=%s period=%s→%s",
+        body.language,
+        body.experiment.title[:120],
+        len(body.userScreenshots or []),
+        body.analysisRunId,
+        body.dataSource,
+        period.get("start"),
+        period.get("end"),
+    )
+    try:
+        result = run_draft_generator(
+            experiment=body.experiment.model_dump(),
+            most_important_finding=body.mostImportantFinding,
+            facts=body.facts,
+            playbooks_consulted=body.playbooksConsulted,
+            app=body.app,
+            user_screenshots=[s.model_dump() for s in body.userScreenshots],
+            language=body.language,
+            period=period,
+            metrics=body.metrics or {},
+            analysis_run_id=body.analysisRunId,
+            data_source=body.dataSource,
+        )
+        draft = result.get("draft") or {}
+        logger.info(
+            "Draft completed type=%s screenshots=%s missing=%s analysisRunId=%s",
+            draft.get("draftType"),
+            len(draft.get("screenshots") or []),
+            len(draft.get("missingInputs") or []),
+            result.get("analysisRunId"),
+        )
+        return result
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Draft failed: %s: %s",
+            type(exc).__name__,
+            str(exc)[:500],
+        )
+        logger.debug("Traceback:\n%s", traceback.format_exc())
+        raise HTTPException(
+            status_code=502,
+            detail=ErrorBody(
+                error=_public_draft_error_message(body.language),
+                code="draft_failed",
             ).model_dump(),
         ) from None
 

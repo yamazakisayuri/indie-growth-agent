@@ -78,8 +78,21 @@ export function Header({
             </dd>
           </div>
         </dl>
-        {report.source === "live" && !analyzing ? (
-          <p className="site-header__live-badge">{copy("usingLive")}</p>
+        {report.dataSource === "live" && !analyzing ? (
+          <p className="site-header__live-badge">
+            {copy("usingLive")}
+            {report.analysisRunId ? (
+              <span className="site-header__run-id">
+                {" "}
+                · run {report.analysisRunId.slice(0, 8)}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
+        {report.dataSource === "mock" && !analyzing ? (
+          <p className="site-header__mock-badge" role="status">
+            {copy("usingMock")}
+          </p>
         ) : null}
         {error ? (
           <p className="site-header__error" role="alert">

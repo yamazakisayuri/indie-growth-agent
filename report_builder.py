@@ -7,6 +7,7 @@ Analysis text comes from StructuredAnalysis.
 from __future__ import annotations
 
 from datetime import date, datetime
+import uuid
 
 from admob.snapshot import AdMobGrowthSnapshot
 from analysis_schema import (
@@ -305,6 +306,8 @@ def build_analyze_response(
 
     return AnalyzeResponse(
         language="ja" if lang == "ja" else "en",
+        analysis_run_id=str(uuid.uuid4()),
+        data_source="live",
         app={
             "name": asc.app.name,
             "bundleId": asc.app.bundle_id,
@@ -336,6 +339,12 @@ def build_analyze_response(
         },
         data_scope=data_scope,
         grounding_rules=_grounding_rules(lang),
+        growth_experiments=[],
+        planner_status=None,
+        planner_error=None,
+        playbooks_consulted=[],
+        known_events_considered=[],
+        known_events_used=[],
     )
 
 

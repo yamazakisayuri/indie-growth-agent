@@ -25,12 +25,13 @@ function DashboardApp() {
       return;
     }
     previousLanguage.current = language;
+    // Keep live Analyze / Planner context across display-language switches.
+    // Only abort an in-flight Analyze; never fall back to mock implicitly.
     abortRef.current?.abort();
     abortRef.current = null;
     requestIdRef.current += 1;
     setAnalyzing(false);
     setElapsedSec(0);
-    setLiveReport(null);
     setError(null);
   }, [language]);
 

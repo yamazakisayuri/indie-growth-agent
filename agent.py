@@ -15,6 +15,7 @@ from format_input import format_agent_input
 from ga4 import try_fetch_ga4_snapshot
 from ga4.snapshot import Ga4GrowthSnapshot
 from report_builder import build_analyze_response
+from planner import attach_planner_safe
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +245,7 @@ def run_analysis(language: str | None = "en") -> AnalyzeResponse:
     if structured is None:
         raise RuntimeError("Agent returned no structured analysis")
 
-    return build_analyze_response(
+    report = build_analyze_response(
         language=lang,
         asc=asc,
         ga4=ga4,
@@ -253,6 +254,8 @@ def run_analysis(language: str | None = "en") -> AnalyzeResponse:
         admob_status=admob_status,
         analysis=structured,
     )
+    # Planner is additive. MCP / Planner failures must not fail Analyze.
+    return attach_planner_safe(report)
 
 
 if __name__ == "__main__":

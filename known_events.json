@@ -1,0 +1,15 @@
+[
+  {
+    "date": "2026-09-20",
+    "end_date": "2026-09-21",
+    "type": "usage",
+    "product": "mahjong",
+    "description": "The developer and friends used the app heavily during the holiday. This may explain part of the temporary increase in record_saved activity."
+  },
+  {
+    "date": "2026-09-08",
+    "type": "store",
+    "product": "mahjong",
+    "description": "A 1-star App Store review disappeared. Search impressions and first-time downloads increased afterward, but no causal relationship has been established."
+  }
+]
