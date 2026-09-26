@@ -1,0 +1,20 @@
+{
+  "_comment": "Developer-declared meaning of GA4 App events for 次うた (nextuta). Only events listed here may be interpreted by the agent; every other event name stays an opaque label. Keys must match products/nextuta.json ga4_app keyEvents. State only what triggers the event and what it records. Do not rate importance.",
+
+  "song_sung": {
+    "source": "developer-declared custom event",
+    "definition": "Fires when the user marks a song as sung (records it to sung history) in the app. Represents a sung-song action for that track, not an App Store download."
+  },
+  "add_to_wishlist": {
+    "source": "developer-declared custom event (Firebase standard name)",
+    "definition": "Fires when the user turns ON the '覚えたい' (want to learn) tag for a song. In this app wishlist means learn-later only, not a generic shopping wishlist."
+  },
+  "add_to_can_sing": {
+    "source": "developer-declared custom event",
+    "definition": "Fires when the user turns ON the '持うた' (can sing / owned repertoire) tag for a song. Separate from add_to_wishlist (覚えたい)."
+  },
+  "open_song_link": {
+    "source": "developer-declared custom event",
+    "definition": "Fires when the user opens an external song link (YouTube practice, DAM, or JOYSOUND karaoke). Provider and purpose are carried as event parameters when present."
+  }
+}

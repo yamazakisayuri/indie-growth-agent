@@ -27,6 +27,7 @@ DEFAULT_KNOWN_EVENTS_LOOKBACK_DAYS = 21
 _BUNDLE_TO_PRODUCT: dict[str, str] = {
     "net.makosoyo.MahjongScoreCalculator": "mahjong",
     "net.makosoyo.shopping-memo": "shopping-memo",
+    "net.makosoyo.nextuta": "nextuta",
 }
 
 
