@@ -151,6 +151,7 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
       mapMetricGroup(data.metrics.admob, language),
     ],
     metricsPayload: data.metrics,
+    revenueSummary: data.revenueSummary ?? undefined,
     // Analysis prose only — UI headings come from i18n in components.
     actions: data.analysis.actions.map((action) => ({
       rank: action.rank,
@@ -161,12 +162,16 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
     facts: data.analysis.facts,
     speculation: data.analysis.speculation,
     dataScope: data.dataScope,
-    // Rule texts may come from API; the section heading is UI-fixed.
-    groundingRules: [
-      t("grounding1", language),
-      t("grounding2", language),
-      t("grounding3", language),
-    ],
+    // Prefer API grounding when present; fall back to UI-owned rules.
+    groundingRules:
+      data.groundingRules?.length > 0
+        ? data.groundingRules
+        : [
+            t("grounding1", language),
+            t("grounding2", language),
+            t("grounding3", language),
+            t("grounding4", language),
+          ],
     mostImportantFinding: data.analysis.mostImportantFinding,
     growthExperiments: (data.growthExperiments ?? []).map(
       (item): GrowthExperiment => ({

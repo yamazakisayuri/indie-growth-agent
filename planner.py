@@ -54,6 +54,15 @@ Hard rules:
 - Do NOT convert Analyzer actions into experiments one-for-one.
 - Do NOT invent metrics, sample sizes, channels, budgets, or causal claims
   that are not supported by the provided Analyzer Facts / metrics.
+- Growth axes (observe in parallel; do not force Revenue every run):
+  Product growth, Conversion, Engagement, and Revenue (when revenueSummary /
+  AdMob earnings are present). Choose experiments from Facts — adding Revenue
+  as an axis does NOT require proposing a Revenue experiment. Zero Revenue
+  experiments is a valid outcome when absolute amounts are small or other axes
+  matter more.
+- Revenue judgment: use absolute amount AND changePercent together. Do not
+  over-weight a large % move on a small absolute amount. Do not casually sum
+  different currencies or ASC Downloads with AdMob earnings as one funnel.
 - If GROWTH.md is present, every experiment must fit Budget, Time, Available,
   Not available, Analytics constraints, and Execution rules. Discard or rewrite
   ideas that require unavailable tools, paid ads, or more time/budget than allowed.
@@ -67,6 +76,8 @@ Hard rules:
     but do not hardcode that outcome; decide from Facts + Known Events + constraints.
   - Store / review / metadata Known Events near a metric move do NOT establish
     that the store change caused the metric move.
+  - The same rules apply when a Revenue move overlaps a Known Event
+    (temporal overlap / correlation candidate / causality unknown).
 - If evidence is too weak (small sample, missing metrics, Facts alone cannot
   support a marketing hypothesis), do NOT invent a growth tactic.
   Prefer either:
@@ -165,6 +176,51 @@ def _metric_lines(group: Any) -> list[str]:
     return lines
 
 
+def _revenue_summary_lines(report: AnalyzeResponse) -> list[str]:
+    summary = getattr(report, "revenue_summary", None)
+    if summary is None:
+        return ["- (not provided)"]
+    currency = getattr(summary, "currency", None)
+    note = getattr(summary, "note", "") or ""
+    lines = [
+        f"- currency (display primary): {currency or '(none)'}",
+        f"- note: {note or '(none)'}",
+        "- sources:",
+    ]
+    sources = getattr(summary, "sources", None) or []
+    if not sources:
+        lines.append("  - (none)")
+        return lines
+    for item in sources:
+        if hasattr(item, "model_dump"):
+            row = item.model_dump(by_alias=True)
+        elif isinstance(item, dict):
+            row = item
+        else:
+            row = {
+                "source": getattr(item, "source", None),
+                "amount": getattr(item, "amount", None),
+                "previousAmount": getattr(item, "previous_amount", None),
+                "changePercent": getattr(item, "change_percent", None),
+                "currency": getattr(item, "currency", None),
+                "connected": getattr(item, "connected", None),
+                "status": getattr(item, "status", None),
+            }
+        lines.append(
+            "  - "
+            f"source={row.get('source')}, amount={row.get('amount')}, "
+            f"previousAmount={row.get('previousAmount')}, "
+            f"changePercent={row.get('changePercent')}, "
+            f"currency={row.get('currency')}, connected={row.get('connected')}, "
+            f"status={row.get('status')}"
+        )
+    lines.append(
+        "- Do not invent App Store / Play / Web revenue. Do not force a Revenue "
+        "experiment solely because this block exists."
+    )
+    return lines
+
+
 def build_planner_prompt(
     report: AnalyzeResponse,
     *,
@@ -255,6 +311,9 @@ def build_planner_prompt(
         "SUMMARY METRICS:",
         *(metric_lines or ["- (none)"]),
         "",
+        "REVENUE SUMMARY (Phase 1 may be AdMob-only; optional total omitted):",
+        *_revenue_summary_lines(report),
+        "",
         "ANALYZER MOST IMPORTANT FINDING:",
         finding or "(empty)",
         "",
@@ -273,8 +332,10 @@ def build_planner_prompt(
         "2) If GROWTH.md is present, filter every candidate through it.",
         "3) If Known Events are present, use them to re-prioritize (especially spikes",
         "   that may already have a temporary explanation) — without asserting causation.",
-        "4) Decide 0–3 Growth Experiments. Prefer none or Measurement when weak.",
-        "5) Fill the structured Planner output.",
+        "4) Weigh Product growth / Conversion / Engagement / Revenue from Facts.",
+        "   Do not create a Revenue experiment only because RevenueSummary exists.",
+        "5) Decide 0–3 Growth Experiments. Prefer none or Measurement when weak.",
+        "6) Fill the structured Planner output.",
     ]
     return "\n".join(parts)
 

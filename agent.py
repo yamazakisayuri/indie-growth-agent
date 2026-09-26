@@ -49,6 +49,19 @@ Hard rules:
   clicks) may be reported as Facts. Do NOT invent reasons for those moves —
   especially eCPM — from unfetched data such as ad demand, geography, format,
   fill rate, or mediation mix.
+- Revenue as a Growth axis (Phase 1 = AdMob ESTIMATED_EARNINGS only unless more
+  sources appear in the input):
+  - Treat Product growth (ASC downloads / impressions), Conversion (ASC rates),
+    Engagement (GA4), and Revenue as parallel observation axes. Choose the Most
+    Important Finding and Top actions from Facts across these axes — do not force
+    Revenue to win every run.
+  - Always consider absolute amount AND changePercent together. Do not let a large
+    percentage move on a small absolute amount become the primary basis for Most
+    Important Finding or a Top 3 action.
+  - Do not judge from changePercent alone.
+  - Do not casually sum revenue across currencies or across ASC / AdMob / other
+    sources — populations and money definitions differ.
+  - Never treat ASC Downloads → AdMob Revenue as one funnel or proven causation.
 - Actions / platform capabilities:
   - Do NOT propose App Store / ASC / GA4 / AdMob platform features, reports,
     analytics dimensions, tiers, thresholds, dashboards, APIs, or data-collection
