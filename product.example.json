@@ -7,6 +7,7 @@
       "enabled": true,
       "appId": null,
       "bundleId": "com.example.YourApp",
+      "sku": null,
       "territory": "JP"
     },
     "ga4_app": {

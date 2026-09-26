@@ -8,6 +8,7 @@
       "enabled": true,
       "appId": "6740174129",
       "bundleId": "net.makosoyo.MahjongScoreCalculator",
+      "sku": "net.makosoyo.MahjongScoreCalculator",
       "territory": "JP"
     },
     "ga4_app": {

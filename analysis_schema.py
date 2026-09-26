@@ -152,19 +152,42 @@ class RevenueSourceItem(BaseModel):
     source: str = Field(
         description="Logical source id, e.g. admob, app_store, google_play, web.",
     )
+    amount_type: str | None = Field(
+        default=None,
+        alias="amountType",
+        description=(
+            "Semantic amount label, e.g. estimated_earnings (AdMob) or "
+            "developer_proceeds (ASC Sales)."
+        ),
+    )
     amount: float | None = None
     previous_amount: float | None = Field(default=None, alias="previousAmount")
     change_percent: float | None = Field(default=None, alias="changePercent")
     currency: str | None = None
+    # Paid / proceeds-bearing units only (ASC). Not free download units.
+    units: int | None = None
+    previous_units: int | None = Field(default=None, alias="previousUnits")
     connected: bool = False
-    status: Literal["ok", "unavailable", "not_connected"] = "not_connected"
+    status: Literal[
+        "ok",
+        "unavailable",
+        "not_connected",
+        "no_data",
+        "not_configured",
+        "permission_denied",
+        "error",
+    ] = "not_connected"
+    # Optional human note (e.g. new revenue with no prior baseline).
+    note: str | None = None
 
 
 class RevenueSummary(BaseModel):
     """Optional cross-source revenue view for Analyzer / Planner / UI.
 
-    Phase 1 typically has a single admob source. ``total`` is intentionally
-    omitted until multiple comparable same-currency sources exist.
+    ``total`` is intentionally omitted: AdMob ESTIMATED_EARNINGS and App Store
+    Developer Proceeds must not be summed (different meaning / certainty /
+    often different currencies). Multiple app_store rows may appear when
+    more than one proceeds currency exists in the window.
     """
 
     model_config = ConfigDict(populate_by_name=True)

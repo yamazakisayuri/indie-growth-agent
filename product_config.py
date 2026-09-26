@@ -41,6 +41,8 @@ class AppStoreChannelConfig:
     app_id: str | None = None
     bundle_id: str | None = None
     territory: str | None = None
+    # App SKU from App Store Connect (Sales Parent Identifier / product filter).
+    sku: str | None = None
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,7 @@ def _parse_app_store(raw: Any) -> AppStoreChannelConfig:
         app_id=_as_str(data.get("appId") or data.get("app_id")),
         bundle_id=_as_str(data.get("bundleId") or data.get("bundle_id")),
         territory=_as_str(data.get("territory")),
+        sku=_as_str(data.get("sku")),
     )
 
 
@@ -570,6 +573,7 @@ def channel_status_rows(
             ),
             "bundleId": product.app_store.bundle_id,
             "appId": product.app_store.app_id,
+            "sku": product.app_store.sku,
             "territory": product.app_store.territory,
         },
         {

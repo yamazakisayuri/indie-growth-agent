@@ -1,8 +1,9 @@
-"""Format ASC (+ optional GA4 / AdMob) facts into Indie Growth Agent input text."""
+"""Format ASC (+ optional GA4 / AdMob / Sales revenue) facts into Agent input text."""
 
 from __future__ import annotations
 
 from admob.snapshot import AdMobAppComparison, AdMobGrowthSnapshot
+from asc.sales import AscSalesRevenueSnapshot
 from asc.snapshot import AscGrowthSnapshot, PeriodTotals
 from ga4.snapshot import Ga4GrowthSnapshot, Ga4PeriodTotals
 
@@ -563,6 +564,78 @@ def _ga4_confirmed_capabilities(ga4: Ga4GrowthSnapshot) -> list[str]:
     return lines
 
 
+def _sales_facts_block(sales: AscSalesRevenueSnapshot) -> list[str]:
+    lines = [
+        "APP STORE SALES REVENUE — FACTS",
+        f"- Status: {sales.status}",
+        f"- amountType: developer_proceeds (Units × Developer Proceeds)",
+        f"- Scope: worldwide (WW). Independent of ASC Analytics territory.",
+        f"- Not Financial Partner Share (settled). Trends Sales estimate only.",
+        f"- Product filter: Apple Identifier == appId OR Parent Identifier == app SKU",
+        f"- appId: {sales.app_id}",
+        f"- appSku: {sales.app_sku}",
+        f"- Current window: {sales.current.start} → {sales.current.end}",
+        f"- Previous window: {sales.previous.start} → {sales.previous.end}",
+    ]
+    if sales.status_message:
+        lines.append(f"- Status detail: {sales.status_message}")
+    if sales.status != "ok":
+        lines.append(
+            "- Do not invent App Store proceeds amounts for this run."
+        )
+        return lines
+
+    if not sales.current.by_currency:
+        lines.append(
+            "- Current paid proceeds: 0 (no proceeds-bearing rows; not an error)."
+        )
+    else:
+        lines.append("- Current by currency:")
+        for row in sales.current.by_currency:
+            lines.append(
+                f"  - {row.currency}: amount={row.amount} "
+                f"paid_units={row.units}"
+            )
+    if not sales.previous.by_currency:
+        lines.append(
+            "- Previous paid proceeds: 0 (no proceeds-bearing rows; not an error)."
+        )
+    else:
+        lines.append("- Previous by currency:")
+        for row in sales.previous.by_currency:
+            lines.append(
+                f"  - {row.currency}: amount={row.amount} "
+                f"paid_units={row.units}"
+            )
+    currencies = sorted(
+        {
+            *(c.currency for c in sales.current.by_currency),
+            *(c.currency for c in sales.previous.by_currency),
+        }
+    )
+    if currencies:
+        lines.append("- Period-over-period (per currency; null % when previous=0):")
+        for currency in currencies:
+            change = sales.change_percent_for(currency)
+            cur = sales.current.amount_for(currency)
+            prev = sales.previous.amount_for(currency)
+            if change is None:
+                pct = "n/a (no prior-period baseline / previous=0)"
+            else:
+                sign = "+" if change >= 0 else ""
+                pct = f"{sign}{change:.1f}%"
+            lines.append(
+                f"  - {currency}: {cur} vs {prev} → {pct}"
+            )
+    lines.append(
+        "- Do not sum currencies. Do not sum with AdMob. "
+        "Units ≠ Revenue. Free downloads are not revenue units."
+    )
+    for note in sales.notes:
+        lines.append(f"- Note: {note}")
+    return lines
+
+
 def format_agent_input(
     snapshot: AscGrowthSnapshot,
     *,
@@ -572,6 +645,7 @@ def format_agent_input(
     ga4_web_status: str | None = None,
     admob: AdMobGrowthSnapshot | None = None,
     admob_status: str | None = None,
+    sales: AscSalesRevenueSnapshot | None = None,
 ) -> str:
     date_span = (
         f"{snapshot.daily[0].date} → {snapshot.daily[-1].date}"
@@ -923,6 +997,17 @@ def format_agent_input(
             ]
         )
 
+    if sales is not None:
+        lines.extend(["", *_sales_facts_block(sales)])
+    else:
+        lines.extend(
+            [
+                "",
+                "APP STORE SALES REVENUE — FACTS",
+                "- App Store Sales revenue not fetched this run.",
+            ]
+        )
+
     lines.extend(
         [
             "",
@@ -941,11 +1026,16 @@ def format_agent_input(
             "IMPRESSION_RPM / CLICKS and their % changes only. Do not invent causes",
             "for eCPM or earnings moves (demand, geo, format, fill, etc.) — those",
             "dimensions are not in this input.",
-            "Treat Revenue (AdMob ESTIMATED_EARNINGS in this run) as one Growth axis",
-            "alongside Product growth / Conversion / Engagement (App) / Engagement (Web).",
+            "For App Store Sales revenue: use Developer Proceeds only (not Customer",
+            "Price). Proceeds are Trends estimates, not Financial Partner Share.",
+            "Scope is WW — never funnel ASC Analytics JP Downloads into WW Revenue.",
+            "Treat Revenue (AdMob and/or App Store proceeds when present) as one Growth",
+            "axis alongside Product growth / Conversion / Engagement (App) / Engagement (Web).",
             "Always weigh absolute amount together with changePercent; do not let a large",
             "% on a small absolute amount become the primary Most Important Finding or",
-            "Top action basis.",
+            "Top action basis. If previous proceeds were 0, do not invent a huge %.",
+            "Do not force a monetization / pricing experiment merely because a single",
+            "IAP or small App Store proceeds amount appears.",
             "When Web GA4 facts are present, you may note parallel same-window moves",
             "(e.g. Web sessions up AND ASC search impressions up). Do NOT assert Web →",
             "App Store download causation or build that funnel without attribution facts.",

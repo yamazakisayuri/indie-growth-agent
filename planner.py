@@ -56,10 +56,12 @@ Hard rules:
   that are not supported by the provided Analyzer Facts / metrics.
 - Growth axes (observe in parallel; do not force Revenue or Web every run):
   Product growth, Conversion, Engagement (App), Engagement (Web when present),
-  and Revenue (when revenueSummary / AdMob earnings are present). Choose
+  and Revenue (when revenueSummary / AdMob earnings / App Store proceeds are
+  present). Choose
   experiments from Facts — adding a channel does NOT require proposing an
   experiment for that channel. Zero Web experiments and zero Revenue experiments
-  are valid outcomes.
+  are valid outcomes. Do NOT force pricing / IAP / monetization experiments
+  merely because a single App Store proceeds row or small amount exists.
 - Web channel rules:
   - Do NOT create a SEO / Web experiment merely because Web / GA4 Web exists.
   - A declared Web capability (e.g. mahjong_score_calculation) means users CAN
@@ -79,7 +81,11 @@ Hard rules:
     with a measurement plan — never as proven cause.
 - Revenue judgment: use absolute amount AND changePercent together. Do not
   over-weight a large % move on a small absolute amount. Do not casually sum
-  different currencies or ASC Downloads with AdMob earnings as one funnel.
+  different currencies or ASC Downloads with AdMob earnings / App Store proceeds
+  as one funnel. AdMob ESTIMATED_EARNINGS ≠ App Store Developer Proceeds.
+  Developer Proceeds ≠ Financial Partner Share. Units ≠ Revenue. ASC Analytics
+  JP ≠ Revenue WW — never funnel Downloads into Revenue.
+  When previousAmount is 0, do not treat missing % as infinite growth.
 - If GROWTH.md is present, every experiment must fit Budget, Time, Available,
   Not available, Analytics constraints, and Execution rules. Discard or rewrite
   ideas that require unavailable tools, paid ads, or more time/budget than allowed.
@@ -216,24 +222,31 @@ def _revenue_summary_lines(report: AnalyzeResponse) -> list[str]:
         else:
             row = {
                 "source": getattr(item, "source", None),
+                "amountType": getattr(item, "amount_type", None),
                 "amount": getattr(item, "amount", None),
                 "previousAmount": getattr(item, "previous_amount", None),
                 "changePercent": getattr(item, "change_percent", None),
                 "currency": getattr(item, "currency", None),
+                "units": getattr(item, "units", None),
                 "connected": getattr(item, "connected", None),
                 "status": getattr(item, "status", None),
+                "note": getattr(item, "note", None),
             }
         lines.append(
             "  - "
-            f"source={row.get('source')}, amount={row.get('amount')}, "
+            f"source={row.get('source')}, amountType={row.get('amountType')}, "
+            f"amount={row.get('amount')}, "
             f"previousAmount={row.get('previousAmount')}, "
             f"changePercent={row.get('changePercent')}, "
-            f"currency={row.get('currency')}, connected={row.get('connected')}, "
-            f"status={row.get('status')}"
+            f"currency={row.get('currency')}, units={row.get('units')}, "
+            f"connected={row.get('connected')}, "
+            f"status={row.get('status')}, note={row.get('note')}"
         )
     lines.append(
-        "- Do not invent App Store / Play / Web revenue. Do not force a Revenue "
-        "experiment solely because this block exists."
+        "- Do not invent App Store / Play / Web revenue beyond these sources. "
+        "Do not sum AdMob with App Store proceeds or across currencies. "
+        "Do not force a Revenue experiment solely because this block exists "
+        "(including a single small IAP)."
     )
     return lines
 

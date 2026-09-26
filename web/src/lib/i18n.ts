@@ -122,13 +122,17 @@ export const uiCopy = {
     ja: "戦績記録が保存されたときに発火するイベント",
     en: "Fires when a match record is saved",
   },
+  revenueAdmobNote: {
+    ja: "AdMob ESTIMATED_EARNINGS と App Store Sales Developer Proceeds を並列表示（合算しない）。Proceeds は Trends 推定であり Financial 確定額ではない。ASC Analytics と Revenue WW は別スコープ。",
+    en: "AdMob ESTIMATED_EARNINGS and App Store Sales Developer Proceeds in parallel (not summed). Proceeds are Trends estimates, not Financial settled share. ASC Analytics ≠ Revenue WW.",
+  },
   estimatedEarnings: {
     ja: "AdMob 推定収益",
     en: "AdMob estimated earnings",
   },
-  revenueAdmobNote: {
-    ja: "AdMob ESTIMATED_EARNINGS のみ（App Store 売上は含まない）",
-    en: "AdMob ESTIMATED_EARNINGS only (App Store proceeds not included)",
+  appStoreProceeds: {
+    ja: "App Store proceeds",
+    en: "App Store proceeds",
   },
   ecpm: {
     ja: "eCPM",

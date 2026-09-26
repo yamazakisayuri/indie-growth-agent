@@ -8,6 +8,7 @@
       "enabled": true,
       "appId": "6479348734",
       "bundleId": "net.makosoyo.shopping-memo",
+      "sku": "NetMakosoyoShoppingMemo",
       "territory": "JP"
     },
     "ga4_app": {
