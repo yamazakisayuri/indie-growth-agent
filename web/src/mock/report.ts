@@ -78,6 +78,7 @@ export const mockReportTemplate = {
     { textKey: "grounding1" },
     { textKey: "grounding2" },
     { textKey: "grounding3" },
+    { textKey: "grounding4" },
   ],
   /** Demo Planner output so Create Draft + screenshot upload UI is reachable offline. */
   plannerStatus: {

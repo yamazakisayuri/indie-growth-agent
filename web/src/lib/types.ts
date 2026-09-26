@@ -123,6 +123,7 @@ export interface GrowthReport {
   metrics: MetricBlock[];
   /** API-shaped metrics for Draft request (same Analyze run). */
   metricsPayload: AnalyzeApiResponse["metrics"];
+  revenueSummary?: AnalyzeApiResponse["revenueSummary"];
   actions: DisplayAction[];
   facts: string[];
   speculation: string[];
@@ -167,6 +168,19 @@ export interface AnalyzeApiResponse {
     ga4: ApiMetricGroup;
     admob: ApiMetricGroup;
   };
+  revenueSummary?: {
+    currency?: string | null;
+    note?: string;
+    sources: Array<{
+      source: string;
+      amount?: number | null;
+      previousAmount?: number | null;
+      changePercent?: number | null;
+      currency?: string | null;
+      connected: boolean;
+      status: "ok" | "unavailable" | "not_connected";
+    }>;
+  } | null;
   analysis: {
     mostImportantFinding: string;
     facts: string[];

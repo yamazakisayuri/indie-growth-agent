@@ -83,8 +83,12 @@ export const uiCopy = {
     en: "Fires when a match record is saved",
   },
   estimatedEarnings: {
-    ja: "推定収益",
-    en: "Estimated earnings",
+    ja: "AdMob 推定収益",
+    en: "AdMob estimated earnings",
+  },
+  revenueAdmobNote: {
+    ja: "AdMob ESTIMATED_EARNINGS のみ（App Store 売上は含まない）",
+    en: "AdMob ESTIMATED_EARNINGS only (App Store proceeds not included)",
   },
   ecpm: {
     ja: "eCPM",
@@ -230,6 +234,10 @@ export const uiCopy = {
   grounding3: {
     ja: "ソース間の母集団を同一視しない",
     en: "Cross-source populations are not assumed identical",
+  },
+  grounding4: {
+    ja: "Revenue は絶対額と変化率の両方を見る（少額の大きな%だけで判断しない）",
+    en: "Judge revenue with absolute amount and changePercent together",
   },
   recommendedExperiments: {
     ja: "Recommended Growth Experiments",

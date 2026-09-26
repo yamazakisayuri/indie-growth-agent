@@ -144,6 +144,36 @@ class DataScopeItem(BaseModel):
     scope: str
 
 
+class RevenueSourceItem(BaseModel):
+    """One revenue source row in RevenueSummary (extensible beyond AdMob)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: str = Field(
+        description="Logical source id, e.g. admob, app_store, google_play, web.",
+    )
+    amount: float | None = None
+    previous_amount: float | None = Field(default=None, alias="previousAmount")
+    change_percent: float | None = Field(default=None, alias="changePercent")
+    currency: str | None = None
+    connected: bool = False
+    status: Literal["ok", "unavailable", "not_connected"] = "not_connected"
+
+
+class RevenueSummary(BaseModel):
+    """Optional cross-source revenue view for Analyzer / Planner / UI.
+
+    Phase 1 typically has a single admob source. ``total`` is intentionally
+    omitted until multiple comparable same-currency sources exist.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    currency: str | None = None
+    note: str = ""
+    sources: list[RevenueSourceItem] = Field(default_factory=list)
+
+
 class AnalyzeResponse(BaseModel):
     """JSON shape returned to the Web UI."""
 
@@ -161,6 +191,10 @@ class AnalyzeResponse(BaseModel):
     data_source: Literal["live", "mock"] = Field(
         default="live",
         alias="dataSource",
+    )
+    revenue_summary: RevenueSummary | None = Field(
+        default=None,
+        alias="revenueSummary",
     )
     # Planner is additive; Analyzer succeeds even when these stay empty / error.
     growth_experiments: list[dict[str, Any]] = Field(

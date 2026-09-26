@@ -15,6 +15,8 @@ from analysis_schema import (
     DataScopeItem,
     MetricGroup,
     MetricItem,
+    RevenueSourceItem,
+    RevenueSummary,
     StructuredAnalysis,
 )
 from asc.snapshot import AscGrowthSnapshot
@@ -65,7 +67,7 @@ def _labels(language: str) -> dict[str, str]:
             "impressions": "インプレッション",
             "first_time_downloads": "初回ダウンロード",
             "active_users": "アクティブユーザー",
-            "estimated_earnings": "推定収益",
+            "estimated_earnings": "AdMob 推定収益",
             "ecpm": "eCPM",
             "admob_impressions": "インプレッション",
             "scope_asc_jp": "iOS / 日本",
@@ -76,6 +78,14 @@ def _labels(language: str) -> dict[str, str]:
             "scope_admob": "設定アプリ / 全世界",
             "scope_admob_off": "未接続",
             "not_connected": "未接続（値は発明しない）",
+            "revenue_note_admob_only": (
+                "Phase 1: AdMob ESTIMATED_EARNINGS only. "
+                "App Store / Play / Web revenue not included."
+            ),
+            "revenue_note_admob_only_ja": (
+                "Phase 1: AdMob の ESTIMATED_EARNINGS のみ。"
+                "App Store / Play / Web 売上は含まない。"
+            ),
         }
     return {
         "app_store": "App Store",
@@ -87,7 +97,7 @@ def _labels(language: str) -> dict[str, str]:
         "impressions": "Impressions",
         "first_time_downloads": "First-time downloads",
         "active_users": "Active users",
-        "estimated_earnings": "Estimated earnings",
+        "estimated_earnings": "AdMob estimated earnings",
         "ecpm": "eCPM",
         "admob_impressions": "Impressions",
         "scope_asc_jp": "iOS / Japan",
@@ -98,6 +108,14 @@ def _labels(language: str) -> dict[str, str]:
         "scope_admob": "configured app(s) / worldwide",
         "scope_admob_off": "not connected",
         "not_connected": "not connected (do not invent values)",
+        "revenue_note_admob_only": (
+            "Phase 1: AdMob ESTIMATED_EARNINGS only. "
+            "App Store / Play / Web revenue not included."
+        ),
+        "revenue_note_admob_only_ja": (
+            "Phase 1: AdMob ESTIMATED_EARNINGS only. "
+            "App Store / Play / Web revenue not included."
+        ),
     }
 
 
@@ -107,25 +125,14 @@ def _grounding_rules(language: str) -> list[str]:
             "Missing data ≠ zero（欠測はゼロ実績として扱わない）",
             "Facts と Speculation を分離する",
             "ソース間の母集団を同一視しない",
+            "Revenue は絶対額と変化率の両方を見る（少額の大きな%だけで判断しない）",
         ]
     return [
         "Missing data ≠ zero",
         "Facts and speculation are separated",
         "Cross-source populations are not assumed identical",
-    ]
-
-
-def _grounding_rules(language: str) -> list[str]:
-    if language == "ja":
-        return [
-            "Missing data ≠ zero（欠測はゼロ実績として扱わない）",
-            "Facts と Speculation を分離する",
-            "ソース間の母集団を同一視しない",
-        ]
-    return [
-        "Missing data ≠ zero",
-        "Facts and speculation are separated",
-        "Cross-source populations are not assumed identical",
+        "Judge revenue with absolute amount and changePercent together "
+        "(do not over-weight large % on small absolute amounts)",
     ]
 
 
@@ -260,6 +267,77 @@ def _build_admob_metrics(
     )
 
 
+def _build_revenue_summary(
+    admob: AdMobGrowthSnapshot | None,
+    admob_status: str | None,
+    language: str,
+    labels: dict[str, str],
+) -> RevenueSummary:
+    note = (
+        labels["revenue_note_admob_only_ja"]
+        if language == "ja"
+        else labels["revenue_note_admob_only"]
+    )
+    if admob is None or not admob.apps:
+        return RevenueSummary(
+            currency=None,
+            note=note,
+            sources=[
+                RevenueSourceItem(
+                    source="admob",
+                    amount=None,
+                    previous_amount=None,
+                    change_percent=None,
+                    currency=None,
+                    connected=False,
+                    status="not_connected",
+                )
+            ],
+        )
+
+    app = admob.apps[0]
+    currency = admob.currency_code
+    if not app.current.has_data:
+        return RevenueSummary(
+            currency=currency,
+            note=note,
+            sources=[
+                RevenueSourceItem(
+                    source="admob",
+                    amount=None,
+                    previous_amount=(
+                        app.previous.estimated_earnings
+                        if app.previous.has_data
+                        else None
+                    ),
+                    change_percent=None,
+                    currency=currency,
+                    connected=True,
+                    status="unavailable",
+                )
+            ],
+        )
+
+    previous_amount = (
+        app.previous.estimated_earnings if app.previous.has_data else None
+    )
+    return RevenueSummary(
+        currency=currency,
+        note=note,
+        sources=[
+            RevenueSourceItem(
+                source="admob",
+                amount=app.current.estimated_earnings,
+                previous_amount=previous_amount,
+                change_percent=_round_pct(app.change_estimated_earnings_pct()),
+                currency=currency,
+                connected=True,
+                status="ok",
+            )
+        ],
+    )
+
+
 def _asc_scope(asc: AscGrowthSnapshot, labels: dict[str, str]) -> str:
     if asc.territory == "JP":
         return labels["scope_asc_jp"]
@@ -339,6 +417,9 @@ def build_analyze_response(
         },
         data_scope=data_scope,
         grounding_rules=_grounding_rules(lang),
+        revenue_summary=_build_revenue_summary(
+            admob, admob_status, lang, labels
+        ),
         growth_experiments=[],
         planner_status=None,
         planner_error=None,

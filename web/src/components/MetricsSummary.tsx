@@ -38,6 +38,9 @@ export function MetricsSummary({ report }: { report: GrowthReport }) {
           <header className="metrics__card-header">
             <h2 className="metrics__title">{block.title}</h2>
             <p className="metrics__source">{block.source}</p>
+            {block.id === "revenue" ? (
+              <p className="metrics__source-note">{copy("revenueAdmobNote")}</p>
+            ) : null}
           </header>
           {block.connected && block.metrics.length > 0 ? (
             <div className="metrics__list">
