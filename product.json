@@ -2,14 +2,18 @@
   "id": "mahjong",
   "name": "Mahjong Score Calculator / 麻雀点数計算",
   "type": "hybrid",
+  "capabilities": [],
   "channels": {
     "app_store": {
       "enabled": true,
+      "appId": "6740174129",
       "bundleId": "net.makosoyo.MahjongScoreCalculator",
       "territory": "JP"
     },
     "ga4_app": {
       "enabled": true,
+      "propertyId": "531612856",
+      "keyEvents": ["first_open", "record_saved", "ad_impression"],
       "eventDefinitionsPath": "event_definitions.json"
     },
     "web": {
@@ -51,7 +55,8 @@
       "note": "Site-wide metrics use hostName EXACT makosoyo.net. Feature path /mahjong/ page views = page viewed (not calculation). form_submit @ /mahjong/ = form submit proxy (not score_calculated). appstore_click = Web App Store CTA click (not ASC download)."
     },
     "admob": {
-      "enabled": true
+      "enabled": true,
+      "appIds": ["ca-app-pub-1537675979264291~1807932968"]
     }
   }
 }

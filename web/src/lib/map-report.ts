@@ -205,6 +205,8 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
     playbooksConsulted: data.playbooksConsulted ?? [],
     knownEventsConsidered: data.knownEventsConsidered ?? [],
     knownEventsUsed: data.knownEventsUsed ?? [],
+    product: data.product ?? null,
+    channels: data.channels ?? [],
   };
 }
 

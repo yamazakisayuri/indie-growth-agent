@@ -23,9 +23,10 @@ DEFAULT_KNOWN_EVENTS_FILENAME = "known_events.json"
 # (e.g. a store change shortly before the window). Overridable via env.
 DEFAULT_KNOWN_EVENTS_LOOKBACK_DAYS = 21
 
-# bundleId → Known Events product id (hackathon single-app map; extend as needed)
+# Legacy bundleId → product id (compat only; prefer product.json / selection).
 _BUNDLE_TO_PRODUCT: dict[str, str] = {
     "net.makosoyo.MahjongScoreCalculator": "mahjong",
+    "net.makosoyo.shopping-memo": "shopping-memo",
 }
 
 
@@ -99,7 +100,10 @@ def resolve_known_events_product(
     *,
     bundle_id: str | None = None,
 ) -> str | None:
-    """Product id for filtering. Env override, else product.json id, else bundle map."""
+    """Product id for filtering.
+
+    Priority: env override → active/selected product.id → legacy bundle map.
+    """
     load_env()
     override = os.getenv("KNOWN_EVENTS_PRODUCT", "").strip()
     if override:

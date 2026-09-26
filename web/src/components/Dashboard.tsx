@@ -1,5 +1,6 @@
 "use client";
 
+import type { ProductSummary } from "@/lib/analyze-client";
 import type { GrowthReport } from "@/lib/types";
 import { AnalysisDetails } from "./AnalysisDetails";
 import { DataScope } from "./DataScope";
@@ -13,6 +14,9 @@ interface DashboardProps {
   analyzing: boolean;
   elapsedSec: number;
   error: string | null;
+  products: ProductSummary[];
+  productId: string;
+  onProductChange: (productId: string) => void;
   onAnalyze: () => void;
 }
 
@@ -21,8 +25,13 @@ export function Dashboard({
   analyzing,
   elapsedSec,
   error,
+  products,
+  productId,
+  onProductChange,
   onAnalyze,
 }: DashboardProps) {
+  const experimentsKey = `${productId}:${report.analysisRunId}:${report.dataSource}`;
+
   return (
     <div className="dashboard">
       <Header
@@ -30,11 +39,14 @@ export function Dashboard({
         analyzing={analyzing}
         elapsedSec={elapsedSec}
         error={error}
+        products={products}
+        productId={productId}
+        onProductChange={onProductChange}
         onAnalyze={onAnalyze}
       />
       <MetricsSummary report={report} />
       <TopActions report={report} />
-      <GrowthExperiments report={report} />
+      <GrowthExperiments key={experimentsKey} report={report} />
       <AnalysisDetails report={report} />
       <DataScope report={report} />
     </div>

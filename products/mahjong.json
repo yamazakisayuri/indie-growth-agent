@@ -1,0 +1,62 @@
+{
+  "id": "mahjong",
+  "name": "Mahjong Score Calculator / 麻雀点数計算",
+  "type": "hybrid",
+  "capabilities": [],
+  "channels": {
+    "app_store": {
+      "enabled": true,
+      "appId": "6740174129",
+      "bundleId": "net.makosoyo.MahjongScoreCalculator",
+      "territory": "JP"
+    },
+    "ga4_app": {
+      "enabled": true,
+      "propertyId": "531612856",
+      "keyEvents": ["first_open", "record_saved", "ad_impression"],
+      "eventDefinitionsPath": "event_definitions.json"
+    },
+    "web": {
+      "enabled": true,
+      "domain": "makosoyo.net",
+      "capabilities": [
+        "mahjong_score_calculation"
+      ],
+      "note": "Mahjong web site (exact hostName filter on GA4 Web). Capabilities declare what users can do — not measured usage."
+    },
+    "ga4_web": {
+      "enabled": true,
+      "propertyId": "464998416",
+      "hostname": "makosoyo.net",
+      "platform": null,
+      "filters": {
+        "hostname": "makosoyo.net",
+        "platform": null
+      },
+      "keyEvents": [
+        "appstore_click"
+      ],
+      "keyEventPagePath": "/mahjong/",
+      "featurePaths": [
+        {
+          "id": "mahjong_score_calculator",
+          "pagePath": "/mahjong/",
+          "pageViews": true,
+          "referenceEvents": [
+            {
+              "eventName": "form_submit",
+              "role": "calculation_submit_proxy",
+              "replaceableBy": "score_calculated"
+            }
+          ]
+        }
+      ],
+      "eventDefinitionsPath": "event_definitions_web.json",
+      "note": "Site-wide metrics use hostName EXACT makosoyo.net. Feature path /mahjong/ page views = page viewed (not calculation). form_submit @ /mahjong/ = form submit proxy (not score_calculated). appstore_click = Web App Store CTA click (not ASC download)."
+    },
+    "admob": {
+      "enabled": true,
+      "appIds": ["ca-app-pub-1537675979264291~1807932968"]
+    }
+  }
+}

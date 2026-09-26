@@ -18,6 +18,10 @@ export const uiCopy = {
     ja: "対象アプリ",
     en: "App",
   },
+  targetProduct: {
+    ja: "対象Product",
+    en: "Product",
+  },
   analysisPeriod: {
     ja: "分析期間",
     en: "Period",

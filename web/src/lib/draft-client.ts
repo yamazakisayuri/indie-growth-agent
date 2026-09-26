@@ -61,6 +61,7 @@ export interface DraftRequestBody {
   metrics?: AnalyzeApiResponse["metrics"];
   analysisRunId?: string;
   dataSource?: DataSource;
+  productId?: string;
   /** First-class input for Screenshot Drafts. Empty → missingInputs requests upload. */
   userScreenshots?: UserScreenshotInput[];
 }

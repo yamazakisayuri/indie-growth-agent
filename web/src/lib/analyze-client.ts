@@ -15,18 +15,57 @@ function agentApiBaseUrl(): string {
   return raw.replace(/\/$/, "");
 }
 
+export interface ProductSummary {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface ProductsResponse {
+  defaultProductId: string;
+  products: ProductSummary[];
+}
+
+/** Call the Python Agent API for the product catalog (no secrets). */
+export async function requestProducts(
+  signal?: AbortSignal,
+): Promise<ProductsResponse> {
+  const response = await fetch(`${agentApiBaseUrl()}/api/products`, {
+    method: "GET",
+    signal,
+  });
+  if (!response.ok) {
+    throw new AnalyzeRequestError("products_failed");
+  }
+  const payload = (await response.json().catch(() => null)) as
+    | ProductsResponse
+    | null;
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !Array.isArray(payload.products)
+  ) {
+    throw new AnalyzeRequestError("products_failed");
+  }
+  return {
+    defaultProductId: payload.defaultProductId || "mahjong",
+    products: payload.products,
+  };
+}
+
 /**
  * Call the Python Agent API directly (Browser → FastAPI).
- * Never send secrets from the browser; only language is posted.
+ * Never send secrets from the browser; only language + productId are posted.
  */
 export async function requestAnalyze(
   language: Language,
+  productId: string,
   signal?: AbortSignal,
 ): Promise<AnalyzeApiResponse> {
   const response = await fetch(`${agentApiBaseUrl()}/api/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ language }),
+    body: JSON.stringify({ language, productId }),
     signal,
   });
 

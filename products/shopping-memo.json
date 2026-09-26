@@ -1,0 +1,45 @@
+{
+  "id": "shopping-memo",
+  "name": "Shopping List Memo / 買い物メモ",
+  "type": "mobile_app",
+  "capabilities": [],
+  "channels": {
+    "app_store": {
+      "enabled": true,
+      "appId": "6479348734",
+      "bundleId": "net.makosoyo.shopping-memo",
+      "territory": "JP"
+    },
+    "ga4_app": {
+      "enabled": true,
+      "propertyId": null,
+      "keyEvents": [],
+      "eventDefinitionsPath": null,
+      "note": "GA4 App propertyId not identified yet — Phase 1 treats as not_configured (do not use another product's property)."
+    },
+    "web": {
+      "enabled": false,
+      "domain": null,
+      "capabilities": [],
+      "note": "not configured"
+    },
+    "ga4_web": {
+      "enabled": false,
+      "propertyId": null,
+      "hostname": null,
+      "platform": null,
+      "filters": {
+        "hostname": null,
+        "platform": null
+      },
+      "keyEvents": [],
+      "featurePaths": [],
+      "eventDefinitionsPath": null,
+      "note": "not configured"
+    },
+    "admob": {
+      "enabled": true,
+      "appIds": ["ca-app-pub-1537675979264291~1038387252"]
+    }
+  }
+}

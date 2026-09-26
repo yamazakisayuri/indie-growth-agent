@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from datetime import date
 
 from strands import Agent
@@ -256,15 +255,27 @@ def build_prompt_from_asc() -> str:
     return build_prompt_from_sources()
 
 
-def run_analysis(language: str | None = "en") -> AnalyzeResponse:
+def run_analysis(
+    language: str | None = "en",
+    *,
+    product_id: str | None = None,
+) -> AnalyzeResponse:
     """
     Shared analysis entry for CLI and Web API.
 
-    1) Fetch ASC / GA4 App / optional GA4 Web / AdMob with existing grounding windows
-    2) Format agent input
-    3) Run Strands / Bedrock with structured output
-    4) Attach observed metrics + analysis into AnalyzeResponse
+    1) Bind product (default mahjong when product_id omitted)
+    2) Fetch ASC / GA4 App / optional GA4 Web / AdMob with existing grounding windows
+    3) Format agent input
+    4) Run Strands / Bedrock with structured output
+    5) Attach observed metrics + analysis into AnalyzeResponse
     """
+    from product_config import use_product
+
+    with use_product(product_id):
+        return _run_analysis_bound(language=language)
+
+
+def _run_analysis_bound(language: str | None = "en") -> AnalyzeResponse:
     lang = _normalize_language(language)
     asc, ga4, ga4_status, ga4_web, ga4_web_status, admob, admob_status = (
         fetch_source_snapshots()
@@ -314,7 +325,22 @@ def run_analysis(language: str | None = "en") -> AnalyzeResponse:
 
 
 if __name__ == "__main__":
+    import argparse
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    lang_arg = sys.argv[1] if len(sys.argv) > 1 else "en"
-    report = run_analysis(language=lang_arg)
+    parser = argparse.ArgumentParser(description="Indie Growth Agent Analyze")
+    parser.add_argument(
+        "language",
+        nargs="?",
+        default="en",
+        help="Response language: ja or en (default: en)",
+    )
+    parser.add_argument(
+        "--product",
+        dest="product_id",
+        default=None,
+        help="Product id (default: mahjong from products/index.json)",
+    )
+    args = parser.parse_args()
+    report = run_analysis(language=args.language, product_id=args.product_id)
     print(json.dumps(report.model_dump(by_alias=True), ensure_ascii=False, indent=2))
