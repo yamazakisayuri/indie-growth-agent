@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { ProductSummary } from "@/lib/analyze-client";
 import { useLanguage } from "@/lib/language-context";
+import { hasSuccessfulReport } from "@/lib/map-report";
 import type { GrowthReport } from "@/lib/types";
 import { LanguageSelector } from "./LanguageSelector";
 
@@ -52,8 +53,7 @@ export function Header({
     report.product?.name ||
     products.find((item) => item.id === productId)?.name ||
     productId;
-  const appLabel =
-    report.dataSource === "live"
+  const appLabel = hasSuccessfulReport(report)
       ? asDisplayText(report.appName, productLabel)
       : productLabel;
 
@@ -97,7 +97,7 @@ export function Header({
             </dd>
           </div>
         </dl>
-        {report.dataSource === "live" && !analyzing ? (
+        {hasSuccessfulReport(report) && !analyzing ? (
           <p className="site-header__live-badge">
             {copy("usingLive")}
             {report.analysisRunId ? (
@@ -108,15 +108,25 @@ export function Header({
             ) : null}
           </p>
         ) : null}
-        {report.dataSource === "mock" && !analyzing ? (
-          <p className="site-header__mock-badge" role="status">
-            {copy("usingMock")}
+        {!hasSuccessfulReport(report) && !analyzing ? (
+          <p className="site-header__empty-badge" role="status">
+            {copy("noCachedReport")}
           </p>
         ) : null}
         {error ? (
-          <p className="site-header__error" role="alert">
-            {asDisplayText(error, copy("analyzeError"))}
-          </p>
+          <div className="site-header__error-row">
+            <p className="site-header__error" role="alert">
+              {asDisplayText(error, copy("analyzeError"))}
+            </p>
+            <button
+              type="button"
+              className="site-header__retry-btn"
+              onClick={onAnalyze}
+              disabled={analyzing}
+            >
+              {copy("retryAnalyze")}
+            </button>
+          </div>
         ) : null}
         {analyzing ? (
           <div className="site-header__progress" aria-live="polite">

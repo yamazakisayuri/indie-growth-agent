@@ -9,7 +9,17 @@ import {
   type ProductSummary,
 } from "@/lib/analyze-client";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
-import { buildMockReport, mapAnalyzeResponse } from "@/lib/map-report";
+import {
+  buildEmptyReport,
+  hasSuccessfulReport,
+  mapAnalyzeResponse,
+} from "@/lib/map-report";
+import {
+  loadCachedReport,
+  loadSelectedProductId,
+  saveCachedReport,
+  saveSelectedProductId,
+} from "@/lib/report-cache";
 import type { GrowthReport } from "@/lib/types";
 
 const FALLBACK_PRODUCTS: ProductSummary[] = [
@@ -23,6 +33,11 @@ const FALLBACK_PRODUCTS: ProductSummary[] = [
     name: "Shopping List Memo / 買い物メモ",
     type: "mobile_app",
   },
+  {
+    id: "nextuta",
+    name: "次うた",
+    type: "hybrid",
+  },
 ];
 
 function DashboardApp() {
@@ -30,12 +45,30 @@ function DashboardApp() {
   const [products, setProducts] = useState<ProductSummary[]>(FALLBACK_PRODUCTS);
   const [productId, setProductId] = useState("mahjong");
   const [liveReport, setLiveReport] = useState<GrowthReport | null>(null);
+  const [cacheReady, setCacheReady] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const previousLanguage = useRef(language);
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+
+  // Hydrate last Product + last successful report from localStorage (client only).
+  useEffect(() => {
+    const savedProductId = loadSelectedProductId();
+    const initialProductId =
+      savedProductId &&
+      FALLBACK_PRODUCTS.some((item) => item.id === savedProductId)
+        ? savedProductId
+        : "mahjong";
+    const cached = loadCachedReport(initialProductId);
+    /* External store (localStorage) → React state; intentional one-shot hydrate. */
+    /* eslint-disable react-hooks/set-state-in-effect -- localStorage hydrate */
+    setProductId(initialProductId);
+    setLiveReport(cached);
+    setCacheReady(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,16 +77,26 @@ function DashboardApp() {
         if (data.products.length > 0) {
           setProducts(data.products);
         }
-        const nextId = data.defaultProductId || data.products[0]?.id || "mahjong";
+        const catalog = data.products.length > 0 ? data.products : FALLBACK_PRODUCTS;
+        const savedProductId = loadSelectedProductId();
+        const nextId =
+          (savedProductId &&
+            catalog.some((item) => item.id === savedProductId) &&
+            savedProductId) ||
+          data.defaultProductId ||
+          catalog[0]?.id ||
+          "mahjong";
         setProductId((current) => {
-          if (data.products.some((item) => item.id === current)) {
+          if (catalog.some((item) => item.id === current)) {
             return current;
           }
+          setLiveReport(loadCachedReport(nextId));
+          saveSelectedProductId(nextId);
           return nextId;
         });
       })
       .catch(() => {
-        // Keep local fallback catalog when API is offline (mock mode).
+        // Keep local fallback catalog when API is offline.
       });
     return () => controller.abort();
   }, []);
@@ -63,8 +106,7 @@ function DashboardApp() {
       return;
     }
     previousLanguage.current = language;
-    // Keep live Analyze / Planner context across display-language switches.
-    // Only abort an in-flight Analyze; never fall back to mock implicitly.
+    // Keep last successful Analyze / Planner context across display-language switches.
     abortRef.current?.abort();
     abortRef.current = null;
     requestIdRef.current += 1;
@@ -89,50 +131,34 @@ function DashboardApp() {
     };
   }, []);
 
-  const clearProductScopedState = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    requestIdRef.current += 1;
-    setLiveReport(null);
-    setAnalyzing(false);
-    setElapsedSec(0);
-    setError(null);
+  const onProductChange = useCallback((nextProductId: string) => {
+    setProductId((current) => {
+      if (nextProductId === current) {
+        return current;
+      }
+      abortRef.current?.abort();
+      abortRef.current = null;
+      requestIdRef.current += 1;
+      setAnalyzing(false);
+      setElapsedSec(0);
+      setError(null);
+      setLiveReport(loadCachedReport(nextProductId));
+      saveSelectedProductId(nextProductId);
+      return nextProductId;
+    });
   }, []);
 
-  const onProductChange = useCallback(
-    (nextProductId: string) => {
-      if (nextProductId === productId) {
-        return;
-      }
-      setProductId(nextProductId);
-      // Drop previous Product's Analyze / Planner / Draft surface entirely.
-      clearProductScopedState();
-    },
-    [productId, clearProductScopedState],
-  );
-
   const report = useMemo(() => {
-    if (liveReport) {
+    if (liveReport && hasSuccessfulReport(liveReport)) {
       return liveReport;
     }
     const selected =
       products.find((item) => item.id === productId) ?? FALLBACK_PRODUCTS[0];
-    const mock = buildMockReport(language);
-    return {
-      ...mock,
-      product: {
-        id: selected.id,
-        name: selected.name,
-        type: selected.type,
-      },
-      // Mock stays mahjong-shaped until Analyze; clear experiments so Draft
-      // cannot run against a mismatched Product.
-      growthExperiments: [],
-      plannerStatus: null,
-      plannerError: null,
-      knownEventsConsidered: [],
-      knownEventsUsed: [],
-    };
+    return buildEmptyReport(language, {
+      id: selected.id,
+      name: selected.name,
+      type: selected.type,
+    });
   }, [liveReport, language, productId, products]);
 
   const onAnalyze = useCallback(async () => {
@@ -161,13 +187,13 @@ function DashboardApp() {
         return;
       }
       // Discard stale responses if the user switched Product mid-flight.
-      if (
-        data.product?.id &&
-        data.product.id !== analyzeProductId
-      ) {
+      if (data.product?.id && data.product.id !== analyzeProductId) {
         return;
       }
-      setLiveReport(mapAnalyzeResponse(data));
+      const mapped = mapAnalyzeResponse(data);
+      setLiveReport(mapped);
+      saveCachedReport(analyzeProductId, mapped);
+      saveSelectedProductId(analyzeProductId);
     } catch (err) {
       if (requestId !== requestIdRef.current) {
         return;
@@ -188,6 +214,11 @@ function DashboardApp() {
     }
   }, [analyzing, language, productId, copy]);
 
+  // Avoid flashing empty shell before localStorage hydrate.
+  if (!cacheReady) {
+    return <main className="page-shell" aria-busy="true" />;
+  }
+
   return (
     <main className="page-shell">
       <Dashboard
@@ -205,8 +236,8 @@ function DashboardApp() {
 }
 
 /**
- * Entry: mock report until Analyze succeeds.
- * Analyze posts { language, productId } to NEXT_PUBLIC_AGENT_API_URL /api/analyze.
+ * Entry: last successful Live Analyze from localStorage (per Product).
+ * Analyze refreshes via POST { language, productId } → Agent API.
  */
 export default function Home() {
   return (

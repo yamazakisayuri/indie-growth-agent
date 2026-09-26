@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -33,6 +34,10 @@ export function LanguageProvider({
   const setLanguage = useCallback((next: Language) => {
     setLanguageState(next);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   const copy = useCallback(
     (key: CopyKey | string) => t(key as CopyKey, language),

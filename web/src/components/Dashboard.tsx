@@ -33,7 +33,10 @@ export function Dashboard({
   const experimentsKey = `${productId}:${report.analysisRunId}:${report.dataSource}`;
 
   return (
-    <div className="dashboard">
+    <div
+      className={analyzing ? "dashboard dashboard__analyzing" : "dashboard"}
+      aria-busy={analyzing || undefined}
+    >
       <Header
         report={report}
         analyzing={analyzing}

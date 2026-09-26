@@ -7,7 +7,6 @@ import type {
   Language,
   MetricBlock,
 } from "@/lib/types";
-import { mockReportTemplate } from "@/mock/report";
 
 /** Known metric ids → UI-owned labels. Event ids (e.g. record_saved) stay raw. */
 const METRIC_LABEL_KEYS: Record<string, CopyKey> = {
@@ -49,8 +48,6 @@ const BLOCK_SOURCE_KEYS: Record<string, CopyKey> = {
 // Prefer backend-provided source label for revenue (AdMob / App Store Sales).
 const KEEP_BACKEND_SOURCE = new Set(["revenue"]);
 
-const MOCK_ANALYSIS_RUN_ID = "mock-demo";
-
 function resolveMetricLabel(
   id: string,
   fallback: string,
@@ -85,7 +82,7 @@ function mapMetricGroup(
         : t(sourceKey, language),
     connected: group.connected,
     statusMessage: group.statusMessage ?? undefined,
-    metrics: group.metrics.map((metric) => ({
+    metrics: (group.metrics ?? []).map((metric) => ({
       id: metric.id,
       label: resolveMetricLabel(metric.id, metric.label, language),
       changePercent:
@@ -102,37 +99,78 @@ function mapMetricGroup(
   };
 }
 
-function buildMockMetricsPayload(
+function emptyMetricGroup(
+  id: ApiMetricGroup["id"],
   language: Language,
-): AnalyzeApiResponse["metrics"] {
-  const template = mockReportTemplate;
-  const toGroup = (
-    block: (typeof template.metrics)[number],
-    id: ApiMetricGroup["id"],
-  ): ApiMetricGroup => ({
+): ApiMetricGroup {
+  const titleKey = BLOCK_TITLE_KEYS[id];
+  const sourceKey = BLOCK_SOURCE_KEYS[id];
+  return {
     id,
-    title: t(block.titleKey as CopyKey, language),
-    source: t(block.sourceLabelKey as CopyKey, language),
-    connected: true,
+    title: titleKey ? t(titleKey, language) : id,
+    source: sourceKey ? t(sourceKey, language) : id,
+    connected: false,
     statusMessage: null,
-    metrics: block.metrics.map((metric) => ({
-      id: metric.labelKey,
-      label: t(metric.labelKey as CopyKey, language),
-      changePercent: metric.changePercent,
-      value: "value" in metric ? metric.value : null,
-      absolute: "absolute" in metric ? metric.absolute : null,
-      note:
-        "noteKey" in metric && metric.noteKey
-          ? t(metric.noteKey as CopyKey, language)
-          : null,
-    })),
-  });
+    metrics: [],
+  };
+}
+
+/** Empty dashboard shell before the first successful Live Analyze. */
+export function buildEmptyReport(
+  language: Language,
+  product: { id: string; name: string; type: string },
+): GrowthReport {
+  const metricsPayload = {
+    appStore: emptyMetricGroup("app_store", language),
+    ga4: emptyMetricGroup("usage", language),
+    admob: emptyMetricGroup("revenue", language),
+    web: emptyMetricGroup("web", language),
+  };
 
   return {
-    appStore: toGroup(template.metrics[0], "app_store"),
-    ga4: toGroup(template.metrics[1], "usage"),
-    admob: toGroup(template.metrics[2], "revenue"),
+    source: "live",
+    dataSource: "live",
+    analysisRunId: "",
+    language,
+    appName: product.name,
+    periodLabel: "—",
+    comparisonLabel: "",
+    period: {
+      start: "",
+      end: "",
+      lookbackDays: 7,
+      label: "—",
+      comparisonLabel: "",
+    },
+    metrics: [
+      mapMetricGroup(metricsPayload.appStore, language),
+      mapMetricGroup(metricsPayload.ga4, language),
+      mapMetricGroup(metricsPayload.admob, language),
+      mapMetricGroup(metricsPayload.web, language),
+    ],
+    metricsPayload,
+    actions: [],
+    facts: [],
+    speculation: [],
+    dataScope: [],
+    groundingRules: [
+      t("grounding1", language),
+      t("grounding2", language),
+      t("grounding3", language),
+      t("grounding4", language),
+      t("grounding5", language),
+    ],
+    growthExperiments: [],
+    plannerStatus: null,
+    plannerError: null,
+    knownEventsConsidered: [],
+    knownEventsUsed: [],
+    product,
   };
+}
+
+export function hasSuccessfulReport(report: GrowthReport | null): boolean {
+  return Boolean(report?.analysisRunId);
 }
 
 /** Map Python AnalyzeResponse → dashboard GrowthReport. */
@@ -213,77 +251,5 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
     knownEventsUsed: data.knownEventsUsed ?? [],
     product: data.product ?? null,
     channels: data.channels ?? [],
-  };
-}
-
-/** Resolve mock template keys into a display report for the active UI language. */
-export function buildMockReport(language: Language): GrowthReport {
-  const c = (key: CopyKey) => t(key, language);
-  const template = mockReportTemplate;
-  const periodLabel = template.periodLabel[language];
-  const metricsPayload = buildMockMetricsPayload(language);
-
-  return {
-    source: "mock",
-    dataSource: "mock",
-    analysisRunId: MOCK_ANALYSIS_RUN_ID,
-    language,
-    appName: template.appName,
-    periodLabel,
-    comparisonLabel: c("vsPrevious"),
-    period: {
-      start: "2026-08-28",
-      end: "2026-09-03",
-      lookbackDays: 7,
-      label: periodLabel,
-      comparisonLabel: c("vsPrevious"),
-    },
-    metrics: template.metrics.map((block) => ({
-      id: block.id,
-      title: c(block.titleKey as CopyKey),
-      source: c(block.sourceLabelKey as CopyKey),
-      connected: true,
-      metrics: block.metrics.map((metric) => ({
-        id: metric.labelKey,
-        label: c(metric.labelKey as CopyKey),
-        changePercent: metric.changePercent,
-        value: "value" in metric ? metric.value : undefined,
-        absolute: "absolute" in metric ? metric.absolute : undefined,
-        note:
-          "noteKey" in metric && metric.noteKey
-            ? c(metric.noteKey as CopyKey)
-            : undefined,
-      })),
-    })),
-    metricsPayload,
-    actions: template.actions.map((action) => ({
-      rank: action.rank,
-      title: c(action.titleKey as CopyKey),
-      reason: c(action.reasonKey as CopyKey),
-    })),
-    facts: template.facts.map((fact) => c(fact.textKey as CopyKey)),
-    speculation: template.speculation.map((item) =>
-      c(item.textKey as CopyKey),
-    ),
-    dataScope: template.dataScope.map((item) => ({
-      source: c(item.sourceKey as CopyKey),
-      scope: c(item.scopeKey as CopyKey),
-    })),
-    groundingRules: template.groundingRules.map((rule) =>
-      c(rule.textKey as CopyKey),
-    ),
-    plannerStatus: template.plannerStatus?.[language],
-    growthExperiments: (template.growthExperiments ?? []).map((exp) => ({
-      title: exp.title[language],
-      hypothesis: exp.hypothesis[language],
-      why: exp.why[language],
-      action: exp.action[language],
-      targetMetric: exp.targetMetric[language],
-      expectedSignal: exp.expectedSignal[language],
-      suggestedDuration: exp.suggestedDuration[language],
-      evidence: exp.evidence[language],
-      playbookReference: exp.playbookReference[language],
-      analysisRunId: MOCK_ANALYSIS_RUN_ID,
-    })),
   };
 }

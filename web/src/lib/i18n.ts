@@ -178,16 +178,16 @@ export const uiCopy = {
     ja: "App Store / GA4 / AdMob の取得と Bedrock 分析のため、通常 2〜3 分かかります。このままお待ちください。",
     en: "Fetching App Store / GA4 / AdMob and running Bedrock usually takes 2–3 minutes. Please keep this page open.",
   },
-  usingMock: {
-    ja: "デモ用モックデータ（Live Analyze ではありません）",
-    en: "Demo mock data (not a Live Analyze)",
-  },
   usingLive: {
-    ja: "実データ（Live Analyze）",
-    en: "Live Analyze data",
+    ja: "前回の分析結果",
+    en: "Last successful Analyze",
+  },
+  noCachedReport: {
+    ja: "まだ分析結果がありません。最新データを分析してください。",
+    en: "No saved Analyze yet. Run Analyze latest data.",
   },
   draftContextMismatch: {
-    ja: "Analysis context mismatch — Experiment と Analyze 結果が別 Run です。もう一度 Analyze してから Draft を作成してください。",
+    ja: "分析コンテキストが一致しません。Experiment と Analyze 結果が別 Run です。もう一度 Analyze してから草案を作成してください。",
     en: "Analysis context mismatch — experiment and report are from different Analyze runs. Run Analyze again, then Create Draft.",
   },
   analyzeError: {
@@ -288,35 +288,35 @@ export const uiCopy = {
     en: "Do not funnel Web into App Store downloads without attribution evidence",
   },
   recommendedExperiments: {
-    ja: "Recommended Growth Experiments",
+    ja: "おすすめの成長実験",
     en: "Recommended Growth Experiments",
   },
   experimentHypothesis: {
-    ja: "Hypothesis",
+    ja: "仮説",
     en: "Hypothesis",
   },
   experimentWhy: {
-    ja: "Why",
+    ja: "理由",
     en: "Why",
   },
   experimentAction: {
-    ja: "Action",
+    ja: "アクション",
     en: "Action",
   },
   experimentTargetMetric: {
-    ja: "Target metric",
+    ja: "対象指標",
     en: "Target metric",
   },
   experimentExpectedSignal: {
-    ja: "Expected signal",
+    ja: "期待するシグナル",
     en: "Expected signal",
   },
   experimentDuration: {
-    ja: "Duration",
+    ja: "期間",
     en: "Duration",
   },
   experimentEvidence: {
-    ja: "Evidence",
+    ja: "根拠",
     en: "Evidence",
   },
   experimentPlaybook: {
@@ -336,7 +336,7 @@ export const uiCopy = {
     en: "Known Events considered",
   },
   createDraft: {
-    ja: "Create Draft",
+    ja: "草案を作成",
     en: "Create Draft",
   },
   creatingDraft: {
@@ -344,7 +344,7 @@ export const uiCopy = {
     en: "Creating draft…",
   },
   draftUploadHint: {
-    ja: "現在の App Store スクリーンショット（PNG / JPEG）。選択順が position 1, 2, … になります。未選択でも Create Draft は可能です。",
+    ja: "現在の App Store スクリーンショット（PNG / JPEG）。選択順が position 1, 2, … になります。未選択でも草案作成は可能です。",
     en: "Current App Store screenshots (PNG / JPEG). Selection order becomes position 1, 2, …. Create Draft works without images.",
   },
   draftSelectImages: {
@@ -368,23 +368,23 @@ export const uiCopy = {
     en: "No change recommended (current creatives look sufficient)",
   },
   draftCurrentMessage: {
-    ja: "Current message",
+    ja: "現状の訴求",
     en: "Current message",
   },
   draftKeep: {
-    ja: "Keep",
+    ja: "残す点",
     en: "Keep",
   },
   draftChange: {
-    ja: "Change",
+    ja: "変える点",
     en: "Change",
   },
   actionDraft: {
-    ja: "Action Draft",
+    ja: "アクション草案",
     en: "Action Draft",
   },
   experimentTitle: {
-    ja: "Experiment",
+    ja: "実験",
     en: "Experiment",
   },
   draftOrphanHint: {
@@ -392,47 +392,47 @@ export const uiCopy = {
     en: "Draft results stay here even if Analyze replaces the experiment list.",
   },
   draftType: {
-    ja: "Draft type",
+    ja: "草案タイプ",
     en: "Draft type",
   },
   draftObjective: {
-    ja: "Objective",
+    ja: "目的",
     en: "Objective",
   },
   draftRationale: {
-    ja: "Rationale",
+    ja: "根拠",
     en: "Rationale",
   },
   draftScreenshot: {
-    ja: "Screenshot",
+    ja: "スクリーンショット",
     en: "Screenshot",
   },
   draftMessageGoal: {
-    ja: "Message goal",
+    ja: "メッセージの狙い",
     en: "Message goal",
   },
   draftCopy: {
-    ja: "Copy draft",
+    ja: "コピー案",
     en: "Copy draft",
   },
   draftRecommendedScreen: {
-    ja: "Recommended screen",
+    ja: "推奨画面",
     en: "Recommended screen",
   },
   draftWhy: {
-    ja: "Why",
+    ja: "理由",
     en: "Why",
   },
   draftMissingInputs: {
-    ja: "Missing inputs",
+    ja: "不足している入力",
     en: "Missing inputs",
   },
   draftNotes: {
-    ja: "Notes",
+    ja: "メモ",
     en: "Notes",
   },
   draftPlaybooksUsed: {
-    ja: "Playbooks used",
+    ja: "使用 Playbook",
     en: "Playbooks used",
   },
   draftError: {
@@ -440,8 +440,40 @@ export const uiCopy = {
     en: "Could not generate the draft.",
   },
   noExperiments: {
-    ja: "No experiment recommended",
+    ja: "おすすめの実験はありません",
     en: "No experiment recommended",
+  },
+  experimentsAwaitAnalyze: {
+    ja: "Analyze 後に成長実験が表示されます",
+    en: "Growth experiments appear after Analyze",
+  },
+  actionsEmpty: {
+    ja: "Analyze 後に優先アクションが表示されます",
+    en: "Prioritized actions appear after Analyze",
+  },
+  factsEmpty: {
+    ja: "Analyze 後に確認できたことが表示されます",
+    en: "Observed facts appear after Analyze",
+  },
+  speculationEmpty: {
+    ja: "推測はまだありません",
+    en: "No speculation yet",
+  },
+  retryAnalyze: {
+    ja: "再試行",
+    en: "Retry",
+  },
+  metricsSummaryLabel: {
+    ja: "指標サマリー",
+    en: "Metrics summary",
+  },
+  analysisDetailsLabel: {
+    ja: "分析詳細",
+    en: "Analysis details",
+  },
+  changeVsPrevious: {
+    ja: "直前期間比",
+    en: "vs previous period",
   },
   plannerError: {
     ja: "Planner / MCP エラー（Analyzer 結果は有効）",
