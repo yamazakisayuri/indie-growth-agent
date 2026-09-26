@@ -10,6 +10,11 @@
       "id": "shopping-memo",
       "name": "Shopping List Memo / 買い物メモ",
       "path": "shopping-memo.json"
+    },
+    {
+      "id": "nextuta",
+      "name": "次うた",
+      "path": "nextuta.json"
     }
   ]
 }

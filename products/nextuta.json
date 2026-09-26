@@ -1,0 +1,54 @@
+{
+  "id": "nextuta",
+  "name": "次うた",
+  "type": "hybrid",
+  "capabilities": [],
+  "channels": {
+    "app_store": {
+      "enabled": true,
+      "appId": "6788394664",
+      "bundleId": "net.makosoyo.nextuta",
+      "sku": "net.makosoyo.nextuta",
+      "territory": "JP"
+    },
+    "ga4_app": {
+      "enabled": true,
+      "propertyId": "538734523",
+      "keyEvents": [
+        "song_sung",
+        "add_to_wishlist",
+        "add_to_can_sing",
+        "open_song_link"
+      ],
+      "eventDefinitionsPath": "event_definitions_nextuta.json"
+    },
+    "web": {
+      "enabled": true,
+      "domain": "nextuta.makosoyo.net",
+      "capabilities": [],
+      "note": "次うた web site (https://nextuta.makosoyo.net/). Shares makosoyo.net Web GA4 property; hostName EXACT filter scopes to this subdomain."
+    },
+    "ga4_web": {
+      "enabled": true,
+      "propertyId": "464998416",
+      "hostname": "nextuta.makosoyo.net",
+      "platform": null,
+      "filters": {
+        "hostname": "nextuta.makosoyo.net",
+        "platform": null
+      },
+      "keyEvents": [],
+      "keyEventPagePath": null,
+      "featurePaths": [],
+      "eventDefinitionsPath": null,
+      "note": "Same Web GA4 property as makosoyo.net (464998416). Metrics filtered by hostName EXACT nextuta.makosoyo.net. Key events / featurePaths not configured yet."
+    },
+    "admob": {
+      "enabled": true,
+      "appIds": [
+        "ca-app-pub-1537675979264291~2220087110",
+        "ca-app-pub-1537675979264291~1927998216"
+      ]
+    }
+  }
+}
