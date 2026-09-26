@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from config import Ga4EventDefinition, Ga4Settings, get_ga4_settings
+from config import Ga4EventDefinition, Ga4FeaturePathSettings, Ga4Settings, get_ga4_settings
 
 from .auth import (
     access_token_from_refresh_token,
@@ -13,6 +13,16 @@ from .auth import (
     service_account_email,
 )
 from .client import Ga4Client
+
+
+@dataclass(frozen=True)
+class Ga4FeaturePathTotals:
+    """Path-scoped totals for one configured feature path (not site-wide)."""
+
+    path_id: str
+    page_path: str
+    page_views: int
+    reference_event_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -24,6 +34,7 @@ class Ga4PeriodTotals:
     sessions: int
     screen_page_views: int
     key_event_counts: dict[str, int] = field(default_factory=dict)
+    feature_paths: tuple[Ga4FeaturePathTotals, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -37,6 +48,8 @@ class Ga4GrowthSnapshot:
     current: Ga4PeriodTotals
     previous: Ga4PeriodTotals
     notes: tuple[str, ...]
+    feature_paths: tuple[Ga4FeaturePathSettings, ...] = ()
+    key_event_page_path: str | None = None
 
     @property
     def undefined_event_names(self) -> tuple[str, ...]:
@@ -52,6 +65,37 @@ class Ga4GrowthSnapshot:
 
     def change_screen_page_views_pct(self) -> float | None:
         return _pct_change(self.current.screen_page_views, self.previous.screen_page_views)
+
+    def feature_path_current(self, path_id: str) -> Ga4FeaturePathTotals | None:
+        for item in self.current.feature_paths:
+            if item.path_id == path_id:
+                return item
+        return None
+
+    def feature_path_previous(self, path_id: str) -> Ga4FeaturePathTotals | None:
+        for item in self.previous.feature_paths:
+            if item.path_id == path_id:
+                return item
+        return None
+
+    def change_feature_page_views_pct(self, path_id: str) -> float | None:
+        cur = self.feature_path_current(path_id)
+        prev = self.feature_path_previous(path_id)
+        if cur is None or prev is None:
+            return None
+        return _pct_change(cur.page_views, prev.page_views)
+
+    def change_feature_reference_event_pct(
+        self, path_id: str, event_name: str
+    ) -> float | None:
+        cur = self.feature_path_current(path_id)
+        prev = self.feature_path_previous(path_id)
+        if cur is None or prev is None:
+            return None
+        return _pct_change(
+            cur.reference_event_counts.get(event_name, 0),
+            prev.reference_event_counts.get(event_name, 0),
+        )
 
 
 def _pct_change(current: int, previous: int) -> float | None:
@@ -150,6 +194,7 @@ def _fetch_key_events(
     event_names: tuple[str, ...],
     *,
     settings: Ga4Settings | None = None,
+    page_path_exact: str | None = None,
 ) -> dict[str, int]:
     if not event_names:
         return {}
@@ -159,15 +204,21 @@ def _fetch_key_events(
             "inListFilter": {"values": list(event_names)},
         }
     }
+    path_filter = None
+    if page_path_exact:
+        path_filter = _exact_string_filter("pagePath", page_path_exact)
     body: dict = {
         "dateRanges": [{"startDate": start, "endDate": end}],
         "dimensions": [{"name": "eventName"}],
         "metrics": [{"name": "eventCount"}],
     }
+    extra = event_filter
+    if path_filter is not None:
+        extra = {"andGroup": {"expressions": [event_filter, path_filter]}}
     if settings is not None:
-        dim_filter = _dimension_filter_from_settings(settings, extra=event_filter)
+        dim_filter = _dimension_filter_from_settings(settings, extra=extra)
     else:
-        dim_filter = event_filter
+        dim_filter = extra
     if dim_filter is not None:
         body["dimensionFilter"] = dim_filter
     payload = client.run_report(property_resource, body)
@@ -181,6 +232,76 @@ def _fetch_key_events(
             continue
         counts[str(name)] = _metric_int(row, 0)
     return counts
+
+
+def _fetch_page_path_views(
+    client: Ga4Client,
+    property_resource: str,
+    start: str,
+    end: str,
+    page_path: str,
+    *,
+    settings: Ga4Settings | None = None,
+) -> int:
+    """Period-scoped screenPageViews for one pagePath (EXACT)."""
+    path_filter = _exact_string_filter("pagePath", page_path)
+    body: dict = {
+        "dateRanges": [{"startDate": start, "endDate": end}],
+        "metrics": [{"name": "screenPageViews"}],
+    }
+    if settings is not None:
+        dim_filter = _dimension_filter_from_settings(settings, extra=path_filter)
+    else:
+        dim_filter = path_filter
+    if dim_filter is not None:
+        body["dimensionFilter"] = dim_filter
+    payload = client.run_report(property_resource, body)
+    rows = payload.get("rows") or []
+    if not rows or not isinstance(rows[0], dict):
+        return 0
+    return _metric_int(rows[0], 0)
+
+
+def _fetch_feature_path_totals(
+    client: Ga4Client,
+    property_resource: str,
+    start: str,
+    end: str,
+    *,
+    settings: Ga4Settings,
+) -> tuple[Ga4FeaturePathTotals, ...]:
+    results: list[Ga4FeaturePathTotals] = []
+    for path in settings.feature_paths:
+        page_views = 0
+        if path.include_page_views:
+            page_views = _fetch_page_path_views(
+                client,
+                property_resource,
+                start,
+                end,
+                path.page_path,
+                settings=settings,
+            )
+        ref_counts: dict[str, int] = {}
+        if path.reference_event_names:
+            ref_counts = _fetch_key_events(
+                client,
+                property_resource,
+                start,
+                end,
+                path.reference_event_names,
+                settings=settings,
+                page_path_exact=path.page_path,
+            )
+        results.append(
+            Ga4FeaturePathTotals(
+                path_id=path.id,
+                page_path=path.page_path,
+                page_views=page_views,
+                reference_event_counts=ref_counts,
+            )
+        )
+    return tuple(results)
 
 
 def fetch_hostname_session_breakdown(
@@ -273,6 +394,7 @@ def fetch_ga4_snapshot(
         end.isoformat(),
         settings.key_event_names,
         settings=settings,
+        page_path_exact=settings.key_event_page_path,
     )
     previous_events = _fetch_key_events(
         client,
@@ -280,6 +402,22 @@ def fetch_ga4_snapshot(
         previous_start.isoformat(),
         previous_end.isoformat(),
         settings.key_event_names,
+        settings=settings,
+        page_path_exact=settings.key_event_page_path,
+    )
+
+    current_feature_paths = _fetch_feature_path_totals(
+        client,
+        settings.property_resource,
+        current_start.isoformat(),
+        end.isoformat(),
+        settings=settings,
+    )
+    previous_feature_paths = _fetch_feature_path_totals(
+        client,
+        settings.property_resource,
+        previous_start.isoformat(),
+        previous_end.isoformat(),
         settings=settings,
     )
 
@@ -290,6 +428,7 @@ def fetch_ga4_snapshot(
         sessions=cur_sessions,
         screen_page_views=cur_views,
         key_event_counts=current_events,
+        feature_paths=current_feature_paths,
     )
     previous = Ga4PeriodTotals(
         start=previous_start.isoformat(),
@@ -298,6 +437,7 @@ def fetch_ga4_snapshot(
         sessions=prev_sessions,
         screen_page_views=prev_views,
         key_event_counts=previous_events,
+        feature_paths=previous_feature_paths,
     )
 
     notes = [
@@ -315,9 +455,38 @@ def fetch_ga4_snapshot(
         defined = {d.name for d in settings.event_definitions}
         undefined = [n for n in settings.key_event_names if n not in defined]
         note = "Key eventCounts included only for: " + ", ".join(settings.key_event_names) + "."
+        if settings.key_event_page_path:
+            note += (
+                f" Further restricted to pagePath EXACT '{settings.key_event_page_path}'."
+            )
         if undefined:
             note += " No declared definition for: " + ", ".join(undefined) + "."
         notes.append(note)
+    if settings.feature_paths:
+        for path in settings.feature_paths:
+            bits: list[str] = []
+            if path.include_page_views:
+                bits.append("page views (= page viewed, NOT feature used)")
+            if path.reference_event_names:
+                refs = ", ".join(path.reference_event_names)
+                bits.append(f"reference events [{refs}]")
+            detail = "; ".join(bits) if bits else "configured"
+            notes.append(
+                f"Feature path '{path.id}' pagePath EXACT '{path.page_path}': {detail}."
+            )
+            for event_name, replacement in path.reference_replaceable_by:
+                notes.append(
+                    f"  Reference event '{event_name}' is a proxy and may later be "
+                    f"replaced by explicit '{replacement}'."
+                )
+        notes.append(
+            "Feature-path metrics are independent of site-wide users/sessions/page "
+            "views and of Product channel capabilities (capability ≠ usage)."
+        )
+        notes.append(
+            "Do not over-weight large % changes on small absolute feature-path or "
+            "key-event counts (sparse Web CTA / form events are normal)."
+        )
     if settings.service_account_path is not None:
         email = service_account_email(settings.service_account_path)
         if email:
@@ -335,6 +504,8 @@ def fetch_ga4_snapshot(
         current=current,
         previous=previous,
         notes=tuple(notes),
+        feature_paths=settings.feature_paths,
+        key_event_page_path=settings.key_event_page_path,
     )
 
 

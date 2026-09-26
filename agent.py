@@ -78,8 +78,16 @@ Hard rules:
   - GA4 event definitions describe WHEN a tracked event fires — different from
     capabilities. Site-wide Web users / sessions / page views are whole-site
     totals (for the filtered host), NOT feature-level usage of a capability.
-  - Never equate "Web users/sessions/pageviews rose" with "capability usage rose"
-    unless a feature-level event or path metric is present in the input.
+  - When feature-path metrics are present in the input:
+    - path page views (e.g. /mahjong/) = the page was viewed, NOT that
+      calculation was used.
+    - form_submit @ that path = the form was submitted (proxy only), NOT
+      score_calculated success.
+    - appstore_click = Web App Store CTA click only — NOT ASC download and
+      NOT App first_open. Never build Web CTA → ASC download funnels or CVR.
+  - Never equate "Web users/sessions/pageviews rose" with "capability usage rose".
+  - Do not over-weight large % changes on small absolute Web path/CTA counts;
+    sparse zeros in a short lookback are normal Facts.
   - Do not force Web experiments merely because a capability is listed.
 - Actions / platform capabilities:
   - Do NOT propose App Store / ASC / GA4 / AdMob platform features, reports,

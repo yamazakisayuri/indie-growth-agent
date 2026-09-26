@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from config import ROOT_DIR, _resolve_path, load_env
+from config import ROOT_DIR, Ga4FeaturePathSettings, _resolve_path, load_env
 
 DEFAULT_PRODUCT_FILENAME = "product.json"
 
@@ -37,6 +37,10 @@ class Ga4ChannelConfig:
     hostname: str | None = None
     platform: str | None = None
     filters: dict[str, str | None] = field(default_factory=dict)
+    # Optional pagePath EXACT filter applied to key eventCounts (Web feature CTA).
+    key_event_page_path: str | None = None
+    # Path-scoped feature metrics (page views + reference events). Not capabilities.
+    feature_paths: tuple[Ga4FeaturePathSettings, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -116,11 +120,76 @@ def _parse_app_store(raw: Any) -> AppStoreChannelConfig:
     )
 
 
+def _parse_feature_paths(raw: Any) -> tuple[Ga4FeaturePathSettings, ...]:
+    if not isinstance(raw, list):
+        return ()
+    paths: list[Ga4FeaturePathSettings] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ValueError(f"ga4 featurePaths[{index}] must be an object")
+        path_id = _as_str(item.get("id"))
+        page_path = _as_str(item.get("pagePath") or item.get("page_path"))
+        if not path_id or not page_path:
+            raise ValueError(
+                f"ga4 featurePaths[{index}] requires id and pagePath"
+            )
+        if not page_path.startswith("/"):
+            raise ValueError(
+                f"ga4 featurePaths[{index}].pagePath must start with /"
+            )
+        include_page_views = _as_bool(
+            item.get("pageViews", item.get("includePageViews", True)),
+            True,
+        )
+        ref_raw = item.get("referenceEvents") or item.get("reference_events") or []
+        ref_names: list[str] = []
+        replaceable: list[tuple[str, str]] = []
+        if isinstance(ref_raw, list):
+            for ref_index, ref in enumerate(ref_raw):
+                if isinstance(ref, str):
+                    name = ref.strip()
+                    if name:
+                        ref_names.append(name)
+                    continue
+                if not isinstance(ref, dict):
+                    raise ValueError(
+                        f"ga4 featurePaths[{index}].referenceEvents[{ref_index}] "
+                        "must be a string or object"
+                    )
+                name = _as_str(ref.get("eventName") or ref.get("event_name"))
+                if not name:
+                    raise ValueError(
+                        f"ga4 featurePaths[{index}].referenceEvents[{ref_index}] "
+                        "requires eventName"
+                    )
+                ref_names.append(name)
+                replacement = _as_str(
+                    ref.get("replaceableBy") or ref.get("replaceable_by")
+                )
+                if replacement:
+                    replaceable.append((name, replacement))
+        paths.append(
+            Ga4FeaturePathSettings(
+                id=path_id,
+                page_path=page_path,
+                include_page_views=include_page_views,
+                reference_event_names=tuple(ref_names),
+                reference_replaceable_by=tuple(replaceable),
+            )
+        )
+    return tuple(paths)
+
+
 def _parse_ga4(raw: Any, *, default_enabled: bool) -> Ga4ChannelConfig:
     data = raw if isinstance(raw, dict) else {}
     filters = _parse_filters(data.get("filters"))
     hostname = _as_str(data.get("hostname")) or filters.get("hostname")
     platform = _as_str(data.get("platform")) or filters.get("platform")
+    key_event_page_path = _as_str(
+        data.get("keyEventPagePath") or data.get("key_event_page_path")
+    )
+    if key_event_page_path and not key_event_page_path.startswith("/"):
+        raise ValueError("ga4 keyEventPagePath must start with /")
     return Ga4ChannelConfig(
         enabled=_as_bool(data.get("enabled"), default_enabled),
         property_id=_as_str(data.get("propertyId") or data.get("property_id")),
@@ -131,6 +200,10 @@ def _parse_ga4(raw: Any, *, default_enabled: bool) -> Ga4ChannelConfig:
         hostname=hostname,
         platform=platform,
         filters=filters,
+        key_event_page_path=key_event_page_path,
+        feature_paths=_parse_feature_paths(
+            data.get("featurePaths") or data.get("feature_paths")
+        ),
     )
 
 

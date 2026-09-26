@@ -31,8 +31,10 @@
         "platform": null
       },
       "keyEvents": [],
+      "keyEventPagePath": null,
+      "featurePaths": [],
       "eventDefinitionsPath": null,
-      "note": "Prefer a separate Web GA4 property. When hostname is set, hostName EXACT filter is applied (subdomains excluded)."
+      "note": "Prefer a separate Web GA4 property. When hostname is set, hostName EXACT filter is applied (subdomains excluded). Optional keyEventPagePath + featurePaths add path-scoped metrics without equating them to Web capabilities."
     },
     "admob": {
       "enabled": true,

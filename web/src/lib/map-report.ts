@@ -20,12 +20,16 @@ const METRIC_LABEL_KEYS: Record<string, CopyKey> = {
   web_users: "webUsers",
   web_sessions: "webSessions",
   web_page_views: "webPageViews",
+  mahjong_score_calculator_page_views: "mahjongPageViews",
   // Keep the identifier itself; i18n value is also "record_saved".
   record_saved: "recordSaved",
 };
 
 const METRIC_NOTE_KEYS: Record<string, CopyKey> = {
   record_saved: "recordSavedNote",
+  mahjong_score_calculator_page_views: "mahjongPageViewsNote",
+  mahjong_score_calculator_form_submit: "formSubmitPathNote",
+  appstore_click: "appstoreClickNote",
 };
 
 const BLOCK_TITLE_KEYS: Record<string, CopyKey> = {
