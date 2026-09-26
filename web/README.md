@@ -1,6 +1,6 @@
 # Indie Growth Agent — Web UI
 
-Static dashboard (Next.js `output: "export"`). Starts on mock data; **Analyze latest data** calls the Python Agent API directly.
+Static dashboard (Next.js `output: "export"`). Shows the **last successful Live Analyze** (localStorage, per Product). **Analyze latest data** refreshes via the Python Agent API.
 
 ## Setup
 
@@ -27,7 +27,12 @@ NEXT_PUBLIC_AGENT_API_URL=http://127.0.0.1:8000
 
 ## Flow
 
-Browser → `POST {NEXT_PUBLIC_AGENT_API_URL}/api/analyze` → ASC / GA4 / AdMob fetch + Strands / Bedrock → structured JSON → UI.
+1. Initial view → last successful report for the selected Product (or empty prompt)
+2. Product list from `GET /api/products` (local fallback catalog if the API is offline)
+3. **Analyze latest data** → `POST {NEXT_PUBLIC_AGENT_API_URL}/api/analyze` with `{ language, productId }` → ASC Analytics / ASC Sales / GA4 App / GA4 Web / AdMob (as configured for that Product) + Strands / Bedrock → JSON → UI + localStorage cache
+4. Optional **Create Draft** → `POST /api/draft` (experiment context + optional screenshots)
+
+Language control switches UI chrome only. It does **not** re-run Analyze or rewrite existing analysis prose; run Analyze again to refresh body text in the new language.
 
 ## Static build
 
@@ -39,7 +44,8 @@ npm run build
 
 ## Structure
 
-- `src/mock/report.ts` — offline demo mock (kept)
-- `src/lib/map-report.ts` — mock + API → dashboard model
-- `src/lib/analyze-client.ts` — browser → FastAPI (no secrets)
+- `src/lib/report-cache.ts` — last successful report per Product (localStorage)
+- `src/lib/map-report.ts` — API → dashboard model (+ empty shell)
+- `src/lib/analyze-client.ts` — browser → FastAPI products / analyze (no secrets)
+- `src/lib/draft-client.ts` — browser → FastAPI draft
 - `src/lib/i18n.ts` — UI chrome ja / en

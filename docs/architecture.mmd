@@ -3,34 +3,37 @@ flowchart TB
   user([Indie developer])
 
   subgraph aws ["AWS"]
-    amplify["AWS Amplify Hosting<br/>Next.js 16 static export<br/>ja / en UI"]
+    amplify["AWS Amplify Hosting<br/>Next.js 16 static export<br/>ja / en UI · Product selector"]
     ecr["Amazon ECR"]
     ecs["Amazon ECS Express Mode<br/>AWS Fargate + ALB HTTPS<br/>FastAPI"]
-    secrets["AWS Secrets Manager"]
     strands["Strands Agents SDK"]
     bedrock["Amazon Bedrock<br/>Claude"]
   end
 
   subgraph external ["External data sources<br/>separate populations — not one funnel"]
-    asc["App Store Connect Analytics"]
-    ga4["Google Analytics 4"]
+    ascAnalytics["App Store Connect Analytics"]
+    ascSales["App Store Connect Sales<br/>Developer Proceeds"]
+    ga4App["GA4 App"]
+    ga4Web["GA4 Web<br/>hostName EXACT"]
     admob["Google AdMob"]
   end
 
   github["GitHub"] -.->|deploy UI| amplify
   github -.->|container image| ecr
   ecr -.-> ecs
-  secrets -.->|Task Execution Role| ecs
 
-  user -->|Open UI / Analyze| amplify
-  amplify -->|"Browser CORS · POST /api/analyze<br/>body: language only"| ecs
+  user -->|Open UI / select Product / Analyze| amplify
+  amplify -->|"Browser CORS · POST /api/analyze<br/>body: language + productId"| ecs
+  amplify -->|"GET /api/products · POST /api/draft"| ecs
 
-  ecs --> asc
-  ecs --> ga4
+  ecs --> ascAnalytics
+  ecs --> ascSales
+  ecs --> ga4App
+  ecs --> ga4Web
   ecs --> admob
 
-  ecs --> grounding["Data Contract / Grounding<br/>periods · populations · missing ≠ zero"]
+  ecs --> grounding["Data Contract / Grounding<br/>periods · populations · missing ≠ zero<br/>revenue sources not summed"]
   grounding --> strands
   strands -->|ECS Task Role| bedrock
-  bedrock --> result["Facts / Speculation<br/>prioritized Top 3 Actions"]
+  bedrock --> result["Facts / Speculation<br/>prioritized Top 3 Actions<br/>optional Growth Experiments"]
   result -->|JSON response| amplify

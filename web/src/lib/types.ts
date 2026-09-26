@@ -1,7 +1,7 @@
 /**
  * Display types for the dashboard.
  * Live API responses arrive already localized for the request language.
- * Mock data is mapped into the same shape via `buildMockReport`.
+ * The UI restores the last successful Analyze from localStorage per Product.
  */
 
 export type Language = "ja" | "en";

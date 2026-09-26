@@ -32,7 +32,7 @@ export function MetricsSummary({ report }: { report: GrowthReport }) {
   const { copy } = useLanguage();
 
   return (
-    <section className="metrics" aria-label="Metrics summary">
+    <section className="metrics" aria-label={copy("metricsSummaryLabel")}>
       {report.metrics.map((block) => (
         <article key={block.id} className="metrics__card">
           <header className="metrics__card-header">

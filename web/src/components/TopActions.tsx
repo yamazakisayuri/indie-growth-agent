@@ -19,22 +19,26 @@ export function TopActions({ report }: { report: GrowthReport }) {
         </h2>
       </header>
 
-      <ol className="actions__list">
-        {report.actions.map((action) => (
-          <li key={action.rank} className="actions__item">
-            <div
-              className="actions__rank"
-              aria-label={`${copy("priority")} ${action.rank}`}
-            >
-              <span className="actions__rank-num">{action.rank}</span>
-            </div>
-            <div className="actions__body">
-              <h3 className="actions__item-title">{action.title}</h3>
-              <p className="actions__item-reason">{action.reason}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {report.actions.length === 0 ? (
+        <p className="panel-empty">{copy("actionsEmpty")}</p>
+      ) : (
+        <ol className="actions__list">
+          {report.actions.map((action) => (
+            <li key={action.rank} className="actions__item">
+              <div
+                className="actions__rank"
+                aria-label={`${copy("priority")} ${action.rank}`}
+              >
+                <span className="actions__rank-num">{action.rank}</span>
+              </div>
+              <div className="actions__body">
+                <h3 className="actions__item-title">{action.title}</h3>
+                <p className="actions__item-reason">{action.reason}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

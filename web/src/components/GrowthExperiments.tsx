@@ -7,6 +7,7 @@ import {
   type UserScreenshotInput,
 } from "@/lib/draft-client";
 import { useLanguage } from "@/lib/language-context";
+import { hasSuccessfulReport } from "@/lib/map-report";
 import type {
   ActionDraft,
   GrowthExperiment,
@@ -70,30 +71,44 @@ async function fileToUserScreenshot(
   };
 }
 
+function DraftField({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className="experiments__draft-row">
+      <dt>{label}</dt>
+      <dd className={emphasize ? "experiments__draft-copy" : undefined}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
 function ActionDraftView({ draft }: { draft: ActionDraft }) {
   const { copy } = useLanguage();
   return (
     <div className="experiments__draft">
       <h4 className="experiments__draft-heading">{copy("actionDraft")}</h4>
-      {draft.experimentTitle ? (
-        <p>
-          <strong>{copy("experimentTitle")}:</strong> {draft.experimentTitle}
-        </p>
-      ) : null}
-      <p>
-        <strong>{copy("draftType")}:</strong> {draft.draftType}
-      </p>
       {draft.noChangeRecommended ? (
         <p className="experiments__draft-flag">
           {copy("draftNoChangeRecommended")}
         </p>
       ) : null}
-      <p>
-        <strong>{copy("draftObjective")}:</strong> {draft.objective}
-      </p>
-      <p>
-        <strong>{copy("draftRationale")}:</strong> {draft.rationale}
-      </p>
+
+      <dl className="experiments__draft-summary">
+        {draft.experimentTitle ? (
+          <DraftField label={copy("experimentTitle")} value={draft.experimentTitle} />
+        ) : null}
+        <DraftField label={copy("draftType")} value={draft.draftType} />
+        <DraftField label={copy("draftObjective")} value={draft.objective} />
+        <DraftField label={copy("draftRationale")} value={draft.rationale} />
+      </dl>
 
       {draft.screenshots?.length > 0 ? (
         <div className="experiments__draft-shots">
@@ -132,7 +147,9 @@ function ActionDraftView({ draft }: { draft: ActionDraft }) {
                 ) : null}
                 <div>
                   <dt>{copy("draftCopy")}</dt>
-                  <dd>{shot.copyDraft || "—"}</dd>
+                  <dd className="experiments__draft-copy">
+                    {shot.copyDraft || "—"}
+                  </dd>
                 </div>
                 <div>
                   <dt>{copy("draftRecommendedScreen")}</dt>
@@ -151,7 +168,7 @@ function ActionDraftView({ draft }: { draft: ActionDraft }) {
       {draft.missingInputs?.length > 0 ? (
         <div>
           <p>
-            <strong>{copy("draftMissingInputs")}:</strong>
+            <strong>{copy("draftMissingInputs")}</strong>
           </p>
           <ul>
             {draft.missingInputs.map((item) => (
@@ -162,16 +179,18 @@ function ActionDraftView({ draft }: { draft: ActionDraft }) {
       ) : null}
 
       {draft.notes ? (
-        <p>
-          <strong>{copy("draftNotes")}:</strong> {draft.notes}
-        </p>
+        <dl className="experiments__draft-summary">
+          <DraftField label={copy("draftNotes")} value={draft.notes} />
+        </dl>
       ) : null}
 
       {draft.playbooksUsed?.length > 0 ? (
-        <p>
-          <strong>{copy("draftPlaybooksUsed")}:</strong>{" "}
-          {draft.playbooksUsed.join(", ")}
-        </p>
+        <dl className="experiments__draft-summary">
+          <DraftField
+            label={copy("draftPlaybooksUsed")}
+            value={draft.playbooksUsed.join(", ")}
+          />
+        </dl>
       ) : null}
     </div>
   );
@@ -252,11 +271,10 @@ function ExperimentBlock({
       onDraftError(experimentTitle, copy("draftContextMismatch"));
       return;
     }
-    // Live Experiment must never be drafted with mock Facts.
+    // Cached / empty report must never be drafted against a mismatched Live run.
     if (
-      report.dataSource === "mock" &&
-      expRun &&
-      !expRun.startsWith("mock")
+      !hasSuccessfulReport(report) ||
+      (expRun && expRun.startsWith("mock"))
     ) {
       onDraftError(experimentTitle, copy("draftContextMismatch"));
       return;
@@ -424,14 +442,18 @@ function ExperimentBlock({
         </button>
       </div>
 
-      {slot.error ? <p className="experiments__error">{slot.error}</p> : null}
+      {slot.error ? (
+        <p className="experiments__error" role="alert">
+          {slot.error}
+        </p>
+      ) : null}
 
       {slot.draft ? <ActionDraftView draft={slot.draft} /> : null}
     </article>
   );
 }
 
-/** Minimal Planner output next to Analyzer results. Design polish later. */
+/** Planner output next to Analyzer results. */
 export function GrowthExperiments({ report }: { report: GrowthReport }) {
   const { copy } = useLanguage();
   const experiments = report.growthExperiments ?? [];
@@ -441,20 +463,11 @@ export function GrowthExperiments({ report }: { report: GrowthReport }) {
     {},
   );
 
-  useEffect(() => {
-    // Drop drafts when the bound Analyze product / run changes.
-    setSlotsByTitle({});
-  }, [report.product?.id, report.analysisRunId]);
-
   const hasPlanner =
     experiments.length > 0 ||
     Boolean(report.plannerStatus) ||
     Boolean(report.plannerError) ||
     Object.keys(slotsByTitle).length > 0;
-
-  if (!hasPlanner) {
-    return null;
-  }
 
   const activeTitles = new Set(experiments.map((item) => item.title));
   const orphanSlots = Object.entries(slotsByTitle).filter(
@@ -495,61 +508,65 @@ export function GrowthExperiments({ report }: { report: GrowthReport }) {
     return { drafting: false, draft: null, error: null };
   }
 
+  if (!hasPlanner) {
+    if (!hasSuccessfulReport(report)) {
+      return (
+        <section className="experiments" aria-labelledby="experiments-heading">
+          <h2 id="experiments-heading" className="experiments__heading">
+            {copy("recommendedExperiments")}
+          </h2>
+          <p className="experiments__empty">{copy("experimentsAwaitAnalyze")}</p>
+        </section>
+      );
+    }
+    return null;
+  }
+
   return (
     <section className="experiments" aria-labelledby="experiments-heading">
       <h2 id="experiments-heading" className="experiments__heading">
         {copy("recommendedExperiments")}
       </h2>
 
-      {report.plannerStatus ? (
-        <p className="experiments__status">{report.plannerStatus}</p>
-      ) : null}
+      <div className="experiments__meta">
+        {report.plannerStatus ? (
+          <p className="experiments__status">{report.plannerStatus}</p>
+        ) : null}
 
-      {report.dataSource === "mock" ? (
-        <p className="experiments__mock-banner" role="status">
-          {copy("usingMock")}
-        </p>
-      ) : null}
+        {report.plannerError ? (
+          <p className="experiments__error" role="alert">
+            {copy("plannerError")}: {report.plannerError}
+          </p>
+        ) : null}
 
-      {report.analysisRunId ? (
-        <p className="experiments__playbooks">
-          analysisRunId: {report.analysisRunId}
-        </p>
-      ) : null}
+        {report.playbooksConsulted && report.playbooksConsulted.length > 0 ? (
+          <p className="experiments__playbooks">
+            {copy("playbooksConsulted")}:{" "}
+            {report.playbooksConsulted.join(", ")}
+          </p>
+        ) : null}
 
-      {report.plannerError ? (
-        <p className="experiments__error">
-          {copy("plannerError")}: {report.plannerError}
-        </p>
-      ) : null}
+        {report.knownEventsUsed && report.knownEventsUsed.length > 0 ? (
+          <p className="experiments__playbooks">
+            {copy("knownEventsUsed")}: {report.knownEventsUsed.join(", ")}
+          </p>
+        ) : null}
 
-      {report.playbooksConsulted && report.playbooksConsulted.length > 0 ? (
-        <p className="experiments__playbooks">
-          {copy("playbooksConsulted")}:{" "}
-          {report.playbooksConsulted.join(", ")}
-        </p>
-      ) : null}
-
-      {report.knownEventsUsed && report.knownEventsUsed.length > 0 ? (
-        <p className="experiments__playbooks">
-          {copy("knownEventsUsed")}: {report.knownEventsUsed.join(", ")}
-        </p>
-      ) : null}
-
-      {report.knownEventsConsidered &&
-      report.knownEventsConsidered.length > 0 ? (
-        <p className="experiments__playbooks">
-          {copy("knownEventsConsidered")}:{" "}
-          {report.knownEventsConsidered
-            .map((event) => {
-              const when = event.end_date
-                ? `${event.date}–${event.end_date}`
-                : event.date;
-              return `${when} (${event.type})`;
-            })
-            .join("; ")}
-        </p>
-      ) : null}
+        {report.knownEventsConsidered &&
+        report.knownEventsConsidered.length > 0 ? (
+          <p className="experiments__playbooks">
+            {copy("knownEventsConsidered")}:{" "}
+            {report.knownEventsConsidered
+              .map((event) => {
+                const when = event.end_date
+                  ? `${event.date}–${event.end_date}`
+                  : event.date;
+                return `${when} (${event.type})`;
+              })
+              .join("; ")}
+          </p>
+        ) : null}
+      </div>
 
       {experiments.length === 0 ? (
         <p className="experiments__empty">{copy("noExperiments")}</p>
@@ -585,7 +602,9 @@ export function GrowthExperiments({ report }: { report: GrowthReport }) {
                 <p className="experiments__status">{copy("creatingDraft")}</p>
               ) : null}
               {slot.error ? (
-                <p className="experiments__error">{slot.error}</p>
+                <p className="experiments__error" role="alert">
+                  {slot.error}
+                </p>
               ) : null}
               {slot.draft ? <ActionDraftView draft={slot.draft} /> : null}
             </div>
