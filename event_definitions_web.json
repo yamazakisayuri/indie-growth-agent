@@ -1,0 +1,23 @@
+{
+  "_comment": "Developer-declared meaning of GA4 Web events / path metrics. Only listed names may be interpreted by the agent. Keys must match product.json ga4_web keyEvents and feature-path metric ids. State only what triggers the metric and what it records. Do not rate importance. Capability (e.g. mahjong_score_calculation) is NOT defined here — capabilities are product declarations, not measurements.",
+
+  "appstore_click": {
+    "source": "developer-declared custom event (gtag on Web)",
+    "definition": "Fires when a user clicks the App Store CTA link on the Web score-calculation page (pagePath=/mahjong/). It means a Web App Store CTA click only. It is not an App Store download, not GA4 App first_open, and must not be funneled into ASC downloads."
+  },
+
+  "mahjong_score_calculator_page_views": {
+    "source": "GA4 screenPageViews filtered to pagePath=/mahjong/",
+    "definition": "Count of page views for the mahjong score-calculation page (/mahjong/). It means the score-calculation page was viewed. It does NOT mean the user performed a score calculation, and it is not usage of the mahjong_score_calculation capability by itself."
+  },
+
+  "form_submit": {
+    "source": "GA4 Enhanced Measurement form_submit, filtered to pagePath=/mahjong/",
+    "definition": "When counted under pagePath=/mahjong/, this event means the score-calculation form was submitted. It is a proxy for a calculation attempt / form submit only — not proof that a score was successfully calculated. Prefer replacing this proxy later with an explicit score_calculated custom event if instrumented."
+  },
+
+  "mahjong_score_calculator_form_submit": {
+    "source": "alias for form_submit @ pagePath=/mahjong/",
+    "definition": "Same meaning as form_submit when scoped to /mahjong/: the score-calculation form was submitted. Proxy only; not score_calculated success."
+  }
+}

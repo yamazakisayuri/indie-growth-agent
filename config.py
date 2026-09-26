@@ -64,6 +64,23 @@ class Ga4EventDefinition:
 
 
 @dataclass(frozen=True)
+class Ga4FeaturePathSettings:
+    """Path-scoped Web GA4 metrics (feature page views + reference events).
+
+    Separate from site-wide users/sessions/page views. A declared Product
+    capability is NOT the same as these measured path metrics.
+    """
+
+    id: str
+    page_path: str
+    include_page_views: bool = True
+    # GA4 eventNames counted only with pagePath EXACT filter (e.g. form_submit).
+    reference_event_names: tuple[str, ...] = ()
+    # Optional: reference event → future replacement event (e.g. form_submit → score_calculated).
+    reference_replaceable_by: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True)
 class Ga4Settings:
     property_id: str
     property_resource: str
@@ -77,6 +94,9 @@ class Ga4Settings:
     # Optional dimension filters (Web channel). Exact match only — no subdomain bleed.
     hostname_exact: str | None = None
     platform_exact: str | None = None
+    # When set, key eventCounts are further restricted to this pagePath (EXACT).
+    key_event_page_path: str | None = None
+    feature_paths: tuple[Ga4FeaturePathSettings, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -259,6 +279,29 @@ def _ga4_auth_from_env() -> tuple[
     return service_account_path, client_id, client_secret, refresh_token
 
 
+def _definition_names_for_settings(
+    *,
+    key_event_names: tuple[str, ...],
+    feature_paths: tuple[Ga4FeaturePathSettings, ...],
+) -> tuple[str, ...]:
+    """Event / metric ids that may appear in the definitions file for this channel."""
+    names: list[str] = list(key_event_names)
+    for path in feature_paths:
+        if path.include_page_views:
+            names.append(f"{path.id}_page_views")
+        for event_name in path.reference_event_names:
+            names.append(event_name)
+            names.append(f"{path.id}_{event_name}")
+    # Preserve order, drop duplicates.
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in names:
+        if name not in seen:
+            seen.add(name)
+            ordered.append(name)
+    return tuple(ordered)
+
+
 def _build_ga4_settings(
     *,
     property_raw: str,
@@ -268,10 +311,16 @@ def _build_ga4_settings(
     auth_label: str,
     hostname_exact: str | None = None,
     platform_exact: str | None = None,
+    key_event_page_path: str | None = None,
+    feature_paths: tuple[Ga4FeaturePathSettings, ...] = (),
 ) -> Ga4Settings:
     property_id, property_resource = _normalize_property_id(property_raw)
+    definition_names = _definition_names_for_settings(
+        key_event_names=key_event_names,
+        feature_paths=feature_paths,
+    )
     event_definitions = (
-        _load_event_definitions(definitions_path, key_event_names)
+        _load_event_definitions(definitions_path, definition_names)
         if definitions_path.is_file()
         else ()
     )
@@ -299,6 +348,8 @@ def _build_ga4_settings(
         refresh_token=refresh_token if use_oauth else None,
         hostname_exact=hostname_exact,
         platform_exact=platform_exact,
+        key_event_page_path=key_event_page_path,
+        feature_paths=feature_paths,
     )
 
 
@@ -414,6 +465,8 @@ def get_ga4_web_settings() -> Ga4Settings | None:
         auth_label="Web GA4",
         hostname_exact=channel.hostname,
         platform_exact=channel.platform,
+        key_event_page_path=channel.key_event_page_path,
+        feature_paths=channel.feature_paths,
     )
 
 

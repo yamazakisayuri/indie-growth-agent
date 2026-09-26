@@ -82,6 +82,22 @@ export const uiCopy = {
     ja: "ページビュー",
     en: "Page views",
   },
+  mahjongPageViews: {
+    ja: "/mahjong/ ページビュー",
+    en: "/mahjong/ page views",
+  },
+  mahjongPageViewsNote: {
+    ja: "点数計算ページを閲覧した（計算利用ではない）",
+    en: "Score-calculation page viewed (not calculation used)",
+  },
+  formSubmitPathNote: {
+    ja: "点数計算フォームがsubmitされた近似指標（計算成功ではない）",
+    en: "Score-calculation form submitted (proxy; not score success)",
+  },
+  appstoreClickNote: {
+    ja: "Web内のApp Store CTAクリック（ASCダウンロードではない）",
+    en: "Web App Store CTA click (not ASC download)",
+  },
   impressions: {
     ja: "インプレッション",
     en: "Impressions",

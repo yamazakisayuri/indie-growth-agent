@@ -65,6 +65,11 @@ Hard rules:
   - A declared Web capability (e.g. mahjong_score_calculation) means users CAN
     do that on the site — it is NOT measured usage and NOT a GA4 event.
   - Site-wide Web users/sessions/page views are NOT feature usage of a capability.
+  - When path-scoped Web metrics are present: path page views = page viewed
+    (not calculation used); form_submit @ path = form submit proxy (not
+    score_calculated); appstore_click = Web App Store CTA click (not ASC
+    download / App first_open). Never propose Web → ASC download funnels or CVR.
+  - Do not over-weight large % moves on tiny absolute Web CTA / form counts.
   - Do not force a Web or Measurement experiment merely because a capability is
     listed. Measurement is allowed when Facts show a real instrumentation gap
     that blocks a decision — still optional; zero such experiments can be correct.
@@ -386,7 +391,9 @@ def build_planner_prompt(
         "4) Weigh Product growth / Conversion / Engagement (App) / Engagement (Web) /",
         "   Revenue from Facts. Do not invent SEO/Web experiments only because Web",
         "   channel or a Web capability exists. Do not treat site-wide Web metrics as",
-        "   feature usage of a capability. Do not create a Revenue experiment only",
+        "   feature usage of a capability. Path page views ≠ calculation; form_submit",
+        "   @ path ≠ score_calculated; appstore_click ≠ ASC download. Do not create",
+        "   Web → ASC download funnels. Do not create a Revenue experiment only",
         "   because RevenueSummary exists. Zero Web / Revenue / Measurement",
         "   experiments can be correct.",
         "5) Decide 0–3 Growth Experiments. Prefer none or Measurement when weak.",

@@ -66,6 +66,24 @@ def _ga4_period_block(title: str, period: Ga4PeriodTotals, event_order: tuple[st
         lines.append("- Key event counts (eventCount, configured events only):")
         for name in event_order:
             lines.append(f"  - {name}: {_fmt_int(period.key_event_counts.get(name, 0))}")
+    if period.feature_paths:
+        lines.append(
+            "- Feature-path metrics (path-scoped; NOT site-wide; NOT capability usage):"
+        )
+        for path in period.feature_paths:
+            lines.append(
+                f"  - path_id={path.path_id} pagePath={path.page_path}:"
+            )
+            lines.append(
+                f"    - page views (page viewed only; NOT calculation used): "
+                f"{_fmt_int(path.page_views)}"
+            )
+            for event_name, count in path.reference_event_counts.items():
+                lines.append(
+                    f"    - reference event {event_name} "
+                    f"(form/submit proxy when form_submit; NOT score_calculated success): "
+                    f"{_fmt_int(count)}"
+                )
     return lines
 
 
@@ -82,6 +100,31 @@ def _ga4_key_event_changes(ga4: Ga4GrowthSnapshot) -> list[str]:
             f"- {name}: {_fmt_pct(_pct_change(cur, prev))} "
             f"(current={_fmt_int(cur)}, previous={_fmt_int(prev)})"
         )
+    if ga4.feature_paths:
+        lines.append(
+            "Feature-path period-over-period change "
+            "(same rules; do not over-weight large % on small absolute counts):"
+        )
+        for path in ga4.feature_paths:
+            cur = ga4.feature_path_current(path.id)
+            prev = ga4.feature_path_previous(path.id)
+            if cur is None or prev is None:
+                continue
+            lines.append(
+                f"- {path.id}_page_views @ {path.page_path}: "
+                f"{_fmt_pct(_pct_change(cur.page_views, prev.page_views))} "
+                f"(current={_fmt_int(cur.page_views)}, previous={_fmt_int(prev.page_views)}; "
+                "means page viewed, NOT calculation used)"
+            )
+            for event_name in path.reference_event_names:
+                c = cur.reference_event_counts.get(event_name, 0)
+                p = prev.reference_event_counts.get(event_name, 0)
+                lines.append(
+                    f"- {event_name} @ {path.page_path}: "
+                    f"{_fmt_pct(_pct_change(c, p))} "
+                    f"(current={_fmt_int(c)}, previous={_fmt_int(p)}; "
+                    "submit proxy only, not score_calculated)"
+                )
     return lines
 
 
@@ -373,13 +416,18 @@ def _population_scope_notes(
             [
                 f"- GA4 Web = the Web analytics property {ga4_web.property_resource}.",
                 "  This is a separate population from GA4 App / ASC / AdMob.",
-                "  Do NOT funnel Web sessions or page views into App Store downloads",
+                "  Do NOT funnel Web sessions, page views, form_submit, or",
+                "  appstore_click into App Store downloads / App first_open,",
                 "  or assert Web → App causation without explicit attribution facts.",
                 "  Parallel same-window observations are allowed.",
             ]
         )
         for note in ga4_web.notes:
             if "hostName EXACT" in note or "Dimension filter" in note:
+                notes.append(f"  {note}")
+            if note.startswith("Feature path ") or note.startswith("Key eventCounts"):
+                notes.append(f"  {note}")
+            if "Further restricted to pagePath" in note:
                 notes.append(f"  {note}")
 
     if admob is None:
@@ -426,7 +474,8 @@ def _population_scope_notes(
                 "  numbers into another's. Examples of disallowed cross-source math:",
                 "  first_open vs first-time downloads, GA4 ad_impression vs AdMob",
                 "  IMPRESSIONS, AdMob earnings vs ASC downloads, Web sessions vs",
-                "  App Store downloads. Do not describe them as stages of one funnel.",
+                "  App Store downloads, Web appstore_click vs ASC downloads. Do not",
+                "  describe them as stages of one funnel.",
             ]
         )
     return notes
@@ -564,17 +613,54 @@ def format_agent_input(
             f"- Web GA4 property {ga4_web.property_resource}: activeUsers, sessions,"
         )
         confirmed.append(
-            "  screenPageViews (page views), configured key events, period-over-period."
+            "  screenPageViews (site-wide page views for the filtered host),"
+        )
+        confirmed.append(
+            "  configured key events, optional feature-path metrics, period-over-period."
         )
         confirmed.append(
             "- Web is an independent channel/population from App Store / GA4 App / AdMob."
         )
         confirmed.append(
-            "- Web GA4 metrics above are site-wide for the filtered host only —"
+            "- Site-wide Web users/sessions/page views are NOT feature-level usage of"
         )
         confirmed.append(
-            "  they are NOT feature-level usage of any Web channel capability."
+            "  any Web channel capability."
         )
+        if ga4_web.feature_paths:
+            confirmed.append(
+                "- Feature-path metrics present in this run (path-scoped measurements;"
+            )
+            confirmed.append(
+                "  still NOT the same as a Product capability declaration):"
+            )
+            for path in ga4_web.feature_paths:
+                bits = []
+                if path.include_page_views:
+                    bits.append(
+                        f"{path.id}_page_views @ {path.page_path} = page viewed only"
+                    )
+                for event_name in path.reference_event_names:
+                    bits.append(
+                        f"{event_name} @ {path.page_path} = reference/proxy event"
+                    )
+                for bit in bits:
+                    confirmed.append(f"  - {bit}")
+            confirmed.append(
+                "- Path page views ≠ calculation used. form_submit @ path = form"
+            )
+            confirmed.append(
+                "  submit proxy only (not score_calculated success). appstore_click ="
+            )
+            confirmed.append(
+                "  Web App Store CTA click only (not ASC download / App first_open)."
+            )
+            confirmed.append(
+                "- Do not over-weight large % changes on small absolute Web path/CTA"
+            )
+            confirmed.append(
+                "  counts; sparse zeros in a short lookback are normal."
+            )
     else:
         confirmed.append(
             f"- {ga4_web_status or 'Web GA4: not connected (optional channel).'}"
@@ -618,8 +704,12 @@ def format_agent_input(
         "  CONFIRMED CAPABILITIES means users CAN do that action on the channel.",
         "  It is NOT a GA4 event definition and NOT a usage count. Site-wide Web",
         "  users/sessions/page views must not be read as feature usage of a",
-        "  capability (e.g. mahjong_score_calculation) unless feature-level events",
-        "  or paths are present in this input (they are not, in this Phase).",
+        "  capability (e.g. mahjong_score_calculation). When feature-path metrics",
+        "  are present, interpret them ONLY via GA4 EVENT DEFINITIONS:",
+        "  path page views = page viewed (not calculation); form_submit @ path =",
+        "  form submit proxy (not score_calculated); appstore_click = Web CTA click",
+        "  (not ASC download). Never build Web → App Store download funnels or CVR.",
+        "  Do not over-weight large % moves on tiny absolute Web event counts.",
         "- Platform capabilities: propose ONLY items listed under CONFIRMED",
         "  CAPABILITIES or ALLOWED LISTING ACTIONS below. Do not propose other ASC,",
         "  GA4, or AdMob analytics features/reports/tiers/thresholds/dimensions even",
@@ -643,8 +733,13 @@ def format_agent_input(
         "  CAPABILITIES,",
         "- Treating GA4 ad_impression and AdMob IMPRESSIONS as the same or matching,",
         "- Web sessions → App Store downloads as one funnel or proven causation,",
+        "- Web appstore_click → ASC downloads / App first_open as one funnel or CVR,",
         "- Equating site-wide Web users/sessions/page views with usage of a declared",
         "  Web capability (capability ≠ measured feature usage),",
+        "- Equating feature-path page views with calculation used, or form_submit",
+        "  with score_calculated success,",
+        "- Treating sparse Web CTA / form absolute counts as strong signals solely",
+        "  because % change is large,",
         "- Search Console / SEO rankings / Web revenue when not in the input,",
         "- Interpreting a GA4 event that has no entry under GA4 EVENT DEFINITIONS,",
         "  asserting a cause for any GA4 eventCount or AdMob metric change, treating",
@@ -856,12 +951,19 @@ def format_agent_input(
             "App Store download causation or build that funnel without attribution facts.",
             "If Web channel capabilities are listed (e.g. mahjong_score_calculation),",
             "you may state as Fact that the capability exists on the Web channel.",
-            "Keep that separate from site-wide Web users/sessions/page views Facts.",
-            "Do NOT claim those site-wide metrics prove capability feature usage.",
-            "Feature-level path/event instrumentation is NOT in this input — do not",
-            "invent usage counts for a capability. A Measurement action is allowed only",
-            "when Facts show a real decision gap; do not force it merely because a",
-            "capability exists.",
+            "Keep that separate from site-wide Web users/sessions/page views Facts",
+            "AND from feature-path Facts.",
+            "Do NOT claim site-wide metrics prove capability feature usage.",
+            "When feature-path metrics are present: path page views mean the page was",
+            "viewed (not that calculation was used); form_submit @ path means the form",
+            "was submitted (proxy only, not score_calculated); appstore_click means a",
+            "Web App Store CTA click (not ASC download / App first_open).",
+            "Never build Web → App Store download funnels or conversion rates.",
+            "Do not over-weight large percentage changes on small absolute Web",
+            "feature-path or CTA counts; zeros/near-zeros in a short lookback are",
+            "normal and still Facts.",
+            "A Measurement action is allowed only when Facts show a real decision",
+            "gap; do not force it merely because a capability exists.",
             "Do not force Web or Revenue to be the Most Important Finding merely because",
             "those channels or capabilities exist.",
             "Do not casually sum currencies or ASC Downloads with AdMob earnings as one",

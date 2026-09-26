@@ -75,6 +75,11 @@ def _labels(language: str) -> dict[str, str]:
             "web_users": "ユーザー",
             "web_sessions": "セッション",
             "web_page_views": "ページビュー",
+            "web_page_views_note": "サイト全体（設定ドメイン）",
+            "mahjong_page_views": "/mahjong/ ページビュー",
+            "mahjong_page_views_note": "点数計算ページを閲覧した（計算利用ではない）",
+            "form_submit_path_note": "点数計算フォームがsubmitされた近似指標（計算成功ではない）",
+            "appstore_click_note": "Web内のApp Store CTAクリック（ASCダウンロードではない）",
             "scope_asc_jp": "iOS / 日本",
             "scope_asc_all": "iOS / 全テリトリー",
             "scope_asc_other": "iOS / {territory}",
@@ -112,6 +117,11 @@ def _labels(language: str) -> dict[str, str]:
         "web_users": "Users",
         "web_sessions": "Sessions",
         "web_page_views": "Page views",
+        "web_page_views_note": "Site-wide (configured host)",
+        "mahjong_page_views": "/mahjong/ page views",
+        "mahjong_page_views_note": "Score-calculation page viewed (not calculation used)",
+        "form_submit_path_note": "Score-calculation form submitted (proxy; not score success)",
+        "appstore_click_note": "Web App Store CTA click (not ASC download)",
         "scope_asc_jp": "iOS / Japan",
         "scope_asc_all": "iOS / all territories",
         "scope_asc_other": "iOS / {territory}",
@@ -141,6 +151,9 @@ def _grounding_rules(language: str) -> list[str]:
             "ソース間の母集団を同一視しない",
             "Revenue は絶対額と変化率の両方を見る（少額の大きな%だけで判断しない）",
             "Web と App を直接ファネル化しない（計測根拠なき Web→App DL 因果を断定しない）",
+            "capability ≠ usage。/mahjong/ page view ≠ 計算利用。form_submit は submit 近似のみ",
+            "appstore_click は Web CTA クリックのみ（ASC DL / first_open ではない）",
+            "少数イベントの大きな変化率を過大評価しない",
         ]
     return [
         "Missing data ≠ zero",
@@ -149,6 +162,9 @@ def _grounding_rules(language: str) -> list[str]:
         "Judge revenue with absolute amount and changePercent together "
         "(do not over-weight large % on small absolute amounts)",
         "Do not funnel Web into App Store downloads without attribution evidence",
+        "capability ≠ usage; path page views ≠ calculation; form_submit is submit proxy only",
+        "appstore_click is Web CTA click only (not ASC download / first_open)",
+        "Do not over-weight large % changes on small absolute Web event counts",
     ]
 
 
@@ -321,18 +337,55 @@ def _build_web_metrics(
             label=labels["web_page_views"],
             change_percent=_round_pct(ga4_web.change_screen_page_views_pct()),
             absolute=f"{ga4_web.current.screen_page_views:,}",
+            note=labels.get("web_page_views_note"),
         ),
     ]
+    for path in ga4_web.feature_paths:
+        cur = ga4_web.feature_path_current(path.id)
+        prev = ga4_web.feature_path_previous(path.id)
+        if path.include_page_views and cur is not None:
+            prev_views = prev.page_views if prev is not None else 0
+            change = None if prev_views <= 0 else ((cur.page_views - prev_views) / prev_views) * 100.0
+            metric_id = f"{path.id}_page_views"
+            metrics.append(
+                MetricItem(
+                    id=metric_id,
+                    label=labels.get("mahjong_page_views", metric_id),
+                    change_percent=_round_pct(change),
+                    absolute=f"{cur.page_views:,}",
+                    note=labels.get("mahjong_page_views_note"),
+                )
+            )
+        if cur is None:
+            continue
+        for event_name in path.reference_event_names:
+            c = cur.reference_event_counts.get(event_name, 0)
+            p = prev.reference_event_counts.get(event_name, 0) if prev else 0
+            change = None if p <= 0 else ((c - p) / p) * 100.0
+            note_key = f"{event_name}_path_note"
+            metrics.append(
+                MetricItem(
+                    id=f"{path.id}_{event_name}",
+                    label=event_name,
+                    change_percent=_round_pct(change),
+                    absolute=f"{c:,}",
+                    note=labels.get(note_key) or labels.get("form_submit_path_note"),
+                )
+            )
     for name in ga4_web.key_event_names:
         cur = ga4_web.current.key_event_counts.get(name, 0)
         prev = ga4_web.previous.key_event_counts.get(name, 0)
         change = None if prev <= 0 else ((cur - prev) / prev) * 100.0
+        note = None
+        if name == "appstore_click":
+            note = labels.get("appstore_click_note")
         metrics.append(
             MetricItem(
                 id=name,
                 label=name,
                 change_percent=_round_pct(change),
                 absolute=f"{cur:,}",
+                note=note,
             )
         )
     return MetricGroup(
