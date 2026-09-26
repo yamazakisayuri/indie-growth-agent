@@ -1,0 +1,42 @@
+{
+  "id": "example_product",
+  "name": "Example Product",
+  "type": "hybrid",
+  "channels": {
+    "app_store": {
+      "enabled": true,
+      "appId": null,
+      "bundleId": "com.example.YourApp",
+      "territory": "JP"
+    },
+    "ga4_app": {
+      "enabled": true,
+      "propertyId": null,
+      "keyEvents": ["first_open"],
+      "eventDefinitionsPath": "event_definitions.json"
+    },
+    "web": {
+      "enabled": false,
+      "domain": null,
+      "capabilities": [],
+      "note": "not configured — capabilities list what users can do on the site (not GA4 usage)"
+    },
+    "ga4_web": {
+      "enabled": false,
+      "propertyId": null,
+      "hostname": null,
+      "platform": null,
+      "filters": {
+        "hostname": null,
+        "platform": null
+      },
+      "keyEvents": [],
+      "eventDefinitionsPath": null,
+      "note": "Prefer a separate Web GA4 property. When hostname is set, hostName EXACT filter is applied (subdomains excluded)."
+    },
+    "admob": {
+      "enabled": true,
+      "appIds": []
+    }
+  }
+}

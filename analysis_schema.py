@@ -131,7 +131,7 @@ class MetricItem(BaseModel):
 class MetricGroup(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    id: Literal["app_store", "usage", "revenue"]
+    id: Literal["app_store", "usage", "revenue", "web"]
     title: str
     source: str
     connected: bool = True
@@ -196,6 +196,9 @@ class AnalyzeResponse(BaseModel):
         default=None,
         alias="revenueSummary",
     )
+    # Optional Product / Channel inventory (from product.json when present).
+    product: dict[str, Any] | None = None
+    channels: list[dict[str, Any]] = Field(default_factory=list)
     # Planner is additive; Analyzer succeeds even when these stay empty / error.
     growth_experiments: list[dict[str, Any]] = Field(
         default_factory=list,

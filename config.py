@@ -74,6 +74,9 @@ class Ga4Settings:
     oauth_client_id: str | None
     oauth_client_secret: str | None
     refresh_token: str | None
+    # Optional dimension filters (Web channel). Exact match only — no subdomain bleed.
+    hostname_exact: str | None = None
+    platform_exact: str | None = None
 
 
 @dataclass(frozen=True)
@@ -162,6 +165,22 @@ def get_app_store_connect_settings() -> AppStoreConnectSettings:
     bundle_id = os.getenv("APP_STORE_CONNECT_BUNDLE_ID", "").strip() or None
     analytics_request_id = os.getenv("APP_STORE_CONNECT_ANALYTICS_REQUEST_ID", "").strip() or None
 
+    # Optional product.json overlays non-secret ASC identity (env remains fallback).
+    try:
+        from product_config import load_product_config
+
+        product = load_product_config()
+    except Exception:
+        product = None
+    if product is not None and product.app_store.enabled:
+        channel = product.app_store
+        if channel.app_id:
+            app_id = channel.app_id
+        if channel.bundle_id:
+            bundle_id = channel.bundle_id
+        if channel.territory:
+            territory = channel.territory.strip().upper() or territory
+
     return AppStoreConnectSettings(
         credentials=credentials,
         app_id=app_id,
@@ -214,50 +233,16 @@ def _load_event_definitions(
     return tuple(definitions)
 
 
-def get_ga4_settings() -> Ga4Settings | None:
-    """Return GA4 settings when configured; otherwise None (treated as not connected)."""
-    load_env()
-
-    property_raw = os.getenv("GA4_PROPERTY_ID", "").strip()
-    if not property_raw:
-        return None
-
-    property_id, property_resource = _normalize_property_id(property_raw)
-
-    lookback_raw = os.getenv("GA4_LOOKBACK_DAYS", "").strip()
-    if not lookback_raw:
-        lookback_raw = os.getenv("APP_STORE_CONNECT_LOOKBACK_DAYS", "7").strip() or "7"
-    try:
-        lookback_days = int(lookback_raw)
-    except ValueError as exc:
-        raise ValueError("GA4_LOOKBACK_DAYS must be an integer") from exc
-    if lookback_days < 1:
-        raise ValueError("GA4_LOOKBACK_DAYS must be >= 1")
-
-    key_events_raw = os.getenv("GA4_KEY_EVENTS", "").strip()
-    key_event_names = tuple(
-        part.strip() for part in key_events_raw.split(",") if part.strip()
-    )
-
-    definitions_raw = os.getenv("GA4_EVENT_DEFINITIONS_PATH", "").strip()
-    if definitions_raw:
-        definitions_path = _resolve_path(definitions_raw)
-        if not definitions_path.is_file():
-            raise FileNotFoundError(
-                f"GA4 event definitions file not found: {definitions_path}"
-            )
-    else:
-        definitions_path = ROOT_DIR / DEFAULT_EVENT_DEFINITIONS_FILENAME
-    event_definitions = (
-        _load_event_definitions(definitions_path, key_event_names)
-        if definitions_path.is_file()
-        else ()
-    )
-
+def _ga4_auth_from_env() -> tuple[
+    Path | None,
+    str | None,
+    str | None,
+    str | None,
+]:
+    """Shared OAuth / service-account credentials for App and Web GA4."""
     sa_raw = os.getenv("GA4_SERVICE_ACCOUNT_PATH", "").strip()
     service_account_path = _resolve_path(sa_raw) if sa_raw else None
     if service_account_path is not None and not service_account_path.is_file():
-        # Path configured but file missing → ignore so OAuth can be used instead.
         service_account_path = None
 
     client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip() or None
@@ -271,21 +256,37 @@ def get_ga4_settings() -> Ga4Settings | None:
                 f"GA4 refresh token file not found: {refresh_token_path}"
             )
         refresh_token = refresh_token_path.read_text(encoding="utf-8").strip() or None
+    return service_account_path, client_id, client_secret, refresh_token
 
+
+def _build_ga4_settings(
+    *,
+    property_raw: str,
+    key_event_names: tuple[str, ...],
+    definitions_path: Path,
+    lookback_days: int,
+    auth_label: str,
+    hostname_exact: str | None = None,
+    platform_exact: str | None = None,
+) -> Ga4Settings:
+    property_id, property_resource = _normalize_property_id(property_raw)
+    event_definitions = (
+        _load_event_definitions(definitions_path, key_event_names)
+        if definitions_path.is_file()
+        else ()
+    )
+    service_account_path, client_id, client_secret, refresh_token = _ga4_auth_from_env()
     has_sa = service_account_path is not None
     has_oauth = bool(client_id and client_secret and refresh_token)
     if not has_sa and not has_oauth:
         raise ValueError(
-            "GA4_PROPERTY_ID is set, but auth is incomplete. Provide OAuth "
+            f"{auth_label} property is set, but auth is incomplete. Provide OAuth "
             "(GOOGLE_OAUTH_CLIENT_ID + GOOGLE_OAUTH_CLIENT_SECRET + "
             "GA4_REFRESH_TOKEN or GA4_REFRESH_TOKEN_PATH) "
             "or GA4_SERVICE_ACCOUNT_PATH."
         )
-
-    # Prefer OAuth when both are available (hackathon / indie-growth reuse path).
     use_oauth = has_oauth
     use_sa = has_sa and not use_oauth
-
     return Ga4Settings(
         property_id=property_id,
         property_resource=property_resource,
@@ -296,6 +297,123 @@ def get_ga4_settings() -> Ga4Settings | None:
         oauth_client_id=client_id if use_oauth else None,
         oauth_client_secret=client_secret if use_oauth else None,
         refresh_token=refresh_token if use_oauth else None,
+        hostname_exact=hostname_exact,
+        platform_exact=platform_exact,
+    )
+
+
+def get_ga4_settings() -> Ga4Settings | None:
+    """Return App GA4 settings when configured; otherwise None (not connected)."""
+    load_env()
+
+    property_raw = os.getenv("GA4_PROPERTY_ID", "").strip()
+    key_events_raw = os.getenv("GA4_KEY_EVENTS", "").strip()
+    key_event_names = tuple(
+        part.strip() for part in key_events_raw.split(",") if part.strip()
+    )
+    definitions_raw = os.getenv("GA4_EVENT_DEFINITIONS_PATH", "").strip()
+    if definitions_raw:
+        definitions_path = _resolve_path(definitions_raw)
+        if not definitions_path.is_file():
+            raise FileNotFoundError(
+                f"GA4 event definitions file not found: {definitions_path}"
+            )
+    else:
+        definitions_path = ROOT_DIR / DEFAULT_EVENT_DEFINITIONS_FILENAME
+
+    # Optional product.json overlays for App GA4 (non-secret identity only).
+    try:
+        from product_config import load_product_config
+
+        product = load_product_config()
+    except Exception:
+        product = None
+    if product is not None:
+        if not product.ga4_app.enabled:
+            return None
+        channel = product.ga4_app
+        if channel.property_id:
+            property_raw = channel.property_id
+        if channel.key_events:
+            key_event_names = channel.key_events
+        if channel.event_definitions_path:
+            definitions_path = _resolve_path(channel.event_definitions_path)
+            if not definitions_path.is_file():
+                raise FileNotFoundError(
+                    f"GA4 event definitions file not found: {definitions_path}"
+                )
+
+    if not property_raw:
+        return None
+
+    lookback_raw = os.getenv("GA4_LOOKBACK_DAYS", "").strip()
+    if not lookback_raw:
+        lookback_raw = os.getenv("APP_STORE_CONNECT_LOOKBACK_DAYS", "7").strip() or "7"
+    try:
+        lookback_days = int(lookback_raw)
+    except ValueError as exc:
+        raise ValueError("GA4_LOOKBACK_DAYS must be an integer") from exc
+    if lookback_days < 1:
+        raise ValueError("GA4_LOOKBACK_DAYS must be >= 1")
+
+    return _build_ga4_settings(
+        property_raw=property_raw,
+        key_event_names=key_event_names,
+        definitions_path=definitions_path,
+        lookback_days=lookback_days,
+        auth_label="GA4",
+    )
+
+
+def get_ga4_web_settings() -> Ga4Settings | None:
+    """Return Web GA4 settings from product.json when configured; else None.
+
+    Preferred: a separate GA4 property from the App channel. When hostname /
+    platform are set on the Web channel, exact-match dimension filters are applied
+    (hostName EXACT — subdomains like tech.example.com do not match example.com).
+    Auth reuses the same .env GA4 credentials as App GA4.
+    """
+    load_env()
+    try:
+        from product_config import load_product_config
+
+        product = load_product_config()
+    except Exception:
+        product = None
+    if product is None:
+        return None
+    channel = product.ga4_web
+    if not channel.enabled or not channel.property_id:
+        return None
+
+    definitions_path = ROOT_DIR / DEFAULT_EVENT_DEFINITIONS_FILENAME
+    if channel.event_definitions_path:
+        definitions_path = _resolve_path(channel.event_definitions_path)
+        if not definitions_path.is_file():
+            raise FileNotFoundError(
+                f"Web GA4 event definitions file not found: {definitions_path}"
+            )
+
+    lookback_raw = os.getenv("GA4_WEB_LOOKBACK_DAYS", "").strip()
+    if not lookback_raw:
+        lookback_raw = os.getenv("GA4_LOOKBACK_DAYS", "").strip()
+    if not lookback_raw:
+        lookback_raw = os.getenv("APP_STORE_CONNECT_LOOKBACK_DAYS", "7").strip() or "7"
+    try:
+        lookback_days = int(lookback_raw)
+    except ValueError as exc:
+        raise ValueError("GA4_WEB_LOOKBACK_DAYS must be an integer") from exc
+    if lookback_days < 1:
+        raise ValueError("GA4_WEB_LOOKBACK_DAYS must be >= 1")
+
+    return _build_ga4_settings(
+        property_raw=channel.property_id,
+        key_event_names=channel.key_events,
+        definitions_path=definitions_path,
+        lookback_days=lookback_days,
+        auth_label="Web GA4",
+        hostname_exact=channel.hostname,
+        platform_exact=channel.platform,
     )
 
 
@@ -426,6 +544,18 @@ def get_admob_settings() -> AdMobSettings | None:
     if not app_ids_raw:
         app_ids_raw = os.getenv("ADMOB_APP_ID", "").strip()
     app_ids = tuple(part.strip() for part in app_ids_raw.split(",") if part.strip())
+
+    try:
+        from product_config import load_product_config
+
+        product = load_product_config()
+    except Exception:
+        product = None
+    if product is not None:
+        if not product.admob.enabled:
+            return None
+        if product.admob.app_ids:
+            app_ids = product.admob.app_ids
 
     currency = os.getenv("ADMOB_CURRENCY_CODE", "JPY").strip().upper() or "JPY"
 

@@ -239,18 +239,29 @@ def _period_alignment_notes(
     asc: AscGrowthSnapshot,
     ga4: Ga4GrowthSnapshot | None,
     admob: AdMobGrowthSnapshot | None,
+    ga4_web: Ga4GrowthSnapshot | None = None,
 ) -> list[str]:
     notes = [
         f"- ASC current period: {asc.current.start} → {asc.current.end}",
         f"- ASC previous period: {asc.previous.start} → {asc.previous.end}",
     ]
     if ga4 is None:
-        notes.append("- GA4 periods: not available (GA4 not connected).")
+        notes.append("- GA4 App periods: not available (GA4 App not connected).")
     else:
         notes.extend(
             [
-                f"- GA4 current period: {ga4.current.start} → {ga4.current.end}",
-                f"- GA4 previous period: {ga4.previous.start} → {ga4.previous.end}",
+                f"- GA4 App current period: {ga4.current.start} → {ga4.current.end}",
+                f"- GA4 App previous period: {ga4.previous.start} → {ga4.previous.end}",
+            ]
+        )
+
+    if ga4_web is None:
+        notes.append("- GA4 Web periods: not available (Web GA4 not connected).")
+    else:
+        notes.extend(
+            [
+                f"- GA4 Web current period: {ga4_web.current.start} → {ga4_web.current.end}",
+                f"- GA4 Web previous period: {ga4_web.previous.start} → {ga4_web.previous.end}",
             ]
         )
 
@@ -270,11 +281,21 @@ def _period_alignment_notes(
     if ga4 is not None:
         sources.append(
             (
-                "GA4",
+                "GA4 App",
                 ga4.current.start,
                 ga4.current.end,
                 ga4.previous.start,
                 ga4.previous.end,
+            )
+        )
+    if ga4_web is not None:
+        sources.append(
+            (
+                "GA4 Web",
+                ga4_web.current.start,
+                ga4_web.current.end,
+                ga4_web.previous.start,
+                ga4_web.previous.end,
             )
         )
     if admob is not None:
@@ -319,6 +340,7 @@ def _population_scope_notes(
     asc: AscGrowthSnapshot,
     ga4: Ga4GrowthSnapshot | None,
     admob: AdMobGrowthSnapshot | None,
+    ga4_web: Ga4GrowthSnapshot | None = None,
 ) -> list[str]:
     """State what each source actually counts. Matching dates != matching populations."""
     territory = (
@@ -332,17 +354,33 @@ def _population_scope_notes(
     ]
 
     if ga4 is None:
-        notes.append("- GA4: not connected for this run.")
+        notes.append("- GA4 App: not connected for this run.")
     else:
         notes.extend(
             [
-                f"- GA4 = the whole property {ga4.property_resource}.",
-                "  This run applies NO country filter and NO platform filter, so GA4",
+                f"- GA4 App = the whole property {ga4.property_resource}.",
+                "  This run applies NO country filter and NO platform filter, so GA4 App",
                 "  numbers cover every platform that property receives (iOS, Android,",
                 "  web) and every country — including traffic that never touches the",
                 "  App Store.",
             ]
         )
+
+    if ga4_web is None:
+        notes.append("- GA4 Web: not connected for this run.")
+    else:
+        notes.extend(
+            [
+                f"- GA4 Web = the Web analytics property {ga4_web.property_resource}.",
+                "  This is a separate population from GA4 App / ASC / AdMob.",
+                "  Do NOT funnel Web sessions or page views into App Store downloads",
+                "  or assert Web → App causation without explicit attribution facts.",
+                "  Parallel same-window observations are allowed.",
+            ]
+        )
+        for note in ga4_web.notes:
+            if "hostName EXACT" in note or "Dimension filter" in note:
+                notes.append(f"  {note}")
 
     if admob is None:
         notes.append("- AdMob: not connected for this run.")
@@ -367,7 +405,16 @@ def _population_scope_notes(
             ]
         )
 
-    connected = [name for name, obj in (("ASC", True), ("GA4", ga4), ("AdMob", admob)) if obj]
+    connected = [
+        name
+        for name, obj in (
+            ("ASC", True),
+            ("GA4 App", ga4),
+            ("GA4 Web", ga4_web),
+            ("AdMob", admob),
+        )
+        if obj
+    ]
     if len(connected) >= 2:
         notes.extend(
             [
@@ -378,8 +425,8 @@ def _population_scope_notes(
                 "- Therefore: do NOT divide, ratio, subtract, or funnel one source's",
                 "  numbers into another's. Examples of disallowed cross-source math:",
                 "  first_open vs first-time downloads, GA4 ad_impression vs AdMob",
-                "  IMPRESSIONS, AdMob earnings vs ASC downloads. Do not describe them",
-                "  as stages of one funnel.",
+                "  IMPRESSIONS, AdMob earnings vs ASC downloads, Web sessions vs",
+                "  App Store downloads. Do not describe them as stages of one funnel.",
             ]
         )
     return notes
@@ -472,6 +519,8 @@ def format_agent_input(
     *,
     ga4: Ga4GrowthSnapshot | None = None,
     ga4_status: str | None = None,
+    ga4_web: Ga4GrowthSnapshot | None = None,
+    ga4_web_status: str | None = None,
     admob: AdMobGrowthSnapshot | None = None,
     admob_status: str | None = None,
 ) -> str:
@@ -481,7 +530,15 @@ def format_agent_input(
         else "n/a"
     )
     ga4_connected = ga4 is not None
+    ga4_web_connected = ga4_web is not None
     admob_connected = admob is not None
+
+    try:
+        from product_config import load_product_config
+
+        product = load_product_config()
+    except Exception:
+        product = None
 
     confirmed = [
         "CONFIRMED CAPABILITIES (from this run)",
@@ -500,7 +557,39 @@ def format_agent_input(
         confirmed.extend(_ga4_confirmed_capabilities(ga4))
     else:
         confirmed.append(
-            f"- {ga4_status or 'GA4: not connected yet (do not invent values).'}"
+            f"- {ga4_status or 'GA4 App: not connected yet (do not invent values).'}"
+        )
+    if ga4_web_connected and ga4_web is not None:
+        confirmed.append(
+            f"- Web GA4 property {ga4_web.property_resource}: activeUsers, sessions,"
+        )
+        confirmed.append(
+            "  screenPageViews (page views), configured key events, period-over-period."
+        )
+        confirmed.append(
+            "- Web is an independent channel/population from App Store / GA4 App / AdMob."
+        )
+        confirmed.append(
+            "- Web GA4 metrics above are site-wide for the filtered host only —"
+        )
+        confirmed.append(
+            "  they are NOT feature-level usage of any Web channel capability."
+        )
+    else:
+        confirmed.append(
+            f"- {ga4_web_status or 'Web GA4: not connected (optional channel).'}"
+        )
+    if product is not None and product.web.enabled and product.web.capabilities:
+        confirmed.append(
+            "- Web channel product capabilities (declared what users CAN do on the"
+        )
+        confirmed.append(
+            "  site — NOT measured usage; do NOT treat as GA4 event counts):"
+        )
+        for cap in product.web.capabilities:
+            confirmed.append(f"  - {cap}")
+        confirmed.append(
+            "- Having a capability does NOT prove period usage of that feature."
         )
     if admob_connected and admob is not None:
         confirmed.extend(_admob_confirmed_capabilities(admob))
@@ -517,11 +606,20 @@ def format_agent_input(
         "- Causality: if cause/effect is not proven by the data, do not assert it.",
         "  Prefer 'largest observed change' / 'appears associated with' over",
         "  'primary cause' / 'did not cause' / 'this proves'.",
-        "- Period alignment: ASC / GA4 / AdMob may cover different calendar windows.",
-        "  Use PERIOD ALIGNMENT below. Never treat misaligned sources as the same period.",
-        "- Population scope: even with identical dates, ASC / GA4 / AdMob count",
-        "  different populations. Use POPULATION SCOPE below. Never ratio or funnel",
-        "  one source into another unless that section states the populations match.",
+        "- Period alignment: ASC / GA4 App / GA4 Web / AdMob may cover different",
+        "  calendar windows. Use PERIOD ALIGNMENT below. Never treat misaligned",
+        "  sources as the same period.",
+        "- Population scope: even with identical dates, ASC / GA4 App / GA4 Web /",
+        "  AdMob count different populations. Use POPULATION SCOPE below. Never",
+        "  ratio or funnel one source into another unless that section states the",
+        "  populations match. Especially: no Web → App Store download funnel without",
+        "  attribution evidence.",
+        "- Product channel capabilities vs analytics: a capability listed under",
+        "  CONFIRMED CAPABILITIES means users CAN do that action on the channel.",
+        "  It is NOT a GA4 event definition and NOT a usage count. Site-wide Web",
+        "  users/sessions/page views must not be read as feature usage of a",
+        "  capability (e.g. mahjong_score_calculation) unless feature-level events",
+        "  or paths are present in this input (they are not, in this Phase).",
         "- Platform capabilities: propose ONLY items listed under CONFIRMED",
         "  CAPABILITIES or ALLOWED LISTING ACTIONS below. Do not propose other ASC,",
         "  GA4, or AdMob analytics features/reports/tiers/thresholds/dimensions even",
@@ -533,6 +631,8 @@ def format_agent_input(
         "ALLOWED LISTING ACTIONS (always allowed to suggest)",
         "- App Store metadata / product page edits: title, subtitle, keyword field,",
         "  description, promotional text, screenshots.",
+        "- Web site content edits when Web channel facts are present (manual only;",
+        "  never claim automatic publish).",
         "",
         "DISALLOWED UNLESS EXPLICITLY PRESENT IN INPUT",
         "- keyword-level analytics, analytics tiers, minimum threshold rules,",
@@ -542,26 +642,65 @@ def format_agent_input(
         "  reports, or any AdMob dimension/metric not listed under CONFIRMED",
         "  CAPABILITIES,",
         "- Treating GA4 ad_impression and AdMob IMPRESSIONS as the same or matching,",
+        "- Web sessions → App Store downloads as one funnel or proven causation,",
+        "- Equating site-wide Web users/sessions/page views with usage of a declared",
+        "  Web capability (capability ≠ measured feature usage),",
+        "- Search Console / SEO rankings / Web revenue when not in the input,",
         "- Interpreting a GA4 event that has no entry under GA4 EVENT DEFINITIONS,",
         "  asserting a cause for any GA4 eventCount or AdMob metric change, treating",
         "  the ASC 'unattributed' remainder as a channel, and any other unlisted",
         "  ASC/GA4/AdMob analytics feature or data-fetch method.",
         "",
-        "APP",
-        f"- Name: {snapshot.app.name}",
-        f"- Bundle ID: {snapshot.app.bundle_id}",
-        f"- App Store Connect app ID: {snapshot.app.id}",
-        f"- ASC territory filter: {snapshot.territory}",
-        f"- Available daily ASC row span: {date_span} ({len(snapshot.daily)} dates)",
-        f"- Latest date with ASC analytics rows: {snapshot.latest_processing_date}",
-        f"- ASC configured lookback: {snapshot.lookback_days} days vs previous {snapshot.lookback_days} days",
+        "PRODUCT / APP",
     ]
+    if product is not None:
+        lines.extend(
+            [
+                f"- Product id: {product.id}",
+                f"- Product name: {product.name}",
+                f"- Product type: {product.type}",
+            ]
+        )
+        if product.web.enabled:
+            lines.append(
+                f"- Web domain: {product.web.domain or '(not set)'}"
+            )
+            if product.web.capabilities:
+                lines.append(
+                    "- Web channel capabilities (declared actions users CAN take —"
+                )
+                lines.append(
+                    "  NOT measured usage; NOT GA4 events): "
+                    + ", ".join(product.web.capabilities)
+                )
+            else:
+                lines.append("- Web channel capabilities: (none declared)")
+    lines.extend(
+        [
+            f"- ASC Name: {snapshot.app.name}",
+            f"- Bundle ID: {snapshot.app.bundle_id}",
+            f"- App Store Connect app ID: {snapshot.app.id}",
+            f"- ASC territory filter: {snapshot.territory}",
+            f"- Available daily ASC row span: {date_span} ({len(snapshot.daily)} dates)",
+            f"- Latest date with ASC analytics rows: {snapshot.latest_processing_date}",
+            f"- ASC configured lookback: {snapshot.lookback_days} days vs previous {snapshot.lookback_days} days",
+        ]
+    )
 
     if ga4_connected and ga4 is not None:
         lines.extend(
             [
-                f"- GA4 property: {ga4.property_resource}",
-                f"- GA4 configured lookback: {ga4.lookback_days} days vs previous {ga4.lookback_days} days",
+                f"- GA4 App property: {ga4.property_resource}",
+                f"- GA4 App configured lookback: {ga4.lookback_days} days vs previous {ga4.lookback_days} days",
+            ]
+        )
+    if ga4_web_connected and ga4_web is not None:
+        domain = product.web.domain if product is not None else None
+        lines.extend(
+            [
+                f"- GA4 Web property: {ga4_web.property_resource}",
+                f"- Web domain (config): {domain or '(not set)'}",
+                f"- GA4 Web configured lookback: {ga4_web.lookback_days} days vs previous {ga4_web.lookback_days} days",
             ]
         )
     if admob_connected and admob is not None:
@@ -581,6 +720,7 @@ def format_agent_input(
                 snapshot,
                 ga4 if ga4_connected else None,
                 admob if admob_connected else None,
+                ga4_web if ga4_web_connected else None,
             ),
             "",
             "POPULATION SCOPE (what each source counts)",
@@ -588,6 +728,7 @@ def format_agent_input(
                 snapshot,
                 ga4 if ga4_connected else None,
                 admob if admob_connected else None,
+                ga4_web if ga4_web_connected else None,
             ),
             "",
             "DATA QUALITY NOTES (facts about coverage)",
@@ -596,6 +737,8 @@ def format_agent_input(
     )
     if ga4_connected and ga4 is not None:
         lines.extend(f"- {note}" for note in ga4.notes)
+    if ga4_web_connected and ga4_web is not None:
+        lines.extend(f"- [Web] {note}" for note in ga4_web.notes)
     if admob_connected and admob is not None:
         lines.extend(f"- {note}" for note in admob.notes)
 
@@ -620,12 +763,12 @@ def format_agent_input(
                 "",
                 *_ga4_event_definition_notes(ga4),
                 "",
-                "GA4 — FACTS",
+                "GA4 APP — FACTS",
                 *_ga4_period_block("Current period", ga4.current, ga4.key_event_names),
                 "",
                 *_ga4_period_block("Previous period", ga4.previous, ga4.key_event_names),
                 "",
-                "GA4 period-over-period change (fact, from the two GA4 periods above only):",
+                "GA4 App period-over-period change (fact, from the two GA4 App periods above only):",
                 f"- Active users (period): {_fmt_pct(ga4.change_active_users_pct())}",
                 f"- Sessions: {_fmt_pct(ga4.change_sessions_pct())}",
                 f"- Screen/page views: {_fmt_pct(ga4.change_screen_page_views_pct())}",
@@ -637,8 +780,40 @@ def format_agent_input(
         lines.extend(
             [
                 "",
-                "GA4 — FACTS",
-                f"- {ga4_status or 'GA4: not connected yet (do not invent values).'}",
+                "GA4 APP — FACTS",
+                f"- {ga4_status or 'GA4 App: not connected yet (do not invent values).'}",
+            ]
+        )
+
+    if ga4_web_connected and ga4_web is not None:
+        lines.extend(
+            [
+                "",
+                *_ga4_event_definition_notes(ga4_web),
+                "",
+                "GA4 WEB — FACTS (independent channel; do not funnel into App Store DL)",
+                *_ga4_period_block(
+                    "Current period", ga4_web.current, ga4_web.key_event_names
+                ),
+                "",
+                *_ga4_period_block(
+                    "Previous period", ga4_web.previous, ga4_web.key_event_names
+                ),
+                "",
+                "GA4 Web period-over-period change (fact, from the two Web periods above only):",
+                f"- Users (period): {_fmt_pct(ga4_web.change_active_users_pct())}",
+                f"- Sessions: {_fmt_pct(ga4_web.change_sessions_pct())}",
+                f"- Page views: {_fmt_pct(ga4_web.change_screen_page_views_pct())}",
+                "",
+                *_ga4_key_event_changes(ga4_web),
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "GA4 WEB — FACTS",
+                f"- {ga4_web_status or 'Web GA4: not connected (optional channel).'}",
             ]
         )
 
@@ -661,10 +836,10 @@ def format_agent_input(
             "and what the developer should prioritize next.",
             "Keep Facts and Speculation clearly separated.",
             "Describe relationships with observation-based language when causality is unproven.",
-            "If ASC / GA4 / AdMob periods differ, analyze each source in its own window;",
-            "do not present them as one shared period.",
-            "Regardless of the periods, keep ASC / GA4 / AdMob numbers in their own",
-            "populations per POPULATION SCOPE: no cross-source ratios or funnels.",
+            "If ASC / GA4 App / GA4 Web / AdMob periods differ, analyze each source in",
+            "its own window; do not present them as one shared period.",
+            "Regardless of the periods, keep ASC / GA4 App / GA4 Web / AdMob numbers in",
+            "their own populations per POPULATION SCOPE: no cross-source ratios or funnels.",
             "For GA4 key events: interpret an event only through GA4 EVENT DEFINITIONS,",
             "report observed counts/changes, and never assert why a count changed.",
             "For AdMob: report observed ESTIMATED_EARNINGS / IMPRESSIONS /",
@@ -672,16 +847,30 @@ def format_agent_input(
             "for eCPM or earnings moves (demand, geo, format, fill, etc.) — those",
             "dimensions are not in this input.",
             "Treat Revenue (AdMob ESTIMATED_EARNINGS in this run) as one Growth axis",
-            "alongside Product growth / Conversion / Engagement. Always weigh absolute",
-            "amount together with changePercent; do not let a large % on a small absolute",
-            "amount become the primary Most Important Finding or Top action basis.",
+            "alongside Product growth / Conversion / Engagement (App) / Engagement (Web).",
+            "Always weigh absolute amount together with changePercent; do not let a large",
+            "% on a small absolute amount become the primary Most Important Finding or",
+            "Top action basis.",
+            "When Web GA4 facts are present, you may note parallel same-window moves",
+            "(e.g. Web sessions up AND ASC search impressions up). Do NOT assert Web →",
+            "App Store download causation or build that funnel without attribution facts.",
+            "If Web channel capabilities are listed (e.g. mahjong_score_calculation),",
+            "you may state as Fact that the capability exists on the Web channel.",
+            "Keep that separate from site-wide Web users/sessions/page views Facts.",
+            "Do NOT claim those site-wide metrics prove capability feature usage.",
+            "Feature-level path/event instrumentation is NOT in this input — do not",
+            "invent usage counts for a capability. A Measurement action is allowed only",
+            "when Facts show a real decision gap; do not force it merely because a",
+            "capability exists.",
+            "Do not force Web or Revenue to be the Most Important Finding merely because",
+            "those channels or capabilities exist.",
             "Do not casually sum currencies or ASC Downloads with AdMob earnings as one",
             "funnel, and do not assert Downloads → Revenue causation.",
             "Never equate GA4 ad_impression with AdMob IMPRESSIONS.",
-            "For Top 3 actions: prioritize across ASC / GA4 / AdMob using ALLOWED",
-            "LISTING ACTIONS, GA4 EVENT DEFINITIONS, and conclusions from CONFIRMED",
-            "CAPABILITIES / facts only. Do not mention unconfirmed ASC/GA4/AdMob",
-            "analytics features, even conditionally.",
+            "For Top 3 actions: prioritize across ASC / GA4 App / GA4 Web / AdMob using",
+            "ALLOWED LISTING ACTIONS, GA4 EVENT DEFINITIONS, and conclusions from",
+            "CONFIRMED CAPABILITIES / facts only. Do not mention unconfirmed",
+            "ASC/GA4/AdMob analytics features, even conditionally.",
             "Return exactly this shape:",
             "1. Most important finding",
             "   - Facts: only what the numbers above state.",
