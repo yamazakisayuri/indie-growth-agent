@@ -275,6 +275,7 @@ function ExperimentBlock({
 
       const result = await requestDraft({
         language,
+        productId: report.product?.id,
         experiment: {
           title: experiment.title,
           hypothesis: experiment.hypothesis,
@@ -435,9 +436,15 @@ export function GrowthExperiments({ report }: { report: GrowthReport }) {
   const { copy } = useLanguage();
   const experiments = report.growthExperiments ?? [];
   // Survive Analyze remounts / experiment-title changes: drafts live here, not in each block.
+  // Cleared when parent remounts on product switch (key includes product id).
   const [slotsByTitle, setSlotsByTitle] = useState<Record<string, DraftSlot>>(
     {},
   );
+
+  useEffect(() => {
+    // Drop drafts when the bound Analyze product / run changes.
+    setSlotsByTitle({});
+  }, [report.product?.id, report.analysisRunId]);
 
   const hasPlanner =
     experiments.length > 0 ||

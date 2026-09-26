@@ -142,6 +142,13 @@ export interface GrowthReport {
     description: string;
   }>;
   knownEventsUsed?: string[];
+  /** Selected Product identity from AnalyzeResponse. */
+  product?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
+  channels?: AnalyzeApiResponse["channels"];
 }
 
 /** Raw JSON from POST /api/analyze (Python Agent API). */

@@ -55,6 +55,9 @@ app.add_middleware(
 
 class AnalyzeRequest(BaseModel):
     language: Literal["ja", "en"] = Field(default="en")
+    product_id: str | None = Field(default=None, alias="productId")
+
+    model_config = {"populate_by_name": True}
 
 
 class DraftExperimentBody(BaseModel):
@@ -96,6 +99,7 @@ class DraftRequest(BaseModel):
     """Human-selected experiment only — never auto-draft all experiments."""
 
     language: Literal["ja", "en"] = Field(default="en")
+    product_id: str | None = Field(default=None, alias="productId")
     experiment: DraftExperimentBody
     mostImportantFinding: str = ""
     facts: list[str] = Field(default_factory=list)
@@ -106,6 +110,8 @@ class DraftRequest(BaseModel):
     metrics: dict = Field(default_factory=dict)
     analysisRunId: str | None = None
     dataSource: Literal["live", "mock"] | None = None
+
+    model_config = {"populate_by_name": True}
 
 
 class ErrorBody(BaseModel):
@@ -176,15 +182,34 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/products")
+def list_products() -> dict:
+    """Public product catalog for the UI selector (no secrets)."""
+    from product_config import get_default_product_id, list_product_summaries
+
+    return {
+        "defaultProductId": get_default_product_id(),
+        "products": list_product_summaries(),
+    }
+
+
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
-    logger.info("Analyze requested language=%s", body.language)
+    logger.info(
+        "Analyze requested language=%s productId=%s",
+        body.language,
+        body.product_id or "(default)",
+    )
     try:
-        report = run_analysis(language=body.language)
+        report = run_analysis(
+            language=body.language,
+            product_id=body.product_id,
+        )
         logger.info(
-            "Analyze completed language=%s app=%s actions=%s experiments=%s "
+            "Analyze completed language=%s product=%s app=%s actions=%s experiments=%s "
             "planner=%s analysisRunId=%s period=%s→%s",
             body.language,
+            (report.product or {}).get("id") if report.product else None,
             report.app.get("name"),
             len(report.analysis.get("actions") or []),
             len(report.growth_experiments or []),
@@ -194,6 +219,16 @@ def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
             (report.period or {}).get("end"),
         )
         return report
+    except ValueError as exc:
+        # Unknown product id etc.
+        logger.warning("Analyze rejected: %s", str(exc)[:300])
+        raise HTTPException(
+            status_code=400,
+            detail=ErrorBody(
+                error=str(exc)[:200],
+                code="invalid_product",
+            ).model_dump(),
+        ) from None
     except Exception as exc:  # noqa: BLE001 — map all failures to a safe client message
         _log_failure(exc)
         raise HTTPException(
@@ -211,9 +246,10 @@ def create_draft(body: DraftRequest) -> dict:
     _assert_draft_analysis_context(body)
     period = body.period.model_dump() if body.period is not None else {}
     logger.info(
-        "Draft requested language=%s experiment=%s user_screenshots=%s "
+        "Draft requested language=%s productId=%s experiment=%s user_screenshots=%s "
         "analysisRunId=%s dataSource=%s period=%s→%s",
         body.language,
+        body.product_id or "(default)",
         body.experiment.title[:120],
         len(body.userScreenshots or []),
         body.analysisRunId,
@@ -222,19 +258,22 @@ def create_draft(body: DraftRequest) -> dict:
         period.get("end"),
     )
     try:
-        result = run_draft_generator(
-            experiment=body.experiment.model_dump(),
-            most_important_finding=body.mostImportantFinding,
-            facts=body.facts,
-            playbooks_consulted=body.playbooksConsulted,
-            app=body.app,
-            user_screenshots=[s.model_dump() for s in body.userScreenshots],
-            language=body.language,
-            period=period,
-            metrics=body.metrics or {},
-            analysis_run_id=body.analysisRunId,
-            data_source=body.dataSource,
-        )
+        from product_config import use_product
+
+        with use_product(body.product_id):
+            result = run_draft_generator(
+                experiment=body.experiment.model_dump(),
+                most_important_finding=body.mostImportantFinding,
+                facts=body.facts,
+                playbooks_consulted=body.playbooksConsulted,
+                app=body.app,
+                user_screenshots=[s.model_dump() for s in body.userScreenshots],
+                language=body.language,
+                period=period,
+                metrics=body.metrics or {},
+                analysis_run_id=body.analysisRunId,
+                data_source=body.dataSource,
+            )
         draft = result.get("draft") or {}
         logger.info(
             "Draft completed type=%s screenshots=%s missing=%s analysisRunId=%s",

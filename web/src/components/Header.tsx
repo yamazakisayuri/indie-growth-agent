@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import type { ProductSummary } from "@/lib/analyze-client";
 import { useLanguage } from "@/lib/language-context";
 import type { GrowthReport } from "@/lib/types";
 import { LanguageSelector } from "./LanguageSelector";
@@ -10,6 +11,9 @@ interface HeaderProps {
   analyzing: boolean;
   elapsedSec: number;
   error: string | null;
+  products: ProductSummary[];
+  productId: string;
+  onProductChange: (productId: string) => void;
   onAnalyze: () => void;
 }
 
@@ -36,11 +40,22 @@ export function Header({
   analyzing,
   elapsedSec,
   error,
+  products,
+  productId,
+  onProductChange,
   onAnalyze,
 }: HeaderProps) {
   const { copy } = useLanguage();
   const periodLabel = asDisplayText(report.periodLabel);
   const comparisonLabel = asDisplayText(report.comparisonLabel);
+  const productLabel =
+    report.product?.name ||
+    products.find((item) => item.id === productId)?.name ||
+    productId;
+  const appLabel =
+    report.dataSource === "live"
+      ? asDisplayText(report.appName, productLabel)
+      : productLabel;
 
   return (
     <header className="site-header">
@@ -64,8 +79,12 @@ export function Header({
         </div>
         <dl className="site-header__meta">
           <div>
+            <dt>{copy("targetProduct")}</dt>
+            <dd>{asDisplayText(productLabel)}</dd>
+          </div>
+          <div>
             <dt>{copy("targetApp")}</dt>
-            <dd>{asDisplayText(report.appName)}</dd>
+            <dd>{appLabel}</dd>
           </div>
           <div>
             <dt>{copy("analysisPeriod")}</dt>
@@ -111,6 +130,22 @@ export function Header({
       </div>
 
       <div className="site-header__controls">
+        <label className="product-selector">
+          <span className="product-selector__label">{copy("targetProduct")}</span>
+          <select
+            className="product-selector__select"
+            value={productId}
+            disabled={analyzing}
+            onChange={(event) => onProductChange(event.target.value)}
+            aria-label={copy("targetProduct")}
+          >
+            {products.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <LanguageSelector />
         <button
           type="button"

@@ -522,6 +522,19 @@ def try_fetch_ga4_snapshot(
     """
     resolved = settings if settings is not None else get_ga4_settings()
     if resolved is None:
+        try:
+            from product_config import allow_env_identity_fallback, load_product_config
+
+            product = load_product_config()
+        except Exception:
+            product = None
+        if (
+            product is not None
+            and product.ga4_app.enabled
+            and not product.ga4_app.property_id
+            and not allow_env_identity_fallback(product)
+        ):
+            return None, f"{label}: not configured (no propertyId for this product)."
         return None, f"{label}: not connected (missing configuration)."
     try:
         return fetch_ga4_snapshot(resolved, as_of=as_of), None

@@ -185,21 +185,31 @@ def get_app_store_connect_settings() -> AppStoreConnectSettings:
     bundle_id = os.getenv("APP_STORE_CONNECT_BUNDLE_ID", "").strip() or None
     analytics_request_id = os.getenv("APP_STORE_CONNECT_ANALYTICS_REQUEST_ID", "").strip() or None
 
-    # Optional product.json overlays non-secret ASC identity (env remains fallback).
+    # Product channel identity overlays env. Non-default products never borrow
+    # another product's env IDs when their own identity is incomplete.
     try:
-        from product_config import load_product_config
+        from product_config import allow_env_identity_fallback, load_product_config
 
         product = load_product_config()
     except Exception:
         product = None
     if product is not None and product.app_store.enabled:
         channel = product.app_store
+        env_ok = allow_env_identity_fallback(product)
         if channel.app_id:
             app_id = channel.app_id
+        elif not env_ok:
+            app_id = None
         if channel.bundle_id:
             bundle_id = channel.bundle_id
+        elif not env_ok:
+            bundle_id = None
         if channel.territory:
             territory = channel.territory.strip().upper() or territory
+        # Clear preferred analytics request when switching away from env default —
+        # request IDs are app-specific.
+        if not env_ok:
+            analytics_request_id = None
 
     return AppStoreConnectSettings(
         credentials=credentials,
@@ -372,9 +382,9 @@ def get_ga4_settings() -> Ga4Settings | None:
     else:
         definitions_path = ROOT_DIR / DEFAULT_EVENT_DEFINITIONS_FILENAME
 
-    # Optional product.json overlays for App GA4 (non-secret identity only).
+    # Product App GA4 identity. Env property is fallback for default product only.
     try:
-        from product_config import load_product_config
+        from product_config import allow_env_identity_fallback, load_product_config
 
         product = load_product_config()
     except Exception:
@@ -383,10 +393,16 @@ def get_ga4_settings() -> Ga4Settings | None:
         if not product.ga4_app.enabled:
             return None
         channel = product.ga4_app
+        env_ok = allow_env_identity_fallback(product)
         if channel.property_id:
             property_raw = channel.property_id
+        elif not env_ok:
+            # Non-default product without propertyId → not_configured.
+            return None
         if channel.key_events:
             key_event_names = channel.key_events
+        elif not env_ok:
+            key_event_names = ()
         if channel.event_definitions_path:
             definitions_path = _resolve_path(channel.event_definitions_path)
             if not definitions_path.is_file():
@@ -599,7 +615,7 @@ def get_admob_settings() -> AdMobSettings | None:
     app_ids = tuple(part.strip() for part in app_ids_raw.split(",") if part.strip())
 
     try:
-        from product_config import load_product_config
+        from product_config import allow_env_identity_fallback, load_product_config
 
         product = load_product_config()
     except Exception:
@@ -607,8 +623,13 @@ def get_admob_settings() -> AdMobSettings | None:
     if product is not None:
         if not product.admob.enabled:
             return None
+        env_ok = allow_env_identity_fallback(product)
         if product.admob.app_ids:
             app_ids = product.admob.app_ids
+        elif not env_ok:
+            # Non-default without appIds → do not use another product's env filter
+            # (would mix revenue). Treat as not configured.
+            return None
 
     currency = os.getenv("ADMOB_CURRENCY_CODE", "JPY").strip().upper() or "JPY"
 

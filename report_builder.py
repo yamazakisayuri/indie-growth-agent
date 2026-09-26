@@ -151,7 +151,7 @@ def _grounding_rules(language: str) -> list[str]:
             "ソース間の母集団を同一視しない",
             "Revenue は絶対額と変化率の両方を見る（少額の大きな%だけで判断しない）",
             "Web と App を直接ファネル化しない（計測根拠なき Web→App DL 因果を断定しない）",
-            "capability ≠ usage。/mahjong/ page view ≠ 計算利用。form_submit は submit 近似のみ",
+            "capability ≠ usage。path page view ≠ 機能利用。form_submit は submit 近似のみ",
             "appstore_click は Web CTA クリックのみ（ASC DL / first_open ではない）",
             "少数イベントの大きな変化率を過大評価しない",
         ]
@@ -162,7 +162,7 @@ def _grounding_rules(language: str) -> list[str]:
         "Judge revenue with absolute amount and changePercent together "
         "(do not over-weight large % on small absolute amounts)",
         "Do not funnel Web into App Store downloads without attribution evidence",
-        "capability ≠ usage; path page views ≠ calculation; form_submit is submit proxy only",
+        "capability ≠ usage; path page views ≠ feature usage; form_submit is submit proxy only",
         "appstore_click is Web CTA click only (not ASC download / first_open)",
         "Do not over-weight large % changes on small absolute Web event counts",
     ]
