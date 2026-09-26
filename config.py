@@ -52,6 +52,10 @@ class AppStoreConnectSettings:
     territory: str
     lookback_days: int
     analytics_request_id: str | None
+    # Sales Reports (Revenue Phase 2). Account-level; never store in Product JSON.
+    vendor_number: str | None = None
+    # App SKU for Sales Parent Identifier / Apple Identifier filtering.
+    app_sku: str | None = None
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,13 @@ def get_app_store_connect_credentials() -> AppStoreConnectCredentials:
     )
 
 
+def get_asc_vendor_number() -> str | None:
+    """Vendor Number for Sales / Finance reports. Account-level secret-adjacent config."""
+    load_env()
+    value = os.getenv("ASC_VENDOR_NUMBER", "").strip()
+    return value or None
+
+
 def get_app_store_connect_settings() -> AppStoreConnectSettings:
     load_env()
     credentials = get_app_store_connect_credentials()
@@ -184,6 +195,8 @@ def get_app_store_connect_settings() -> AppStoreConnectSettings:
     app_id = os.getenv("APP_STORE_CONNECT_APP_ID", "").strip() or None
     bundle_id = os.getenv("APP_STORE_CONNECT_BUNDLE_ID", "").strip() or None
     analytics_request_id = os.getenv("APP_STORE_CONNECT_ANALYTICS_REQUEST_ID", "").strip() or None
+    vendor_number = get_asc_vendor_number()
+    app_sku: str | None = None
 
     # Product channel identity overlays env. Non-default products never borrow
     # another product's env IDs when their own identity is incomplete.
@@ -206,6 +219,10 @@ def get_app_store_connect_settings() -> AppStoreConnectSettings:
             bundle_id = None
         if channel.territory:
             territory = channel.territory.strip().upper() or territory
+        if channel.sku:
+            app_sku = channel.sku
+        elif not env_ok:
+            app_sku = None
         # Clear preferred analytics request when switching away from env default —
         # request IDs are app-specific.
         if not env_ok:
@@ -218,6 +235,8 @@ def get_app_store_connect_settings() -> AppStoreConnectSettings:
         territory=territory,
         lookback_days=lookback_days,
         analytics_request_id=analytics_request_id,
+        vendor_number=vendor_number,
+        app_sku=app_sku,
     )
 
 

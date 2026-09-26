@@ -46,6 +46,9 @@ const BLOCK_SOURCE_KEYS: Record<string, CopyKey> = {
   web: "sourceWeb",
 };
 
+// Prefer backend-provided source label for revenue (AdMob / App Store Sales).
+const KEEP_BACKEND_SOURCE = new Set(["revenue"]);
+
 const MOCK_ANALYSIS_RUN_ID = "mock-demo";
 
 function resolveMetricLabel(
@@ -76,7 +79,10 @@ function mapMetricGroup(
   return {
     id: group.id,
     title: titleKey ? t(titleKey, language) : group.title,
-    source: sourceKey ? t(sourceKey, language) : group.source,
+    source:
+      KEEP_BACKEND_SOURCE.has(group.id) || !sourceKey
+        ? group.source
+        : t(sourceKey, language),
     connected: group.connected,
     statusMessage: group.statusMessage ?? undefined,
     metrics: group.metrics.map((metric) => ({

@@ -10,6 +10,7 @@ from admob import try_fetch_admob_snapshot
 from admob.snapshot import AdMobGrowthSnapshot
 from analysis_schema import AnalyzeResponse, StructuredAnalysis
 from asc import AscGrowthSnapshot, fetch_growth_snapshot
+from asc.sales import AscSalesRevenueSnapshot, try_fetch_sales_revenue_snapshot
 from format_input import format_agent_input
 from ga4 import try_fetch_ga4_snapshot, try_fetch_ga4_web_snapshot
 from ga4.snapshot import Ga4GrowthSnapshot
@@ -48,8 +49,8 @@ Hard rules:
   clicks) may be reported as Facts. Do NOT invent reasons for those moves —
   especially eCPM — from unfetched data such as ad demand, geography, format,
   fill rate, or mediation mix.
-- Revenue as a Growth axis (Phase 1 = AdMob ESTIMATED_EARNINGS only unless more
-  sources appear in the input):
+- Revenue as a Growth axis (AdMob ESTIMATED_EARNINGS and/or App Store Sales
+  Developer Proceeds when present in the input):
   - Treat Product growth (ASC downloads / impressions), Conversion (ASC rates),
     Engagement (GA4 App), Web engagement (GA4 Web when present), and Revenue as
     parallel observation axes. Choose the Most Important Finding and Top actions
@@ -57,10 +58,19 @@ Hard rules:
   - Always consider absolute amount AND changePercent together. Do not let a large
     percentage move on a small absolute amount become the primary basis for Most
     Important Finding or a Top 3 action.
-  - Do not judge from changePercent alone.
+  - Do not judge from changePercent alone. If previous was 0, do not invent an
+    infinite or huge % — treat it as new proceeds without a ratio.
+  - Units ≠ Revenue. Free download Units are not revenue. Customer Price is not
+    the Growth revenue metric; use Developer Proceeds when App Store revenue is
+    present. Developer Proceeds are Sales Trends estimates — not Financial
+    Partner Share.
   - Do not casually sum revenue across currencies or across ASC / AdMob / other
-    sources — populations and money definitions differ.
+    sources — populations and money definitions differ. Never FX-convert.
+  - ASC Analytics territory (e.g. JP) and App Store Revenue (worldwide) are
+    different scopes. Never funnel JP Downloads → WW Revenue or assert causation.
   - Never treat ASC Downloads → AdMob Revenue as one funnel or proven causation.
+  - Do not force a Revenue / monetization experiment merely because App Store
+    proceeds (even a single IAP) appear in the input.
 - Web vs App channels (when Web GA4 / Web site facts are present):
   - Treat Web and App Store / App GA4 as independent populations.
   - Parallel observation is allowed (e.g. Web sessions rose in the same window
@@ -223,21 +233,51 @@ def fetch_source_snapshots() -> tuple[
     str | None,
     AdMobGrowthSnapshot | None,
     str | None,
+    AscSalesRevenueSnapshot | None,
 ]:
-    """Fetch ASC (required) + optional GA4 App / GA4 Web / AdMob."""
+    """Fetch ASC (required) + optional GA4 App / GA4 Web / AdMob + Sales revenue."""
     # Anchor GA4 and AdMob to the newest ASC date so all sources compare the same windows.
     asc = fetch_growth_snapshot()
     as_of = _asc_anchor_date(asc)
     ga4, ga4_status = try_fetch_ga4_snapshot(as_of=as_of)
     ga4_web, ga4_web_status = try_fetch_ga4_web_snapshot(as_of=as_of)
     admob, admob_status = try_fetch_admob_snapshot(as_of=as_of)
-    return asc, ga4, ga4_status, ga4_web, ga4_web_status, admob, admob_status
+
+    from config import get_app_store_connect_settings
+
+    settings = get_app_store_connect_settings()
+    sales = try_fetch_sales_revenue_snapshot(
+        app_id=settings.app_id or asc.app.id,
+        app_sku=settings.app_sku,
+        current_start=asc.current.start,
+        current_end=asc.current.end,
+        previous_start=asc.previous.start,
+        previous_end=asc.previous.end,
+        lookback_days=asc.lookback_days,
+    )
+    return (
+        asc,
+        ga4,
+        ga4_status,
+        ga4_web,
+        ga4_web_status,
+        admob,
+        admob_status,
+        sales,
+    )
 
 
 def build_prompt_from_sources(*, language: str | None = None) -> str:
-    asc, ga4, ga4_status, ga4_web, ga4_web_status, admob, admob_status = (
-        fetch_source_snapshots()
-    )
+    (
+        asc,
+        ga4,
+        ga4_status,
+        ga4_web,
+        ga4_web_status,
+        admob,
+        admob_status,
+        sales,
+    ) = fetch_source_snapshots()
     prompt = format_agent_input(
         asc,
         ga4=ga4,
@@ -246,6 +286,7 @@ def build_prompt_from_sources(*, language: str | None = None) -> str:
         ga4_web_status=ga4_web_status,
         admob=admob,
         admob_status=admob_status,
+        sales=sales,
     )
     return prompt + _language_instruction(_normalize_language(language))
 
@@ -264,7 +305,7 @@ def run_analysis(
     Shared analysis entry for CLI and Web API.
 
     1) Bind product (default mahjong when product_id omitted)
-    2) Fetch ASC / GA4 App / optional GA4 Web / AdMob with existing grounding windows
+    2) Fetch ASC / GA4 App / optional GA4 Web / AdMob / Sales revenue
     3) Format agent input
     4) Run Strands / Bedrock with structured output
     5) Attach observed metrics + analysis into AnalyzeResponse
@@ -277,9 +318,16 @@ def run_analysis(
 
 def _run_analysis_bound(language: str | None = "en") -> AnalyzeResponse:
     lang = _normalize_language(language)
-    asc, ga4, ga4_status, ga4_web, ga4_web_status, admob, admob_status = (
-        fetch_source_snapshots()
-    )
+    (
+        asc,
+        ga4,
+        ga4_status,
+        ga4_web,
+        ga4_web_status,
+        admob,
+        admob_status,
+        sales,
+    ) = fetch_source_snapshots()
     prompt = format_agent_input(
         asc,
         ga4=ga4,
@@ -288,16 +336,18 @@ def _run_analysis_bound(language: str | None = "en") -> AnalyzeResponse:
         ga4_web_status=ga4_web_status,
         admob=admob,
         admob_status=admob_status,
+        sales=sales,
     ) + _language_instruction(lang)
 
     logger.info(
         "Running Indie Growth Agent analysis language=%s app=%s period=%s→%s "
-        "web_ga4=%s",
+        "web_ga4=%s sales_revenue=%s",
         lang,
         asc.app.name,
         asc.current.start,
         asc.current.end,
         "connected" if ga4_web is not None else "not_connected",
+        sales.status if sales is not None else "none",
     )
 
     result = agent(
@@ -318,6 +368,7 @@ def _run_analysis_bound(language: str | None = "en") -> AnalyzeResponse:
         ga4_web_status=ga4_web_status,
         admob=admob,
         admob_status=admob_status,
+        sales=sales,
         analysis=structured,
     )
     # Planner is additive. MCP / Planner failures must not fail Analyze.

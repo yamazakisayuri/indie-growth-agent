@@ -195,12 +195,23 @@ export interface AnalyzeApiResponse {
     note?: string;
     sources: Array<{
       source: string;
+      amountType?: string | null;
       amount?: number | null;
       previousAmount?: number | null;
       changePercent?: number | null;
       currency?: string | null;
+      units?: number | null;
+      previousUnits?: number | null;
       connected: boolean;
-      status: "ok" | "unavailable" | "not_connected";
+      status:
+        | "ok"
+        | "unavailable"
+        | "not_connected"
+        | "no_data"
+        | "not_configured"
+        | "permission_denied"
+        | "error";
+      note?: string | null;
     }>;
   } | null;
   analysis: {
