@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from agent import run_analysis
 from analysis_schema import AnalyzeResponse
+from analyze_cache import analyze_cache_key, get_or_run_analyze
 from draft_generator import run_draft_generator
 
 logger = logging.getLogger("indie_growth_api")
@@ -195,19 +196,25 @@ def list_products() -> dict:
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
+    cache_key = analyze_cache_key(body.product_id, body.language)
     logger.info(
-        "Analyze requested language=%s productId=%s",
+        "Analyze requested language=%s productId=%s cacheKey=%s",
         body.language,
         body.product_id or "(default)",
+        cache_key,
     )
     try:
-        report = run_analysis(
-            language=body.language,
-            product_id=body.product_id,
+        report, from_cache = get_or_run_analyze(
+            cache_key,
+            lambda: run_analysis(
+                language=body.language,
+                product_id=body.product_id,
+            ),
         )
         logger.info(
-            "Analyze completed language=%s product=%s app=%s actions=%s experiments=%s "
-            "planner=%s analysisRunId=%s period=%s→%s",
+            "Analyze completed cached=%s language=%s product=%s app=%s actions=%s "
+            "experiments=%s planner=%s analysisRunId=%s period=%s→%s",
+            from_cache,
             body.language,
             (report.product or {}).get("id") if report.product else None,
             report.app.get("name"),
@@ -220,7 +227,7 @@ def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
         )
         return report
     except ValueError as exc:
-        # Unknown product id etc.
+        # Unknown product id etc. — not cached.
         logger.warning("Analyze rejected: %s", str(exc)[:300])
         raise HTTPException(
             status_code=400,
