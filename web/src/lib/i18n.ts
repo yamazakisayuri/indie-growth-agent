@@ -131,12 +131,16 @@ export const uiCopy = {
     en: "Fetching App Store / GA4 / AdMob and running Bedrock usually takes 2–3 minutes. Please keep this page open.",
   },
   usingMock: {
-    ja: "デモ用モックデータ",
-    en: "Demo mock data",
+    ja: "デモ用モックデータ（Live Analyze ではありません）",
+    en: "Demo mock data (not a Live Analyze)",
   },
   usingLive: {
-    ja: "実データ",
-    en: "Live data",
+    ja: "実データ（Live Analyze）",
+    en: "Live Analyze data",
+  },
+  draftContextMismatch: {
+    ja: "Analysis context mismatch — Experiment と Analyze 結果が別 Run です。もう一度 Analyze してから Draft を作成してください。",
+    en: "Analysis context mismatch — experiment and report are from different Analyze runs. Run Analyze again, then Create Draft.",
   },
   analyzeError: {
     ja: "分析を完了できませんでした。データ接続を確認してください。",
@@ -226,6 +230,166 @@ export const uiCopy = {
   grounding3: {
     ja: "ソース間の母集団を同一視しない",
     en: "Cross-source populations are not assumed identical",
+  },
+  recommendedExperiments: {
+    ja: "Recommended Growth Experiments",
+    en: "Recommended Growth Experiments",
+  },
+  experimentHypothesis: {
+    ja: "Hypothesis",
+    en: "Hypothesis",
+  },
+  experimentWhy: {
+    ja: "Why",
+    en: "Why",
+  },
+  experimentAction: {
+    ja: "Action",
+    en: "Action",
+  },
+  experimentTargetMetric: {
+    ja: "Target metric",
+    en: "Target metric",
+  },
+  experimentExpectedSignal: {
+    ja: "Expected signal",
+    en: "Expected signal",
+  },
+  experimentDuration: {
+    ja: "Duration",
+    en: "Duration",
+  },
+  experimentEvidence: {
+    ja: "Evidence",
+    en: "Evidence",
+  },
+  experimentPlaybook: {
+    ja: "Playbook",
+    en: "Playbook",
+  },
+  playbooksConsulted: {
+    ja: "参照 Playbook",
+    en: "Playbooks consulted",
+  },
+  knownEventsUsed: {
+    ja: "判断に使った Known Events",
+    en: "Known Events used",
+  },
+  knownEventsConsidered: {
+    ja: "渡した Known Events",
+    en: "Known Events considered",
+  },
+  createDraft: {
+    ja: "Create Draft",
+    en: "Create Draft",
+  },
+  creatingDraft: {
+    ja: "草案を生成中…",
+    en: "Creating draft…",
+  },
+  draftUploadHint: {
+    ja: "現在の App Store スクリーンショット（PNG / JPEG）。選択順が position 1, 2, … になります。未選択でも Create Draft は可能です。",
+    en: "Current App Store screenshots (PNG / JPEG). Selection order becomes position 1, 2, …. Create Draft works without images.",
+  },
+  draftSelectImages: {
+    ja: "画像を選択",
+    en: "Select images",
+  },
+  draftClearImages: {
+    ja: "選択解除",
+    en: "Clear selection",
+  },
+  draftNoImagesSelected: {
+    ja: "画像未選択（Draft は missingInputs で要求できます）",
+    en: "No images selected (Draft may request them via missingInputs)",
+  },
+  draftImageTypeError: {
+    ja: "PNG / JPEG のみ選択できます。",
+    en: "Only PNG / JPEG files are accepted.",
+  },
+  draftNoChangeRecommended: {
+    ja: "変更非推奨（現状の訴求で十分と判断）",
+    en: "No change recommended (current creatives look sufficient)",
+  },
+  draftCurrentMessage: {
+    ja: "Current message",
+    en: "Current message",
+  },
+  draftKeep: {
+    ja: "Keep",
+    en: "Keep",
+  },
+  draftChange: {
+    ja: "Change",
+    en: "Change",
+  },
+  actionDraft: {
+    ja: "Action Draft",
+    en: "Action Draft",
+  },
+  experimentTitle: {
+    ja: "Experiment",
+    en: "Experiment",
+  },
+  draftOrphanHint: {
+    ja: "Analyze 完了で Experiment 一覧が変わっても、直前の Draft 結果はここに残します。",
+    en: "Draft results stay here even if Analyze replaces the experiment list.",
+  },
+  draftType: {
+    ja: "Draft type",
+    en: "Draft type",
+  },
+  draftObjective: {
+    ja: "Objective",
+    en: "Objective",
+  },
+  draftRationale: {
+    ja: "Rationale",
+    en: "Rationale",
+  },
+  draftScreenshot: {
+    ja: "Screenshot",
+    en: "Screenshot",
+  },
+  draftMessageGoal: {
+    ja: "Message goal",
+    en: "Message goal",
+  },
+  draftCopy: {
+    ja: "Copy draft",
+    en: "Copy draft",
+  },
+  draftRecommendedScreen: {
+    ja: "Recommended screen",
+    en: "Recommended screen",
+  },
+  draftWhy: {
+    ja: "Why",
+    en: "Why",
+  },
+  draftMissingInputs: {
+    ja: "Missing inputs",
+    en: "Missing inputs",
+  },
+  draftNotes: {
+    ja: "Notes",
+    en: "Notes",
+  },
+  draftPlaybooksUsed: {
+    ja: "Playbooks used",
+    en: "Playbooks used",
+  },
+  draftError: {
+    ja: "草案を生成できませんでした。",
+    en: "Could not generate the draft.",
+  },
+  noExperiments: {
+    ja: "No experiment recommended",
+    en: "No experiment recommended",
+  },
+  plannerError: {
+    ja: "Planner / MCP エラー（Analyzer 結果は有効）",
+    en: "Planner / MCP error (Analyzer result still valid)",
   },
 } as const;
 

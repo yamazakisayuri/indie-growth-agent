@@ -6,7 +6,10 @@
 
 export type Language = "ja" | "en";
 
-export type ReportSource = "mock" | "live";
+/** Explicit Analyze / Draft context source. Alias of report `source`. */
+export type DataSource = "live" | "mock";
+
+export type ReportSource = DataSource;
 
 export interface DisplayMetric {
   id: string;
@@ -33,29 +36,118 @@ export interface DisplayAction {
   basis?: string;
 }
 
+export interface AnalysisPeriod {
+  start: string;
+  end: string;
+  lookbackDays: number;
+  label: string;
+  comparisonLabel: string;
+  latestProcessingDate?: string;
+}
+
+export interface GrowthExperiment {
+  title: string;
+  hypothesis: string;
+  why: string;
+  action: string;
+  targetMetric: string;
+  expectedSignal: string;
+  suggestedDuration: string;
+  evidence: string;
+  playbookReference: string;
+  /** Same Analyze run id as the parent report when present. */
+  analysisRunId?: string;
+}
+
+export interface ScreenshotDraftItem {
+  position: number;
+  messageGoal?: string;
+  currentMessage?: string;
+  keep?: string;
+  change?: string;
+  copyDraft: string;
+  recommendedScreen: string;
+  why: string;
+}
+
+export interface ActionDraft {
+  experimentTitle: string;
+  draftType: string;
+  objective: string;
+  rationale: string;
+  screenshots: ScreenshotDraftItem[];
+  missingInputs: string[];
+  notes: string;
+  playbooksUsed: string[];
+  noChangeRecommended?: boolean;
+}
+
+export interface ActionDraftResponse {
+  draft: ActionDraft;
+  analysisRunId?: string | null;
+  dataSource?: DataSource | null;
+  period?: Partial<AnalysisPeriod> | Record<string, unknown>;
+  storeContext?: {
+    available?: Record<string, unknown>;
+    missingInputs?: string[];
+    notes?: string[];
+  };
+  userScreenshotsReceived?: Array<{
+    position: number;
+    fileName?: string | null;
+    mimeType?: string | null;
+    hasImageBytes?: boolean;
+    description?: string | null;
+  }>;
+}
+
 export interface DataScopeRow {
   source: string;
   scope: string;
 }
 
 export interface GrowthReport {
+  /** @deprecated Prefer dataSource — kept equal for existing UI. */
   source: ReportSource;
+  dataSource: DataSource;
+  analysisRunId: string;
   language: Language;
   appName: string;
   periodLabel: string;
   comparisonLabel: string;
+  period: AnalysisPeriod;
+  /** Optional raw app identity for Draft Generator. */
+  appBundleId?: string;
+  appStoreConnectId?: string;
+  appTerritory?: string;
   metrics: MetricBlock[];
+  /** API-shaped metrics for Draft request (same Analyze run). */
+  metricsPayload: AnalyzeApiResponse["metrics"];
   actions: DisplayAction[];
   facts: string[];
   speculation: string[];
   dataScope: DataScopeRow[];
   groundingRules: string[];
   mostImportantFinding?: string;
+  growthExperiments?: GrowthExperiment[];
+  plannerStatus?: string | null;
+  plannerError?: string | null;
+  playbooksConsulted?: string[];
+  knownEventsConsidered?: Array<{
+    date: string;
+    end_date?: string;
+    type: string;
+    product: string;
+    description: string;
+  }>;
+  knownEventsUsed?: string[];
 }
 
 /** Raw JSON from POST /api/analyze (Python Agent API). */
 export interface AnalyzeApiResponse {
   language: Language;
+  analysisRunId?: string;
+  dataSource?: DataSource;
   app: {
     name: string;
     bundleId?: string;
@@ -88,6 +180,18 @@ export interface AnalyzeApiResponse {
   };
   dataScope: DataScopeRow[];
   groundingRules: string[];
+  growthExperiments?: GrowthExperiment[];
+  plannerStatus?: string | null;
+  plannerError?: string | null;
+  playbooksConsulted?: string[];
+  knownEventsConsidered?: Array<{
+    date: string;
+    end_date?: string;
+    type: string;
+    product: string;
+    description: string;
+  }>;
+  knownEventsUsed?: string[];
 }
 
 export interface ApiMetricGroup {

@@ -3,6 +3,7 @@
 import type { GrowthReport } from "@/lib/types";
 import { AnalysisDetails } from "./AnalysisDetails";
 import { DataScope } from "./DataScope";
+import { GrowthExperiments } from "./GrowthExperiments";
 import { Header } from "./Header";
 import { MetricsSummary } from "./MetricsSummary";
 import { TopActions } from "./TopActions";
@@ -33,6 +34,7 @@ export function Dashboard({
       />
       <MetricsSummary report={report} />
       <TopActions report={report} />
+      <GrowthExperiments report={report} />
       <AnalysisDetails report={report} />
       <DataScope report={report} />
     </div>

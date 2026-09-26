@@ -2,6 +2,7 @@ import { t, type CopyKey } from "@/lib/i18n";
 import type {
   AnalyzeApiResponse,
   ApiMetricGroup,
+  GrowthExperiment,
   GrowthReport,
   Language,
   MetricBlock,
@@ -35,6 +36,8 @@ const BLOCK_SOURCE_KEYS: Record<string, CopyKey> = {
   usage: "sourceGa4",
   revenue: "sourceAdmob",
 };
+
+const MOCK_ANALYSIS_RUN_ID = "mock-demo";
 
 function resolveMetricLabel(
   id: string,
@@ -84,21 +87,70 @@ function mapMetricGroup(
   };
 }
 
+function buildMockMetricsPayload(
+  language: Language,
+): AnalyzeApiResponse["metrics"] {
+  const template = mockReportTemplate;
+  const toGroup = (
+    block: (typeof template.metrics)[number],
+    id: ApiMetricGroup["id"],
+  ): ApiMetricGroup => ({
+    id,
+    title: t(block.titleKey as CopyKey, language),
+    source: t(block.sourceLabelKey as CopyKey, language),
+    connected: true,
+    statusMessage: null,
+    metrics: block.metrics.map((metric) => ({
+      id: metric.labelKey,
+      label: t(metric.labelKey as CopyKey, language),
+      changePercent: metric.changePercent,
+      value: "value" in metric ? metric.value : null,
+      absolute: "absolute" in metric ? metric.absolute : null,
+      note:
+        "noteKey" in metric && metric.noteKey
+          ? t(metric.noteKey as CopyKey, language)
+          : null,
+    })),
+  });
+
+  return {
+    appStore: toGroup(template.metrics[0], "app_store"),
+    ga4: toGroup(template.metrics[1], "usage"),
+    admob: toGroup(template.metrics[2], "revenue"),
+  };
+}
+
 /** Map Python AnalyzeResponse → dashboard GrowthReport. */
 export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
   const language = data.language;
+  const analysisRunId = data.analysisRunId || `live-missing-${Date.now()}`;
+  const dataSource = data.dataSource === "mock" ? "mock" : "live";
 
   return {
-    source: "live",
+    source: dataSource,
+    dataSource,
+    analysisRunId,
     language,
     appName: data.app.name,
     periodLabel: data.period.label,
     comparisonLabel: data.period.comparisonLabel,
+    period: {
+      start: data.period.start,
+      end: data.period.end,
+      lookbackDays: data.period.lookbackDays,
+      label: data.period.label,
+      comparisonLabel: data.period.comparisonLabel,
+      latestProcessingDate: data.period.latestProcessingDate,
+    },
+    appBundleId: data.app.bundleId,
+    appStoreConnectId: data.app.appStoreConnectId,
+    appTerritory: data.app.territory,
     metrics: [
       mapMetricGroup(data.metrics.appStore, language),
       mapMetricGroup(data.metrics.ga4, language),
       mapMetricGroup(data.metrics.admob, language),
     ],
+    metricsPayload: data.metrics,
     // Analysis prose only — UI headings come from i18n in components.
     actions: data.analysis.actions.map((action) => ({
       rank: action.rank,
@@ -116,6 +168,25 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
       t("grounding3", language),
     ],
     mostImportantFinding: data.analysis.mostImportantFinding,
+    growthExperiments: (data.growthExperiments ?? []).map(
+      (item): GrowthExperiment => ({
+        title: item.title,
+        hypothesis: item.hypothesis,
+        why: item.why,
+        action: item.action,
+        targetMetric: item.targetMetric,
+        expectedSignal: item.expectedSignal,
+        suggestedDuration: item.suggestedDuration,
+        evidence: item.evidence,
+        playbookReference: item.playbookReference,
+        analysisRunId: item.analysisRunId || analysisRunId,
+      }),
+    ),
+    plannerStatus: data.plannerStatus ?? null,
+    plannerError: data.plannerError ?? null,
+    playbooksConsulted: data.playbooksConsulted ?? [],
+    knownEventsConsidered: data.knownEventsConsidered ?? [],
+    knownEventsUsed: data.knownEventsUsed ?? [],
   };
 }
 
@@ -123,13 +194,24 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
 export function buildMockReport(language: Language): GrowthReport {
   const c = (key: CopyKey) => t(key, language);
   const template = mockReportTemplate;
+  const periodLabel = template.periodLabel[language];
+  const metricsPayload = buildMockMetricsPayload(language);
 
   return {
     source: "mock",
+    dataSource: "mock",
+    analysisRunId: MOCK_ANALYSIS_RUN_ID,
     language,
     appName: template.appName,
-    periodLabel: template.periodLabel[language],
+    periodLabel,
     comparisonLabel: c("vsPrevious"),
+    period: {
+      start: "2026-08-28",
+      end: "2026-09-03",
+      lookbackDays: 7,
+      label: periodLabel,
+      comparisonLabel: c("vsPrevious"),
+    },
     metrics: template.metrics.map((block) => ({
       id: block.id,
       title: c(block.titleKey as CopyKey),
@@ -147,6 +229,7 @@ export function buildMockReport(language: Language): GrowthReport {
             : undefined,
       })),
     })),
+    metricsPayload,
     actions: template.actions.map((action) => ({
       rank: action.rank,
       title: c(action.titleKey as CopyKey),
@@ -163,5 +246,18 @@ export function buildMockReport(language: Language): GrowthReport {
     groundingRules: template.groundingRules.map((rule) =>
       c(rule.textKey as CopyKey),
     ),
+    plannerStatus: template.plannerStatus?.[language],
+    growthExperiments: (template.growthExperiments ?? []).map((exp) => ({
+      title: exp.title[language],
+      hypothesis: exp.hypothesis[language],
+      why: exp.why[language],
+      action: exp.action[language],
+      targetMetric: exp.targetMetric[language],
+      expectedSignal: exp.expectedSignal[language],
+      suggestedDuration: exp.suggestedDuration[language],
+      evidence: exp.evidence[language],
+      playbookReference: exp.playbookReference[language],
+      analysisRunId: MOCK_ANALYSIS_RUN_ID,
+    })),
   };
 }

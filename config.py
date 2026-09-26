@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -308,6 +309,80 @@ def _normalize_admob_account(raw: str) -> str:
         "ADMOB_ACCOUNT_ID must be pub-… or accounts/pub-… "
         f"(got {raw!r})"
     )
+
+
+@dataclass(frozen=True)
+class GrowthMcpSettings:
+    """Stdio launch config for Growth Agent MCP (knowledge provider for Planner).
+
+    Paths / commands come from env so the MCP stays outside this repo and can
+    later switch from a local ``node dist/index.js`` build to ``npx growth-agent-mcp``.
+    """
+
+    command: str
+    args: tuple[str, ...]
+    cwd: str | None = None
+
+
+def _parse_growth_mcp_args(raw: str) -> tuple[str, ...]:
+    """Accept a JSON string array or a shell-style argument string."""
+    text = raw.strip()
+    if not text:
+        return ()
+    if text.startswith("["):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "GROWTH_MCP_ARGS must be a JSON array or a shell-style string"
+            ) from exc
+        if not isinstance(parsed, list) or not all(isinstance(x, str) for x in parsed):
+            raise ValueError("GROWTH_MCP_ARGS JSON must be an array of strings")
+        return tuple(parsed)
+    return tuple(shlex.split(text))
+
+
+def get_growth_mcp_settings() -> GrowthMcpSettings | None:
+    """Return Growth MCP launch settings when configured; otherwise None (Planner skips MCP)."""
+    load_env()
+
+    command = os.getenv("GROWTH_MCP_COMMAND", "").strip()
+    if not command:
+        return None
+
+    args = _parse_growth_mcp_args(os.getenv("GROWTH_MCP_ARGS", ""))
+    cwd_raw = os.getenv("GROWTH_MCP_CWD", "").strip()
+    cwd = str(_resolve_path(cwd_raw)) if cwd_raw else None
+
+    return GrowthMcpSettings(command=command, args=args, cwd=cwd)
+
+
+DEFAULT_GROWTH_MD_FILENAME = "GROWTH.md"
+
+
+def get_growth_md_text() -> str | None:
+    """Load optional GROWTH.md (constraints / available resources for Planner).
+
+    Resolution order:
+    1. GROWTH_MD_PATH if set
+    2. Repository-root GROWTH.md if present
+    Missing file → None (Planner runs without constraints, as before).
+    """
+    load_env()
+
+    path_raw = os.getenv("GROWTH_MD_PATH", "").strip()
+    if path_raw:
+        path = _resolve_path(path_raw)
+        if not path.is_file():
+            raise FileNotFoundError(f"GROWTH_MD_PATH file not found: {path}")
+        text = path.read_text(encoding="utf-8").strip()
+        return text or None
+
+    default_path = ROOT_DIR / DEFAULT_GROWTH_MD_FILENAME
+    if not default_path.is_file():
+        return None
+    text = default_path.read_text(encoding="utf-8").strip()
+    return text or None
 
 
 def get_admob_settings() -> AdMobSettings | None:

@@ -176,9 +176,19 @@ body {
   color: var(--text-subtle);
 }
 
+.site-header__mock-badge {
+  color: var(--down);
+  font-weight: 600;
+}
+
 .site-header__live-badge {
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.site-header__run-id {
+  font-weight: 400;
+  color: var(--text-subtle);
 }
 
 .site-header__error {
@@ -516,6 +526,221 @@ body {
   color: var(--text-muted);
 }
 
+/* —— Growth experiments (Planner; minimal) —— */
+.experiments {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.experiments__heading {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.experiments__status,
+.experiments__playbooks,
+.experiments__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.experiments__mock-banner {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--down);
+}
+
+.experiments__error {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.experiments__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.experiments__item-title {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.experiments__fields {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.experiments__fields > div {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.experiments__fields dt {
+  margin: 0;
+  color: var(--text-subtle);
+  font-weight: 500;
+}
+
+.experiments__fields dd {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.experiments__orphan-drafts {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.experiments__orphan-heading {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.experiments__draft-actions {
+  margin-top: 12px;
+}
+
+.experiments__upload {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.experiments__upload-hint,
+.experiments__upload-empty {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-subtle);
+}
+
+.experiments__upload-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.experiments__file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.experiments__upload-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.experiments__upload-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  max-width: 120px;
+}
+
+.experiments__upload-preview {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+}
+
+.experiments__draft-btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.experiments__draft-btn--ghost {
+  background: transparent;
+}
+
+.experiments__draft-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.experiments__draft {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.experiments__draft-flag {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.experiments__draft-heading {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.experiments__draft-shots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.experiments__draft-shot h5 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
 /* —— Analysis —— */
 .analysis {
   display: grid;
@@ -629,6 +854,11 @@ body {
 @media (max-width: 640px) {
   .actions {
     padding: 18px 16px;
+  }
+
+  .experiments__fields > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 
   .actions__title {
