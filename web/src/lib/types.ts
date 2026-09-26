@@ -21,7 +21,7 @@ export interface DisplayMetric {
 }
 
 export interface MetricBlock {
-  id: "app_store" | "usage" | "revenue";
+  id: "app_store" | "usage" | "revenue" | "web";
   title: string;
   source: string;
   connected: boolean;
@@ -167,7 +167,22 @@ export interface AnalyzeApiResponse {
     appStore: ApiMetricGroup;
     ga4: ApiMetricGroup;
     admob: ApiMetricGroup;
+    web?: ApiMetricGroup;
   };
+  product?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
+  channels?: Array<{
+    id: string;
+    kind: string;
+    connected: boolean;
+    status: string;
+    domain?: string | null;
+    propertyId?: string | null;
+    note?: string | null;
+  }>;
   revenueSummary?: {
     currency?: string | null;
     note?: string;
@@ -209,7 +224,7 @@ export interface AnalyzeApiResponse {
 }
 
 export interface ApiMetricGroup {
-  id: "app_store" | "usage" | "revenue";
+  id: "app_store" | "usage" | "revenue" | "web";
   title: string;
   source: string;
   connected: boolean;

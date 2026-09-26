@@ -70,6 +70,11 @@ def _labels(language: str) -> dict[str, str]:
             "estimated_earnings": "AdMob 推定収益",
             "ecpm": "eCPM",
             "admob_impressions": "インプレッション",
+            "web": "Web",
+            "source_web": "GA4 Web",
+            "web_users": "ユーザー",
+            "web_sessions": "セッション",
+            "web_page_views": "ページビュー",
             "scope_asc_jp": "iOS / 日本",
             "scope_asc_all": "iOS / 全テリトリー",
             "scope_asc_other": "iOS / {territory}",
@@ -77,6 +82,8 @@ def _labels(language: str) -> dict[str, str]:
             "scope_ga4_off": "未接続",
             "scope_admob": "設定アプリ / 全世界",
             "scope_admob_off": "未接続",
+            "scope_web_off": "未設定 / 未接続",
+            "scope_web": "Web プロパティ / 設定ドメイン",
             "not_connected": "未接続（値は発明しない）",
             "revenue_note_admob_only": (
                 "Phase 1: AdMob ESTIMATED_EARNINGS only. "
@@ -100,6 +107,11 @@ def _labels(language: str) -> dict[str, str]:
         "estimated_earnings": "AdMob estimated earnings",
         "ecpm": "eCPM",
         "admob_impressions": "Impressions",
+        "web": "Web",
+        "source_web": "GA4 Web",
+        "web_users": "Users",
+        "web_sessions": "Sessions",
+        "web_page_views": "Page views",
         "scope_asc_jp": "iOS / Japan",
         "scope_asc_all": "iOS / all territories",
         "scope_asc_other": "iOS / {territory}",
@@ -107,6 +119,8 @@ def _labels(language: str) -> dict[str, str]:
         "scope_ga4_off": "not connected",
         "scope_admob": "configured app(s) / worldwide",
         "scope_admob_off": "not connected",
+        "scope_web_off": "not configured / not connected",
+        "scope_web": "Web property / configured domain",
         "not_connected": "not connected (do not invent values)",
         "revenue_note_admob_only": (
             "Phase 1: AdMob ESTIMATED_EARNINGS only. "
@@ -126,6 +140,7 @@ def _grounding_rules(language: str) -> list[str]:
             "Facts と Speculation を分離する",
             "ソース間の母集団を同一視しない",
             "Revenue は絶対額と変化率の両方を見る（少額の大きな%だけで判断しない）",
+            "Web と App を直接ファネル化しない（計測根拠なき Web→App DL 因果を断定しない）",
         ]
     return [
         "Missing data ≠ zero",
@@ -133,6 +148,7 @@ def _grounding_rules(language: str) -> list[str]:
         "Cross-source populations are not assumed identical",
         "Judge revenue with absolute amount and changePercent together "
         "(do not over-weight large % on small absolute amounts)",
+        "Do not funnel Web into App Store downloads without attribution evidence",
     ]
 
 
@@ -267,6 +283,67 @@ def _build_admob_metrics(
     )
 
 
+def _build_web_metrics(
+    ga4_web: Ga4GrowthSnapshot | None,
+    ga4_web_status: str | None,
+    labels: dict[str, str],
+    *,
+    domain: str | None = None,
+) -> MetricGroup:
+    source = labels["source_web"]
+    if domain:
+        source = f"{labels['source_web']} ({domain})"
+    if ga4_web is None:
+        return MetricGroup(
+            id="web",
+            title=labels["web"],
+            source=source,
+            connected=False,
+            status_message=ga4_web_status or labels["not_connected"],
+            metrics=[],
+        )
+
+    metrics: list[MetricItem] = [
+        MetricItem(
+            id="web_users",
+            label=labels["web_users"],
+            change_percent=_round_pct(ga4_web.change_active_users_pct()),
+            absolute=f"{ga4_web.current.active_users:,}",
+        ),
+        MetricItem(
+            id="web_sessions",
+            label=labels["web_sessions"],
+            change_percent=_round_pct(ga4_web.change_sessions_pct()),
+            absolute=f"{ga4_web.current.sessions:,}",
+        ),
+        MetricItem(
+            id="web_page_views",
+            label=labels["web_page_views"],
+            change_percent=_round_pct(ga4_web.change_screen_page_views_pct()),
+            absolute=f"{ga4_web.current.screen_page_views:,}",
+        ),
+    ]
+    for name in ga4_web.key_event_names:
+        cur = ga4_web.current.key_event_counts.get(name, 0)
+        prev = ga4_web.previous.key_event_counts.get(name, 0)
+        change = None if prev <= 0 else ((cur - prev) / prev) * 100.0
+        metrics.append(
+            MetricItem(
+                id=name,
+                label=name,
+                change_percent=_round_pct(change),
+                absolute=f"{cur:,}",
+            )
+        )
+    return MetricGroup(
+        id="web",
+        title=labels["web"],
+        source=source,
+        connected=True,
+        metrics=metrics,
+    )
+
+
 def _build_revenue_summary(
     admob: AdMobGrowthSnapshot | None,
     admob_status: str | None,
@@ -355,19 +432,29 @@ def build_analyze_response(
     admob: AdMobGrowthSnapshot | None,
     admob_status: str | None,
     analysis: StructuredAnalysis,
+    ga4_web: Ga4GrowthSnapshot | None = None,
+    ga4_web_status: str | None = None,
 ) -> AnalyzeResponse:
     lang: str = "ja" if language == "ja" else "en"
     labels = _labels(lang)
+
+    from product_config import channel_status_rows, load_product_config
+
+    product = load_product_config()
 
     actions = sorted(analysis.actions, key=lambda a: a.rank)[:3]
     speculation = [
         s for s in analysis.speculation if s.strip() and s.strip().lower() != "none"
     ]
 
+    web_domain = product.web.domain if product is not None else None
     metrics = {
         "appStore": _build_app_store_metrics(asc, labels),
         "ga4": _build_ga4_metrics(ga4, ga4_status, labels, lang),
         "admob": _build_admob_metrics(admob, admob_status, labels),
+        "web": _build_web_metrics(
+            ga4_web, ga4_web_status, labels, domain=web_domain
+        ),
     }
 
     data_scope = [
@@ -380,7 +467,34 @@ def build_analyze_response(
             source=labels["source_admob"],
             scope=labels["scope_admob"] if admob is not None else labels["scope_admob_off"],
         ),
+        DataScopeItem(
+            source=labels["source_web"],
+            scope=(
+                (
+                    f"{labels['scope_web']}"
+                    + (f" ({web_domain})" if web_domain else "")
+                )
+                if ga4_web is not None
+                else labels["scope_web_off"]
+            ),
+        ),
     ]
+
+    product_payload = None
+    if product is not None:
+        product_payload = {
+            "id": product.id,
+            "name": product.name,
+            "type": product.type,
+        }
+
+    channels = channel_status_rows(
+        product=product,
+        ga4_app_connected=ga4 is not None,
+        ga4_web_connected=ga4_web is not None,
+        admob_connected=admob is not None,
+        asc_connected=True,
+    )
 
     return AnalyzeResponse(
         language="ja" if lang == "ja" else "en",
@@ -392,6 +506,8 @@ def build_analyze_response(
             "appStoreConnectId": asc.app.id,
             "territory": asc.territory,
         },
+        product=product_payload,
+        channels=channels,
         period={
             "start": asc.current.start,
             "end": asc.current.end,

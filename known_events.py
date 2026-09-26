@@ -99,11 +99,19 @@ def resolve_known_events_product(
     *,
     bundle_id: str | None = None,
 ) -> str | None:
-    """Product id for filtering. Env override, else bundle map, else None (no product filter)."""
+    """Product id for filtering. Env override, else product.json id, else bundle map."""
     load_env()
     override = os.getenv("KNOWN_EVENTS_PRODUCT", "").strip()
     if override:
         return override
+    try:
+        from product_config import load_product_config
+
+        product = load_product_config()
+    except Exception:
+        product = None
+    if product is not None and product.id:
+        return product.id
     if bundle_id and bundle_id in _BUNDLE_TO_PRODUCT:
         return _BUNDLE_TO_PRODUCT[bundle_id]
     return None

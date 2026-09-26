@@ -1,0 +1,40 @@
+{
+  "id": "mahjong",
+  "name": "Mahjong Score Calculator / 麻雀点数計算",
+  "type": "hybrid",
+  "channels": {
+    "app_store": {
+      "enabled": true,
+      "bundleId": "net.makosoyo.MahjongScoreCalculator",
+      "territory": "JP"
+    },
+    "ga4_app": {
+      "enabled": true,
+      "eventDefinitionsPath": "event_definitions.json"
+    },
+    "web": {
+      "enabled": true,
+      "domain": "makosoyo.net",
+      "capabilities": [
+        "mahjong_score_calculation"
+      ],
+      "note": "Mahjong web site (exact hostName filter on GA4 Web). Capabilities declare what users can do — not measured usage."
+    },
+    "ga4_web": {
+      "enabled": true,
+      "propertyId": "464998416",
+      "hostname": "makosoyo.net",
+      "platform": null,
+      "filters": {
+        "hostname": "makosoyo.net",
+        "platform": null
+      },
+      "keyEvents": [],
+      "eventDefinitionsPath": null,
+      "note": "Same GA4 property may include other hosts; hostName EXACT = makosoyo.net excludes tech.makosoyo.net etc. Metrics are site-wide, not feature-level."
+    },
+    "admob": {
+      "enabled": true
+    }
+  }
+}

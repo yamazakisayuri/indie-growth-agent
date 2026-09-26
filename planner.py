@@ -54,12 +54,24 @@ Hard rules:
 - Do NOT convert Analyzer actions into experiments one-for-one.
 - Do NOT invent metrics, sample sizes, channels, budgets, or causal claims
   that are not supported by the provided Analyzer Facts / metrics.
-- Growth axes (observe in parallel; do not force Revenue every run):
-  Product growth, Conversion, Engagement, and Revenue (when revenueSummary /
-  AdMob earnings are present). Choose experiments from Facts — adding Revenue
-  as an axis does NOT require proposing a Revenue experiment. Zero Revenue
-  experiments is a valid outcome when absolute amounts are small or other axes
-  matter more.
+- Growth axes (observe in parallel; do not force Revenue or Web every run):
+  Product growth, Conversion, Engagement (App), Engagement (Web when present),
+  and Revenue (when revenueSummary / AdMob earnings are present). Choose
+  experiments from Facts — adding a channel does NOT require proposing an
+  experiment for that channel. Zero Web experiments and zero Revenue experiments
+  are valid outcomes.
+- Web channel rules:
+  - Do NOT create a SEO / Web experiment merely because Web / GA4 Web exists.
+  - A declared Web capability (e.g. mahjong_score_calculation) means users CAN
+    do that on the site — it is NOT measured usage and NOT a GA4 event.
+  - Site-wide Web users/sessions/page views are NOT feature usage of a capability.
+  - Do not force a Web or Measurement experiment merely because a capability is
+    listed. Measurement is allowed when Facts show a real instrumentation gap
+    that blocks a decision — still optional; zero such experiments can be correct.
+  - Parallel same-window Facts are fine; Web → App Store download causation or
+    funnels require attribution evidence (usually absent).
+  - Cross-channel hypotheses are allowed only as labeled Speculation / hypothesis
+    with a measurement plan — never as proven cause.
 - Revenue judgment: use absolute amount AND changePercent together. Do not
   over-weight a large % move on a small absolute amount. Do not casually sum
   different currencies or ASC Downloads with AdMob earnings as one funnel.
@@ -253,10 +265,46 @@ def build_planner_prompt(
 
     metric_lines: list[str] = []
     metrics = report.metrics or {}
-    for key in ("appStore", "ga4", "admob"):
+    for key in ("appStore", "ga4", "admob", "web"):
         group = metrics.get(key)
         if group is not None:
             metric_lines.extend(_metric_lines(group))
+
+    product = getattr(report, "product", None) or {}
+    channels = getattr(report, "channels", None) or []
+    channel_lines: list[str] = []
+    if product:
+        channel_lines.append(
+            f"- product: id={product.get('id')}, name={product.get('name')}, "
+            f"type={product.get('type')}"
+        )
+    for ch in channels:
+        if isinstance(ch, dict):
+            caps = ch.get("capabilities") or []
+            cap_bit = (
+                f", capabilities={caps}"
+                if caps
+                else ""
+            )
+            channel_lines.append(
+                "  - "
+                f"id={ch.get('id')}, kind={ch.get('kind')}, status={ch.get('status')}, "
+                f"connected={ch.get('connected')}"
+                + (f", domain={ch.get('domain')}" if ch.get("domain") else "")
+                + (
+                    f", propertyId={ch.get('propertyId')}"
+                    if ch.get("propertyId")
+                    else ""
+                )
+                + cap_bit
+            )
+            if caps and ch.get("id") == "web":
+                channel_lines.append(
+                    "    (capabilities = declared what users CAN do on Web; "
+                    "NOT measured usage; NOT equal to site-wide Web GA4 metrics)"
+                )
+    if not channel_lines:
+        channel_lines = ["- (no product.json — env-only single-app mode)"]
 
     if growth_md:
         growth_block = [
@@ -294,6 +342,9 @@ def build_planner_prompt(
         "",
         *growth_block,
         *known_block,
+        "PRODUCT / CHANNELS:",
+        *channel_lines,
+        "",
         "APP:",
         f"- name: {app.get('name')}",
         f"- bundleId: {app.get('bundleId')}",
@@ -332,8 +383,12 @@ def build_planner_prompt(
         "2) If GROWTH.md is present, filter every candidate through it.",
         "3) If Known Events are present, use them to re-prioritize (especially spikes",
         "   that may already have a temporary explanation) — without asserting causation.",
-        "4) Weigh Product growth / Conversion / Engagement / Revenue from Facts.",
-        "   Do not create a Revenue experiment only because RevenueSummary exists.",
+        "4) Weigh Product growth / Conversion / Engagement (App) / Engagement (Web) /",
+        "   Revenue from Facts. Do not invent SEO/Web experiments only because Web",
+        "   channel or a Web capability exists. Do not treat site-wide Web metrics as",
+        "   feature usage of a capability. Do not create a Revenue experiment only",
+        "   because RevenueSummary exists. Zero Web / Revenue / Measurement",
+        "   experiments can be correct.",
         "5) Decide 0–3 Growth Experiments. Prefer none or Measurement when weak.",
         "6) Fill the structured Planner output.",
     ]

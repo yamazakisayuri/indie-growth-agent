@@ -50,6 +50,10 @@ export const uiCopy = {
     ja: "収益",
     en: "Revenue",
   },
+  web: {
+    ja: "Web",
+    en: "Web",
+  },
   sourceAsc: {
     ja: "App Store Connect",
     en: "App Store Connect",
@@ -61,6 +65,22 @@ export const uiCopy = {
   sourceAdmob: {
     ja: "Google AdMob",
     en: "Google AdMob",
+  },
+  sourceWeb: {
+    ja: "GA4 Web",
+    en: "GA4 Web",
+  },
+  webUsers: {
+    ja: "ユーザー",
+    en: "Users",
+  },
+  webSessions: {
+    ja: "セッション",
+    en: "Sessions",
+  },
+  webPageViews: {
+    ja: "ページビュー",
+    en: "Page views",
   },
   impressions: {
     ja: "インプレッション",
@@ -238,6 +258,10 @@ export const uiCopy = {
   grounding4: {
     ja: "Revenue は絶対額と変化率の両方を見る（少額の大きな%だけで判断しない）",
     en: "Judge revenue with absolute amount and changePercent together",
+  },
+  grounding5: {
+    ja: "Web と App を直接ファネル化しない（計測根拠なき Web→App DL 因果を断定しない）",
+    en: "Do not funnel Web into App Store downloads without attribution evidence",
   },
   recommendedExperiments: {
     ja: "Recommended Growth Experiments",

@@ -79,24 +79,62 @@ def _metric_int(row: dict, index: int) -> int:
     return int(n) if n > 0 else 0
 
 
+def _exact_string_filter(field_name: str, value: str) -> dict:
+    """GA4 Data API exact string match (no contains / no subdomain bleed)."""
+    return {
+        "filter": {
+            "fieldName": field_name,
+            "stringFilter": {
+                "matchType": "EXACT",
+                "value": value,
+                "caseSensitive": False,
+            },
+        }
+    }
+
+
+def _dimension_filter_from_settings(
+    settings: Ga4Settings,
+    *,
+    extra: dict | None = None,
+) -> dict | None:
+    """Combine optional hostName / platform EXACT filters with an extra expression."""
+    expressions: list[dict] = []
+    if settings.hostname_exact:
+        expressions.append(_exact_string_filter("hostName", settings.hostname_exact))
+    if settings.platform_exact:
+        expressions.append(_exact_string_filter("platform", settings.platform_exact))
+    if extra is not None:
+        expressions.append(extra)
+    if not expressions:
+        return None
+    if len(expressions) == 1:
+        return expressions[0]
+    return {"andGroup": {"expressions": expressions}}
+
+
 def _fetch_period_totals(
     client: Ga4Client,
     property_resource: str,
     start: str,
     end: str,
+    *,
+    settings: Ga4Settings | None = None,
 ) -> tuple[int, int, int]:
     """Return period-scoped (activeUsers, sessions, screenPageViews)."""
-    payload = client.run_report(
-        property_resource,
-        {
-            "dateRanges": [{"startDate": start, "endDate": end}],
-            "metrics": [
-                {"name": "activeUsers"},
-                {"name": "sessions"},
-                {"name": "screenPageViews"},
-            ],
-        },
-    )
+    body: dict = {
+        "dateRanges": [{"startDate": start, "endDate": end}],
+        "metrics": [
+            {"name": "activeUsers"},
+            {"name": "sessions"},
+            {"name": "screenPageViews"},
+        ],
+    }
+    if settings is not None:
+        dim_filter = _dimension_filter_from_settings(settings)
+        if dim_filter is not None:
+            body["dimensionFilter"] = dim_filter
+    payload = client.run_report(property_resource, body)
     rows = payload.get("rows") or []
     if not rows or not isinstance(rows[0], dict):
         return 0, 0, 0
@@ -110,23 +148,29 @@ def _fetch_key_events(
     start: str,
     end: str,
     event_names: tuple[str, ...],
+    *,
+    settings: Ga4Settings | None = None,
 ) -> dict[str, int]:
     if not event_names:
         return {}
-    payload = client.run_report(
-        property_resource,
-        {
-            "dateRanges": [{"startDate": start, "endDate": end}],
-            "dimensions": [{"name": "eventName"}],
-            "dimensionFilter": {
-                "filter": {
-                    "fieldName": "eventName",
-                    "inListFilter": {"values": list(event_names)},
-                }
-            },
-            "metrics": [{"name": "eventCount"}],
-        },
-    )
+    event_filter = {
+        "filter": {
+            "fieldName": "eventName",
+            "inListFilter": {"values": list(event_names)},
+        }
+    }
+    body: dict = {
+        "dateRanges": [{"startDate": start, "endDate": end}],
+        "dimensions": [{"name": "eventName"}],
+        "metrics": [{"name": "eventCount"}],
+    }
+    if settings is not None:
+        dim_filter = _dimension_filter_from_settings(settings, extra=event_filter)
+    else:
+        dim_filter = event_filter
+    if dim_filter is not None:
+        body["dimensionFilter"] = dim_filter
+    payload = client.run_report(property_resource, body)
     counts = {name: 0 for name in event_names}
     for row in payload.get("rows") or []:
         if not isinstance(row, dict):
@@ -137,6 +181,42 @@ def _fetch_key_events(
             continue
         counts[str(name)] = _metric_int(row, 0)
     return counts
+
+
+def fetch_hostname_session_breakdown(
+    settings: Ga4Settings,
+    *,
+    start: str,
+    end: str,
+    apply_hostname_filter: bool,
+) -> list[tuple[str, int]]:
+    """Sessions by hostName — used to verify EXACT filter excludes subdomains."""
+    token, _auth = _access_token(settings)
+    client = Ga4Client(token)
+    body: dict = {
+        "dateRanges": [{"startDate": start, "endDate": end}],
+        "dimensions": [{"name": "hostName"}],
+        "metrics": [{"name": "sessions"}],
+        "orderBys": [
+            {"metric": {"metricName": "sessions"}, "desc": True},
+        ],
+        "limit": 50,
+    }
+    if apply_hostname_filter and settings.hostname_exact:
+        body["dimensionFilter"] = _exact_string_filter(
+            "hostName", settings.hostname_exact
+        )
+    payload = client.run_report(settings.property_resource, body)
+    rows_out: list[tuple[str, int]] = []
+    for row in payload.get("rows") or []:
+        if not isinstance(row, dict):
+            continue
+        dims = row.get("dimensionValues") or []
+        host = dims[0].get("value") if dims and isinstance(dims[0], dict) else None
+        if not host:
+            continue
+        rows_out.append((str(host), _metric_int(row, 0)))
+    return rows_out
 
 
 def _access_token(settings: Ga4Settings) -> tuple[str, str]:
@@ -176,12 +256,14 @@ def fetch_ga4_snapshot(
         settings.property_resource,
         current_start.isoformat(),
         end.isoformat(),
+        settings=settings,
     )
     prev_users, prev_sessions, prev_views = _fetch_period_totals(
         client,
         settings.property_resource,
         previous_start.isoformat(),
         previous_end.isoformat(),
+        settings=settings,
     )
 
     current_events = _fetch_key_events(
@@ -190,6 +272,7 @@ def fetch_ga4_snapshot(
         current_start.isoformat(),
         end.isoformat(),
         settings.key_event_names,
+        settings=settings,
     )
     previous_events = _fetch_key_events(
         client,
@@ -197,6 +280,7 @@ def fetch_ga4_snapshot(
         previous_start.isoformat(),
         previous_end.isoformat(),
         settings.key_event_names,
+        settings=settings,
     )
 
     current = Ga4PeriodTotals(
@@ -220,6 +304,13 @@ def fetch_ga4_snapshot(
         "activeUsers / sessions / screenPageViews are period-scoped totals "
         "(single GA4 dateRange, no date dimension). activeUsers is not a sum of daily activeUsers.",
     ]
+    if settings.hostname_exact:
+        notes.append(
+            f"Dimension filter: hostName EXACT '{settings.hostname_exact}' "
+            "(subdomains such as tech.<host> are excluded)."
+        )
+    if settings.platform_exact:
+        notes.append(f"Dimension filter: platform EXACT '{settings.platform_exact}'.")
     if settings.key_event_names:
         defined = {d.name for d in settings.event_definitions}
         undefined = [n for n in settings.key_event_names if n not in defined]
@@ -250,15 +341,37 @@ def fetch_ga4_snapshot(
 def try_fetch_ga4_snapshot(
     *,
     as_of: date | None = None,
+    settings: Ga4Settings | None = None,
+    label: str = "GA4",
 ) -> tuple[Ga4GrowthSnapshot | None, str | None]:
-    """Return (snapshot, skip_or_error_message). None message means connected OK."""
-    settings = get_ga4_settings()
+    """Return (snapshot, skip_or_error_message). None message means connected OK.
+
+    When ``settings`` is omitted, App GA4 env/product settings are used.
+    Pass an explicit Ga4Settings instance for alternate channels (e.g. Web).
+    """
+    resolved = settings if settings is not None else get_ga4_settings()
+    if resolved is None:
+        return None, f"{label}: not connected (missing configuration)."
+    try:
+        return fetch_ga4_snapshot(resolved, as_of=as_of), None
+    except Exception as exc:
+        return None, f"{label}: fetch failed ({exc})."
+
+
+def try_fetch_ga4_web_snapshot(
+    *,
+    as_of: date | None = None,
+) -> tuple[Ga4GrowthSnapshot | None, str | None]:
+    """Optional Web GA4 channel. Not connected when product.json omits propertyId."""
+    from config import get_ga4_web_settings
+
+    settings = get_ga4_web_settings()
     if settings is None:
-        return None, "GA4: not connected (missing configuration)."
+        return None, "Web GA4: not connected (optional channel not configured)."
     try:
         return fetch_ga4_snapshot(settings, as_of=as_of), None
     except Exception as exc:
-        return None, f"GA4: fetch failed ({exc})."
+        return None, f"Web GA4: fetch failed ({exc})."
 
 
 def format_period_comparison(snapshot: Ga4GrowthSnapshot) -> str:

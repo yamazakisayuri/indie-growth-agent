@@ -17,6 +17,9 @@ const METRIC_LABEL_KEYS: Record<string, CopyKey> = {
   estimated_earnings: "estimatedEarnings",
   ecpm: "ecpm",
   admob_impressions: "admobImpressions",
+  web_users: "webUsers",
+  web_sessions: "webSessions",
+  web_page_views: "webPageViews",
   // Keep the identifier itself; i18n value is also "record_saved".
   record_saved: "recordSaved",
 };
@@ -29,12 +32,14 @@ const BLOCK_TITLE_KEYS: Record<string, CopyKey> = {
   app_store: "appStore",
   usage: "usage",
   revenue: "revenue",
+  web: "web",
 };
 
 const BLOCK_SOURCE_KEYS: Record<string, CopyKey> = {
   app_store: "sourceAsc",
   usage: "sourceGa4",
   revenue: "sourceAdmob",
+  web: "sourceWeb",
 };
 
 const MOCK_ANALYSIS_RUN_ID = "mock-demo";
@@ -149,6 +154,9 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
       mapMetricGroup(data.metrics.appStore, language),
       mapMetricGroup(data.metrics.ga4, language),
       mapMetricGroup(data.metrics.admob, language),
+      ...(data.metrics.web
+        ? [mapMetricGroup(data.metrics.web, language)]
+        : []),
     ],
     metricsPayload: data.metrics,
     revenueSummary: data.revenueSummary ?? undefined,
@@ -171,6 +179,7 @@ export function mapAnalyzeResponse(data: AnalyzeApiResponse): GrowthReport {
             t("grounding2", language),
             t("grounding3", language),
             t("grounding4", language),
+            t("grounding5", language),
           ],
     mostImportantFinding: data.analysis.mostImportantFinding,
     growthExperiments: (data.growthExperiments ?? []).map(

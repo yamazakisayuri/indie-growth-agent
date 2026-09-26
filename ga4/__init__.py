@@ -5,6 +5,7 @@ from .snapshot import (
     fetch_ga4_snapshot,
     format_period_comparison,
     try_fetch_ga4_snapshot,
+    try_fetch_ga4_web_snapshot,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "fetch_ga4_snapshot",
     "format_period_comparison",
     "try_fetch_ga4_snapshot",
+    "try_fetch_ga4_web_snapshot",
 ]
