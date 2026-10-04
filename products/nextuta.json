@@ -9,7 +9,7 @@
       "appId": "6788394664",
       "bundleId": "net.makosoyo.nextuta",
       "sku": "net.makosoyo.nextuta",
-      "territory": "JP"
+      "territory": "ALL"
     },
     "ga4_app": {
       "enabled": true,
