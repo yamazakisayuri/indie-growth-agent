@@ -52,8 +52,6 @@ class AppStoreConnectSettings:
     territory: str
     lookback_days: int
     analytics_request_id: str | None
-    # Sales Reports (Revenue Phase 2). Account-level; never store in Product JSON.
-    vendor_number: str | None = None
     # App SKU for Sales Parent Identifier / Apple Identifier filtering.
     app_sku: str | None = None
 
@@ -195,7 +193,6 @@ def get_app_store_connect_settings() -> AppStoreConnectSettings:
     app_id = os.getenv("APP_STORE_CONNECT_APP_ID", "").strip() or None
     bundle_id = os.getenv("APP_STORE_CONNECT_BUNDLE_ID", "").strip() or None
     analytics_request_id = os.getenv("APP_STORE_CONNECT_ANALYTICS_REQUEST_ID", "").strip() or None
-    vendor_number = get_asc_vendor_number()
     app_sku: str | None = None
 
     # Product channel identity overlays env. Non-default products never borrow
@@ -235,7 +232,6 @@ def get_app_store_connect_settings() -> AppStoreConnectSettings:
         territory=territory,
         lookback_days=lookback_days,
         analytics_request_id=analytics_request_id,
-        vendor_number=vendor_number,
         app_sku=app_sku,
     )
 
@@ -452,7 +448,7 @@ def get_ga4_settings() -> Ga4Settings | None:
 
 
 def get_ga4_web_settings() -> Ga4Settings | None:
-    """Return Web GA4 settings from product.json when configured; else None.
+    """Return Web GA4 settings from the product config when configured; else None.
 
     Preferred: a separate GA4 property from the App channel. When hostname /
     platform are set on the Web channel, exact-match dimension filters are applied

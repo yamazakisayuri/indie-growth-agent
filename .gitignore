@@ -17,3 +17,6 @@ web/node_modules/
 web/.next/
 web/out/
 tmp/
+
+# Local demo recordings / run outputs
+demo/

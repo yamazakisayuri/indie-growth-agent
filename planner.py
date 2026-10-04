@@ -322,7 +322,7 @@ def build_planner_prompt(
                     "NOT measured usage; NOT equal to site-wide Web GA4 metrics)"
                 )
     if not channel_lines:
-        channel_lines = ["- (no product.json — env-only single-app mode)"]
+        channel_lines = ["- (no product config — env-only single-app mode)"]
 
     if growth_md:
         growth_block = [

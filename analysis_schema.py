@@ -219,7 +219,7 @@ class AnalyzeResponse(BaseModel):
         default=None,
         alias="revenueSummary",
     )
-    # Optional Product / Channel inventory (from product.json when present).
+    # Optional Product / Channel inventory (from products/<id>.json when present).
     product: dict[str, Any] | None = None
     channels: list[dict[str, Any]] = Field(default_factory=list)
     # Planner is additive; Analyzer succeeds even when these stay empty / error.
