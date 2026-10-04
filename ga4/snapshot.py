@@ -304,42 +304,6 @@ def _fetch_feature_path_totals(
     return tuple(results)
 
 
-def fetch_hostname_session_breakdown(
-    settings: Ga4Settings,
-    *,
-    start: str,
-    end: str,
-    apply_hostname_filter: bool,
-) -> list[tuple[str, int]]:
-    """Sessions by hostName — used to verify EXACT filter excludes subdomains."""
-    token, _auth = _access_token(settings)
-    client = Ga4Client(token)
-    body: dict = {
-        "dateRanges": [{"startDate": start, "endDate": end}],
-        "dimensions": [{"name": "hostName"}],
-        "metrics": [{"name": "sessions"}],
-        "orderBys": [
-            {"metric": {"metricName": "sessions"}, "desc": True},
-        ],
-        "limit": 50,
-    }
-    if apply_hostname_filter and settings.hostname_exact:
-        body["dimensionFilter"] = _exact_string_filter(
-            "hostName", settings.hostname_exact
-        )
-    payload = client.run_report(settings.property_resource, body)
-    rows_out: list[tuple[str, int]] = []
-    for row in payload.get("rows") or []:
-        if not isinstance(row, dict):
-            continue
-        dims = row.get("dimensionValues") or []
-        host = dims[0].get("value") if dims and isinstance(dims[0], dict) else None
-        if not host:
-            continue
-        rows_out.append((str(host), _metric_int(row, 0)))
-    return rows_out
-
-
 def _access_token(settings: Ga4Settings) -> tuple[str, str]:
     if settings.service_account_path is not None:
         return access_token_from_service_account(settings.service_account_path), "service_account"
@@ -546,7 +510,7 @@ def try_fetch_ga4_web_snapshot(
     *,
     as_of: date | None = None,
 ) -> tuple[Ga4GrowthSnapshot | None, str | None]:
-    """Optional Web GA4 channel. Not connected when product.json omits propertyId."""
+    """Optional Web GA4 channel. Not connected when the product config omits propertyId."""
     from config import get_ga4_web_settings
 
     settings = get_ga4_web_settings()

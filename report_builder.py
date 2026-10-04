@@ -6,7 +6,7 @@ Analysis text comes from StructuredAnalysis.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 import uuid
 
 from admob.snapshot import AdMobGrowthSnapshot
@@ -289,11 +289,9 @@ def _build_ga4_metrics(
 def _build_revenue_metrics(
     admob: AdMobGrowthSnapshot | None,
     admob_status: str | None,
-    sales: "AscSalesRevenueSnapshot | None",
+    sales: AscSalesRevenueSnapshot | None,
     labels: dict[str, str],
 ) -> MetricGroup:
-    from asc.sales import AscSalesRevenueSnapshot  # noqa: F401 — typing aid
-
     metrics: list[MetricItem] = []
     connected = False
 
@@ -810,7 +808,3 @@ def build_analyze_response(
         known_events_considered=[],
         known_events_used=[],
     )
-
-
-def response_generated_at() -> str:
-    return datetime.now().isoformat(timespec="seconds")

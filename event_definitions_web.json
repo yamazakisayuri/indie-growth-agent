@@ -1,5 +1,5 @@
 {
-  "_comment": "Developer-declared meaning of GA4 Web events / path metrics. Only listed names may be interpreted by the agent. Keys must match product.json ga4_web keyEvents and feature-path metric ids. State only what triggers the metric and what it records. Do not rate importance. Capability (e.g. mahjong_score_calculation) is NOT defined here — capabilities are product declarations, not measurements.",
+  "_comment": "Developer-declared meaning of GA4 Web events / path metrics. Only listed names may be interpreted by the agent. Keys must match products/<id>.json ga4_web keyEvents and feature-path metric ids. State only what triggers the metric and what it records. Do not rate importance. Capability (e.g. mahjong_score_calculation) is NOT defined here — capabilities are product declarations, not measurements.",
 
   "appstore_click": {
     "source": "developer-declared custom event (gtag on Web)",

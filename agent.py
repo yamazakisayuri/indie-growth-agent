@@ -291,11 +291,6 @@ def build_prompt_from_sources(*, language: str | None = None) -> str:
     return prompt + _language_instruction(_normalize_language(language))
 
 
-# Backward-compatible alias
-def build_prompt_from_asc() -> str:
-    return build_prompt_from_sources()
-
-
 def run_analysis(
     language: str | None = "en",
     *,

@@ -13,16 +13,14 @@ Resolution rules for channel identity:
 from __future__ import annotations
 
 import json
-import os
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-from config import ROOT_DIR, Ga4FeaturePathSettings, _resolve_path, load_env
+from config import ROOT_DIR, Ga4FeaturePathSettings
 
-DEFAULT_PRODUCT_FILENAME = "product.json"
 PRODUCTS_DIRNAME = "products"
 PRODUCTS_INDEX_FILENAME = "index.json"
 DEFAULT_PRODUCT_ID = "mahjong"
@@ -346,29 +344,6 @@ def list_product_summaries() -> list[dict[str, str]]:
     return summaries
 
 
-def _legacy_product_json_path() -> Path | None:
-    """Root product.json / PRODUCT_JSON_PATH (migration compatibility)."""
-    load_env()
-    path_raw = os.getenv("PRODUCT_JSON_PATH", "").strip()
-    if path_raw:
-        path = _resolve_path(path_raw)
-        return path if path.is_file() else None
-    default = ROOT_DIR / DEFAULT_PRODUCT_FILENAME
-    return default if default.is_file() else None
-
-
-def product_json_path() -> Path | None:
-    """Path used by env-only / legacy loaders. Prefer products/ when present."""
-    index = load_product_index()
-    default_id = index.default_product_id
-    for entry in index.products:
-        if entry.id == default_id:
-            path = products_dir() / entry.path
-            if path.is_file():
-                return path
-    return _legacy_product_json_path()
-
-
 def _parse_product_dict(raw: dict[str, Any], *, path: Path) -> ProductConfig:
     product_id = _as_str(raw.get("id"))
     name = _as_str(raw.get("name"))
@@ -420,12 +395,6 @@ def load_product_by_id(product_id: str | None = None) -> ProductConfig:
             )
         return product
 
-    # Migration: explicit default / omitted id may fall back to root product.json.
-    if requested == index.default_product_id:
-        legacy = _legacy_product_json_path()
-        if legacy is not None:
-            return _load_product_file(legacy)
-
     known = ", ".join(entry.id for entry in index.products) or "(none)"
     raise ValueError(f"Unknown product id: {requested}. Known: {known}")
 
@@ -434,8 +403,7 @@ def load_product_config() -> ProductConfig | None:
     """Return the active product, or default product when catalog exists.
 
     Prefer ``use_product`` / ``load_product_by_id`` for explicit selection.
-    Returns None only when no products catalog and no legacy product.json exist
-    (env-only mode).
+    Returns None only when no products catalog exists (env-only mode).
     """
     active = _active_product.get()
     if active is not None:
@@ -449,10 +417,7 @@ def load_product_config() -> ProductConfig | None:
     if index_path.is_file() or (products_dir() / "mahjong.json").is_file():
         return load_product_by_id(None)
 
-    legacy = _legacy_product_json_path()
-    if legacy is None:
-        return None
-    return _load_product_file(legacy)
+    return None
 
 
 def is_default_product(product: ProductConfig | None = None) -> bool:
@@ -478,24 +443,6 @@ def use_product(product_id: str | None = None) -> Iterator[ProductConfig]:
     finally:
         _active_product.reset(token)
         _active_product_id.reset(id_token)
-
-
-def ga4_web_is_configured(product: ProductConfig | None = None) -> bool:
-    """True when Web GA4 should be fetched (enabled + propertyId)."""
-    product = product if product is not None else load_product_config()
-    if product is None:
-        return False
-    channel = product.ga4_web
-    return bool(channel.enabled and channel.property_id)
-
-
-def ga4_app_is_configured(product: ProductConfig | None = None) -> bool:
-    """True when App GA4 has an explicit propertyId on the product."""
-    product = product if product is not None else load_product_config()
-    if product is None:
-        return False
-    channel = product.ga4_app
-    return bool(channel.enabled and channel.property_id)
 
 
 def channel_status_rows(

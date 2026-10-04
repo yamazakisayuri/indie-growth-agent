@@ -23,7 +23,7 @@ DEFAULT_KNOWN_EVENTS_FILENAME = "known_events.json"
 # (e.g. a store change shortly before the window). Overridable via env.
 DEFAULT_KNOWN_EVENTS_LOOKBACK_DAYS = 21
 
-# Legacy bundleId → product id (compat only; prefer product.json / selection).
+# Legacy bundleId → product id (compat only; prefer product config / selection).
 _BUNDLE_TO_PRODUCT: dict[str, str] = {
     "net.makosoyo.MahjongScoreCalculator": "mahjong",
     "net.makosoyo.shopping-memo": "shopping-memo",

@@ -49,12 +49,6 @@ def analyze_cache_key(product_id: str | None, language: str) -> str:
     return f"{product}|{lang}|{tokyo_analysis_date()}"
 
 
-def get_cached_analyze(key: str) -> AnalyzeResponse | None:
-    with _lock:
-        hit = _success.get(key)
-    return hit.model_copy(deep=True) if hit is not None else None
-
-
 def get_or_run_analyze(
     key: str,
     runner: Callable[[], AnalyzeResponse],
