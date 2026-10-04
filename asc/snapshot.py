@@ -104,15 +104,20 @@ def _collect_report_days(
     territory: str,
     kind: str,
 ) -> dict[str, DailyMetrics]:
+    # Consecutive daily instances re-deliver the same date, so each date is taken
+    # from the newest instance only (instances are newest-first) instead of summed.
     by_date: dict[str, DailyMetrics] = {}
     instances = list_daily_instances(client, report_id, limit=MAX_INSTANCES)
     for instance in instances:
+        instance_days: dict[str, DailyMetrics] = {}
         for text in load_instance_texts(client, instance.id):
             if kind == "discovery":
                 chunk = aggregate_discovery(text, territory)
             else:
                 chunk = aggregate_downloads(text, territory)
-            merge_daily(by_date, chunk)
+            merge_daily(instance_days, chunk)
+        for day, metrics in instance_days.items():
+            by_date.setdefault(day, metrics)
     return by_date
 
 
