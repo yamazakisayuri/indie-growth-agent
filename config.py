@@ -559,6 +559,15 @@ def get_growth_mcp_settings() -> GrowthMcpSettings | None:
     return GrowthMcpSettings(command=command, args=args, cwd=cwd)
 
 
+DEFAULT_LLM_PROVIDER = "bedrock"
+
+
+def get_llm_provider() -> str:
+    """Return the model provider for every Strands Agent (LLM_PROVIDER, default bedrock)."""
+    load_env()
+    return os.getenv("LLM_PROVIDER", "").strip().lower() or DEFAULT_LLM_PROVIDER
+
+
 DEFAULT_GROWTH_MD_FILENAME = "GROWTH.md"
 
 

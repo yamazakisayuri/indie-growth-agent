@@ -18,7 +18,10 @@ ROOT = Path(__file__).resolve().parents[1]
 # Entry modules for CLI analyze, Planner, Draft, and the Web API.
 IMPORT_SMOKE_MODULES = ("agent", "planner", "draft_generator", "api_server")
 
-OFFLINE_CHECKS = ("scripts/verify_analyze_cache.py",)
+OFFLINE_CHECKS = (
+    "scripts/verify_analyze_cache.py",
+    "scripts/verify_llm_provider.py",
+)
 
 
 def _run(label: str, args: list[str]) -> bool:

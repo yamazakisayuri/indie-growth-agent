@@ -20,6 +20,7 @@ from strands.tools.mcp import MCPClient
 
 from analysis_schema import ActionDraft, DraftGeneratorOutput
 from config import get_growth_mcp_settings, get_growth_md_text
+from llm import build_model
 from store_context import StoreListingContext, collect_store_listing_context
 
 logger = logging.getLogger(__name__)
@@ -594,7 +595,9 @@ def run_draft_generator(
     if mcp_client is not None:
         with mcp_client:
             tools = list(mcp_client.list_tools_sync())
-            agent = Agent(system_prompt=DRAFT_SYSTEM_PROMPT, tools=tools)
+            agent = Agent(
+                system_prompt=DRAFT_SYSTEM_PROMPT, tools=tools, model=build_model()
+            )
             result = agent(
                 agent_prompt,
                 structured_output_model=DraftGeneratorOutput,
@@ -602,7 +605,7 @@ def run_draft_generator(
             )
     else:
         logger.info("Growth MCP not configured; Draft Generator runs without tools")
-        agent = Agent(system_prompt=DRAFT_SYSTEM_PROMPT, tools=[])
+        agent = Agent(system_prompt=DRAFT_SYSTEM_PROMPT, tools=[], model=build_model())
         result = agent(
             agent_prompt,
             structured_output_model=DraftGeneratorOutput,

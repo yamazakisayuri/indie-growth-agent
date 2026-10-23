@@ -20,6 +20,7 @@ from analysis_schema import (
 )
 from config import GrowthMcpSettings, get_growth_mcp_settings, get_growth_md_text
 from known_events import KnownEvent, get_known_events_for_report
+from llm import build_model
 
 logger = logging.getLogger(__name__)
 
@@ -536,6 +537,7 @@ def run_planner(
         planner_agent = Agent(
             system_prompt=PLANNER_SYSTEM_PROMPT,
             tools=tools,
+            model=build_model(),
         )
         result = planner_agent(
             prompt,
