@@ -568,6 +568,68 @@ def get_llm_provider() -> str:
     return os.getenv("LLM_PROVIDER", "").strip().lower() or DEFAULT_LLM_PROVIDER
 
 
+# Local runtimes can take minutes to load a model on the first request.
+DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_SECONDS = 180.0
+
+
+@dataclass(frozen=True)
+class OpenAICompatibleSettings:
+    """Any server that speaks the OpenAI Chat Completions API."""
+
+    base_url: str
+    api_key: str
+    model_id: str
+    headers: tuple[tuple[str, str], ...] = ()
+    timeout_seconds: float = DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_SECONDS
+
+
+def _parse_headers_json(name: str, raw: str) -> tuple[tuple[str, str], ...]:
+    text = raw.strip()
+    if not text:
+        return ()
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{name} must be a JSON object of header names to values") from exc
+    if not isinstance(parsed, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()
+    ):
+        raise ValueError(f"{name} must be a JSON object of string header names to string values")
+    return tuple(parsed.items())
+
+
+def get_openai_compatible_settings() -> OpenAICompatibleSettings:
+    """Settings for LLM_PROVIDER=openai_compatible. Raises ValueError when incomplete."""
+    load_env()
+
+    required = (
+        "OPENAI_COMPATIBLE_BASE_URL",
+        "OPENAI_COMPATIBLE_API_KEY",
+        "OPENAI_COMPATIBLE_MODEL",
+    )
+    missing = [name for name in required if not os.getenv(name, "").strip()]
+    if missing:
+        raise ValueError("LLM_PROVIDER=openai_compatible needs " + ", ".join(missing))
+
+    timeout_raw = os.getenv("OPENAI_COMPATIBLE_TIMEOUT_SECONDS", "").strip()
+    try:
+        timeout = float(timeout_raw) if timeout_raw else DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_SECONDS
+    except ValueError as exc:
+        raise ValueError("OPENAI_COMPATIBLE_TIMEOUT_SECONDS must be a number") from exc
+    if timeout <= 0:
+        raise ValueError("OPENAI_COMPATIBLE_TIMEOUT_SECONDS must be > 0")
+
+    return OpenAICompatibleSettings(
+        base_url=os.getenv("OPENAI_COMPATIBLE_BASE_URL", "").strip().rstrip("/"),
+        api_key=os.getenv("OPENAI_COMPATIBLE_API_KEY", "").strip(),
+        model_id=os.getenv("OPENAI_COMPATIBLE_MODEL", "").strip(),
+        headers=_parse_headers_json(
+            "OPENAI_COMPATIBLE_HEADERS", os.getenv("OPENAI_COMPATIBLE_HEADERS", "")
+        ),
+        timeout_seconds=timeout,
+    )
+
+
 DEFAULT_GROWTH_MD_FILENAME = "GROWTH.md"
 
 

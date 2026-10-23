@@ -21,6 +21,7 @@ IMPORT_SMOKE_MODULES = ("agent", "planner", "draft_generator", "api_server")
 OFFLINE_CHECKS = (
     "scripts/verify_analyze_cache.py",
     "scripts/verify_llm_provider.py",
+    "scripts/verify_openai_compatible.py",
 )
 
 
