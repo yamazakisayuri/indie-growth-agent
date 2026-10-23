@@ -2,10 +2,10 @@
 
 Everything up to the tag [`open-agent-baseline`](https://github.com/yamazakisayuri/indie-growth-agent/tree/open-agent-baseline) (commit `40afb4a`, committed 2026-10-04) was built **before** the development period, which opened on 2026-10-22 00:00 UTC.
 
-There are no commits between `open-agent-baseline` (2026-10-04) and the start of the development period (2026-10-22 00:00 UTC). Hackathon work is the set of commits that come after the tag **and** have a commit date on or after 2026-10-22 00:00 UTC:
+There are no commits between `open-agent-baseline` (2026-10-04) and the start of the development period (2026-10-22 00:00 UTC). Hackathon work lives on the [`open-agent-2026`](https://github.com/yamazakisayuri/indie-growth-agent/tree/open-agent-2026) branch: the commits that come after the tag **and** have a commit date on or after 2026-10-22 00:00 UTC:
 
 ```bash
-git log --since="2026-10-22T00:00:00Z" open-agent-baseline..main
+git log --since="2026-10-22T00:00:00Z" open-agent-baseline..open-agent-2026
 ```
 
 ## Prior submission
