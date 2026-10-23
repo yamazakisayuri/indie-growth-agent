@@ -14,6 +14,7 @@ from asc.sales import AscSalesRevenueSnapshot, try_fetch_sales_revenue_snapshot
 from format_input import format_agent_input
 from ga4 import try_fetch_ga4_snapshot, try_fetch_ga4_web_snapshot
 from ga4.snapshot import Ga4GrowthSnapshot
+from llm import build_model
 from report_builder import build_analyze_response
 from planner import attach_planner_safe
 
@@ -157,7 +158,7 @@ Do NOT invent UI headings such as "Next actions" / "次にやるべきこと",
 Those labels are owned by the client UI. Only fill analysis content fields.
 """
 
-agent = Agent(system_prompt=SYSTEM_PROMPT)
+agent = Agent(system_prompt=SYSTEM_PROMPT, model=build_model())
 
 
 def _asc_anchor_date(snapshot: AscGrowthSnapshot) -> date | None:
