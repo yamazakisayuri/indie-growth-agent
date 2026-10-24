@@ -69,8 +69,10 @@ def run_evidence_loop(
     language: str = "ja",
     max_critic_rounds: int = DEFAULT_MAX_CRITIC_ROUNDS,
     model: str = "",
+    context_note: str = "",
     on_update: Callable[[EvidenceRun], None] | None = None,
 ) -> EvidenceRun:
+    """context_note: identifiers the models need, e.g. our app_id, appended to the schema."""
     internal = list(internal_tables)
     external = list(external_tables)
     current, previous = comparison_periods(store)
@@ -84,7 +86,11 @@ def run_evidence_loop(
         previous_period=previous,
         max_critic_rounds=max_critic_rounds,
     )
-    all_schema = describe_tables(store, only=[*internal, *external])
+    def schema(only: list[str]) -> str:
+        text = describe_tables(store, only=only)
+        return f"{text}\n\nIdentifiers:\n{context_note}" if context_note else text
+
+    all_schema = schema([*internal, *external])
     table_names = [t.name for t in store.tables()]
 
     def save() -> None:
@@ -154,7 +160,7 @@ def run_evidence_loop(
             "internal",
             analyst_initial_prompt(
                 product_name=product_name,
-                schema_text=describe_tables(store, only=internal),
+                schema_text=schema(internal),
                 current=current,
                 previous=previous,
                 language=run.language,

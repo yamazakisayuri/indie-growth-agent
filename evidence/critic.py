@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import time
 from collections.abc import Iterable, Sequence
 from decimal import Decimal, InvalidOperation
@@ -23,6 +24,8 @@ from .schema import (
 from .store import EvidenceStore, EvidenceStoreError
 
 _SCALES = (1.0, 100.0, 0.01)
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+_NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
 def to_number(value: Any) -> float | None:
@@ -57,6 +60,25 @@ def values_match(claimed: Any, actual: Any) -> bool:
         return False
     tolerance = 0.5 * 10 ** -_decimals(claimed) + 1e-9
     return any(abs(a * scale - c) <= tolerance for scale in _SCALES)
+
+
+def is_composite(value: Any) -> bool:
+    """A text value that packs several numbers, e.g. 'impressions=2248, downloads=37'."""
+    if not isinstance(value, str) or to_number(value) is not None:
+        return False
+    text = value.strip()
+    if _ISO_DATE.match(text) and len(text) <= 25:
+        return False
+    return len(_NUMBER.findall(text)) >= 2 or any(ch in text for ch in "=;")
+
+
+def values_equal(claimed: Any, actual: Any) -> bool:
+    """Numbers by values_match; single texts (e.g. a genre) by case-insensitive equality."""
+    if to_number(claimed) is not None:
+        return values_match(claimed, actual)
+    if claimed is None or actual is None:
+        return False
+    return str(claimed).strip().casefold() == str(actual).strip().casefold()
 
 
 def run_logged(store: EvidenceStore, sql: str, role: str, log: list[SqlCall]):
@@ -128,6 +150,13 @@ def structural_findings(
             add(claim.id, "unverifiable", f"Evidence cites tables that do not exist: {unknown}.")
         if claim.kind in ("fact", "observation") and not claim.evidence:
             add(claim.id, "unverifiable", f"A {claim.kind} needs at least one evidence item.")
+        if any(is_composite(e.value) for e in claim.evidence):
+            add(
+                claim.id,
+                "unverifiable",
+                "An evidence value packs several numbers. Use one evidence item per number, "
+                "each with SQL that returns exactly that value.",
+            )
         if claim.kind == "fact":
             if cited & external:
                 add(
@@ -171,7 +200,7 @@ def recheck_cited_sql(
     findings: list[CriticFinding] = []
     for claim in output.claims:
         for evidence in claim.evidence:
-            if not evidence.sql.strip() or to_number(evidence.value) is None:
+            if not evidence.sql.strip() or evidence.value is None or is_composite(evidence.value):
                 continue
             actual, error = _scalar(store, evidence.sql, "code", log)
             if error is not None:
@@ -186,7 +215,7 @@ def recheck_cited_sql(
                         claimed_value=evidence.value,
                     )
                 )
-            elif not values_match(evidence.value, actual):
+            elif not values_equal(evidence.value, actual):
                 findings.append(
                     CriticFinding(
                         id=ids.next(),
@@ -220,8 +249,19 @@ def apply_critic_report(
         if claim is None or check.evidence_index >= len(claim.evidence):
             continue
         evidence = claim.evidence[check.evidence_index]
+        if is_composite(evidence.value):
+            outcomes.append(
+                CheckOutcome(
+                    claim_id=claim.id,
+                    sql=check.sql,
+                    claimed_value=evidence.value,
+                    matched=False,
+                    error="The claim's evidence value packs several numbers; not compared.",
+                )
+            )
+            continue
         actual, error = _scalar(store, check.sql, "critic", log)
-        matched = error is None and values_match(evidence.value, actual)
+        matched = error is None and values_equal(evidence.value, actual)
         outcomes.append(
             CheckOutcome(
                 claim_id=claim.id,

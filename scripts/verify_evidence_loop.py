@@ -21,8 +21,10 @@ from evidence.critic import (  # noqa: E402
     FindingIds,
     apply_critic_report,
     critic_payload,
+    is_composite,
     recheck_cited_sql,
     structural_findings,
+    values_equal,
     values_match,
 )
 from evidence.loop import comparison_periods, run_evidence_loop  # noqa: E402
@@ -119,6 +121,12 @@ def check_values_match() -> None:
     assert not values_match("n/a", 1) and not values_match(1, None)
     print("OK values_match: exact counts, claim precision, percent/ratio forms, strings from stores")
 
+    assert is_composite("impressions=2248, page_views=76") and is_composite("previous=15, current=11")
+    assert not is_composite("Games") and not is_composite("2026-10-11") and not is_composite(2258)
+    assert values_equal("Games", "games ") and not values_equal("Games", "Utilities")
+    assert values_equal("35.63%", 0.35632)
+    print("OK packed values like 'a=1, b=2' are detected; single texts compare as text")
+
 
 def check_code_rules(store: SQLiteEvidenceStore) -> None:
     ids = FindingIds("r1")
@@ -136,6 +144,7 @@ def check_code_rules(store: SQLiteEvidenceStore) -> None:
                 _claim("x1", "fact", 2824, RATING_SQL, table="competitor_listing"),
                 _claim("x2", "hypothesis"),
                 _claim("x3", "observation", 1, "SELECT 1", table="nope"),
+                _claim("x4", "fact", "impressions=2248, downloads=37", "SELECT 1"),
             ],
             "actions": [
                 {"rank": 1, "title": "a", "reason": "r", "claim_ids": ["x3"]},
@@ -157,8 +166,9 @@ def check_code_rules(store: SQLiteEvidenceStore) -> None:
     assert ("x3", "unverifiable") in kinds, kinds
     assert ("x3", "causal_leap") in kinds, kinds
     assert ("missing", "unverifiable") in kinds, kinds
+    assert ("x4", "unverifiable") in kinds, kinds
     print("OK code rules: external data as fact, hypothesis without test, unknown table, "
-          "observation-only action, missing claim id")
+          "observation-only action, missing claim id, packed evidence values")
 
     log: list[SqlCall] = []
     recheck = recheck_cited_sql(V2, store=store, ids=FindingIds("r1"), log=log)
@@ -241,8 +251,10 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
         critic=critic,
         internal_tables=INTERNAL_TABLE_NAMES,
         external_tables=EXTERNAL_TABLE_NAMES,
+        context_note="- Our app_id = '1'",
         on_update=lambda r: saved.append(r.model_dump_json(by_alias=True)),
     )
+    assert all("Our app_id = '1'" in p for p in [*analyst.prompts, *critic.prompts])
     assert run.status == "converged", (run.status, run.error)
     assert [s.version for s in run.steps] == ["v1", "v2", "v3"]
     assert [s.stage for s in run.steps] == ["internal", "competitive", "critic_revision"]

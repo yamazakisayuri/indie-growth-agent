@@ -26,7 +26,7 @@ from evidence.agents import DEFAULT_MAX_QUERIES, StrandsAnalyst, StrandsCritic  
 from evidence.loop import DEFAULT_MAX_CRITIC_ROUNDS, run_evidence_loop  # noqa: E402
 from evidence.schema import EvidenceRun  # noqa: E402
 from evidence.sources import EXTERNAL_TABLE_NAMES, INTERNAL_TABLE_NAMES  # noqa: E402
-from product_config import load_product_by_id  # noqa: E402
+from product_config import ProductConfig, load_product_by_id  # noqa: E402
 
 RUNS_DIR = ROOT / "tmp" / "evidence_runs"
 
@@ -36,6 +36,14 @@ def _model_label() -> str:
     if provider == "openai_compatible":
         return f"openai_compatible:{get_openai_compatible_settings().model_id}"
     return provider
+
+
+def _context_note(product: ProductConfig) -> str:
+    lines = [f"- known_events.product = '{product.id}'"]
+    if product.app_store.app_id:
+        lines.insert(0, f"- Our app_id = '{product.app_store.app_id}' (asc_* tables, competitor_listing)")
+    lines.append("- competitor_listing.is_self = 1 is our app; 0 are competitors")
+    return "\n".join(lines)
 
 
 def _print_summary(run: EvidenceRun, path: Path) -> None:
@@ -92,6 +100,7 @@ def main() -> None:
             language=args.language,
             max_critic_rounds=args.max_rounds,
             model=_model_label(),
+            context_note=_context_note(product),
             on_update=save,
         )
     finally:
