@@ -27,6 +27,7 @@ from evidence.schema import (  # noqa: E402
     RevisionStep,
     TestPlan,
 )
+from evidence.prompts import past_decisions_text  # noqa: E402
 from evidence.sources import ASC_DAILY  # noqa: E402
 from evidence.sqlite_store import SQLiteEvidenceStore  # noqa: E402
 from interventions import (  # noqa: E402
@@ -356,6 +357,26 @@ def main() -> None:
         assert "変更後 25（2026-10-16〜2026-10-22）" in ai_outcome.content
         assert "AI の成功基準: +5ポイント以上" in ai_outcome.content
         print("OK outcomes are recalled with the human verdict and the SQL numbers kept apart")
+
+        stored_ai = reopened.get(ai.id)
+        assert stored_ai.decision.outcome is None, "the ledger keeps the outcome in evaluation"
+        with_outcome = stored_ai.decision_with_outcome()
+        assert with_outcome.id == ai.id and with_outcome.outcome is not None
+        assert with_outcome.outcome.verdict == "improved"
+        assert with_outcome.outcome.note == "転換率が上がった"
+        assert with_outcome.outcome.implemented_on == "2026-10-15"
+        assert with_outcome.outcome.measured_after == stored_ai.after.metrics
+        assert all(m.sql for m in with_outcome.outcome.measured_after)
+        assert reopened.get(retry.id).decision_with_outcome().outcome is None
+        inconclusive = reopened.get(manual.id).decision_with_outcome().outcome
+        assert inconclusive.verdict == "inconclusive" and inconclusive.measured_after
+        text = past_decisions_text(
+            [reopened.get(retry.id).decision_with_outcome(), with_outcome]
+        )
+        assert text.count("  outcome: ") == 1, text
+        assert "outcome: developer's verdict = improved (2026-10-23, implemented 2026-10-15)" in text
+        assert "page_view_to_download_pct=25.0 (2026-10-16..2026-10-22)" in text
+        print("OK evaluated interventions give the Analyst the verdict and after numbers, apart")
 
         raw = json.loads(reopened.get(ai.id).model_dump_json(by_alias=True))
         assert set(raw["evaluation"]) == {"evaluatedOn", "verdict", "note"}

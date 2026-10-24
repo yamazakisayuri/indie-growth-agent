@@ -102,6 +102,12 @@ def past_decisions_text(decisions: Sequence[DecisionRecord]) -> str:
         "re-query the store for any number. Avoid re-proposing a change whose evaluation",
         "date has not passed; when it has, consider proposing to measure it):",
     ]
+    if any(d.outcome for d in decisions):
+        lines.append(
+            "An 'outcome' line is a past result: the developer's own verdict (a human "
+            "judgment) and numbers measured when it was evaluated. Neither is verified for "
+            "this run. Use it to learn what worked; never state it as a fact."
+        )
     for d in decisions:
         baseline = ", ".join(
             f"{b.metric}={b.value} ({b.period_start}..{b.period_end})" for b in d.baseline
@@ -113,6 +119,23 @@ def past_decisions_text(decisions: Sequence[DecisionRecord]) -> str:
             + f" | evaluate on {d.evaluation_date}"
             + (f" | baseline: {baseline}" if baseline else "")
         )
+        if d.outcome is not None:
+            o = d.outcome
+            after = ", ".join(
+                f"{m.metric}={m.value} ({m.period_start}..{m.period_end})"
+                for m in o.measured_after
+            )
+            lines.append(
+                f"  outcome: developer's verdict = {o.verdict} ({o.evaluated_on}"
+                + (f", implemented {o.implemented_on}" if o.implemented_on else "")
+                + ")"
+                + (f" | developer's note: {o.note}" if o.note else "")
+                + (
+                    f" | measured after the change, at evaluation time: {after}"
+                    if after
+                    else " | no after-change numbers were measured"
+                )
+            )
     return "\n".join(lines)
 
 

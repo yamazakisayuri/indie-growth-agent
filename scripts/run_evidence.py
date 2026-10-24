@@ -45,7 +45,8 @@ logger = logging.getLogger(__name__)
 def recall_decisions(
     product: ProductConfig, *, memory: DecisionMemory, ledger: InterventionLedger
 ) -> list[DecisionRecord]:
-    """Past decisions for this product: found in memory, read back from the intervention ledger.
+    """Past decisions for this product: found in memory, read back from the intervention ledger
+    with their outcome (verdict and after numbers) once evaluated.
 
     Read-only. Decisions reach memory only when a person adopts or registers one
     (scripts/interventions.py); running an analysis never writes memory.
@@ -56,7 +57,7 @@ def recall_decisions(
             item = ledger.get(ref_id)
         except InterventionError:
             return None
-        return None if item.status == "dropped" else item.decision
+        return None if item.status == "dropped" else item.decision_with_outcome()
 
     # product_id already scopes the recall; extra query words (e.g. the English app
     # name) only dilute tag matches in engines that read the first few query words.

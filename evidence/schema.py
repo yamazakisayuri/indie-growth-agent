@@ -217,6 +217,20 @@ class BaselineMetric(EvidenceModel):
     sql: str = ""
 
 
+class DecisionOutcome(EvidenceModel):
+    """How a past decision turned out: the developer's verdict, plus numbers measured then.
+
+    Analyst context only, never evidence: the verdict is a human judgment, and the numbers
+    were measured at evaluation time and are not re-verified by a later run.
+    """
+
+    evaluated_on: str = Field(pattern=ISO_DATE)
+    verdict: Literal["improved", "no_change", "worse", "inconclusive"]
+    note: str = ""
+    implemented_on: str | None = Field(default=None, pattern=ISO_DATE)
+    measured_after: list[BaselineMetric] = Field(default_factory=list)
+
+
 class DecisionRecord(EvidenceModel):
     """A change a person chose to make, with what to measure and when."""
 
@@ -231,6 +245,9 @@ class DecisionRecord(EvidenceModel):
     success_criterion: str
     evaluation_date: str = Field(pattern=ISO_DATE)
     created_at: str
+    outcome: DecisionOutcome | None = Field(
+        default=None, description="Set only once the decision has been evaluated."
+    )
 
 
 class EvidenceRun(EvidenceModel):

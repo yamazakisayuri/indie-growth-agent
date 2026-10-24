@@ -20,6 +20,7 @@ from evidence.schema import (
     ISO_DATE,
     BaselineMetric,
     Claim,
+    DecisionOutcome,
     DecisionRecord,
     EvidenceModel,
     TestPlan,
@@ -101,3 +102,19 @@ class Intervention(EvidenceModel):
     @property
     def title(self) -> str:
         return self.decision.action_title
+
+    def decision_with_outcome(self) -> DecisionRecord:
+        """The decision for Analyst context, with the verdict and after numbers once evaluated."""
+        if self.evaluation is None:
+            return self.decision
+        return self.decision.model_copy(
+            update={
+                "outcome": DecisionOutcome(
+                    evaluated_on=self.evaluation.evaluated_on,
+                    verdict=self.evaluation.verdict,
+                    note=self.evaluation.note,
+                    implemented_on=self.implemented_on,
+                    measured_after=list(self.after.metrics) if self.after else [],
+                )
+            }
+        )

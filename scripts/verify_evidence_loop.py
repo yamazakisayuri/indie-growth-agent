@@ -34,6 +34,8 @@ from evidence.critic import (  # noqa: E402
     values_match,
 )
 from evidence.loop import comparison_periods, run_evidence_loop  # noqa: E402
+from evidence.prompts import past_decisions_text  # noqa: E402
+from evidence.schema import DecisionOutcome  # noqa: E402
 from evidence.sources import (  # noqa: E402
     ASC_DAILY,
     COMPETITOR_LISTING,
@@ -427,6 +429,22 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
         evaluation_date="2026-10-29",
         created_at="2026-10-01T10:00:00+09:00",
     )
+    assert "outcome" not in past_decisions_text([decision])
+    evaluated = decision.model_copy(
+        update={
+            "id": "d-2026-09-10",
+            "action_title": "キーワードから三麻を外した",
+            "outcome": DecisionOutcome(
+                evaluated_on="2026-09-30",
+                verdict="inconclusive",
+                note="母数が小さい",
+                implemented_on="2026-09-15",
+                measured_after=[
+                    {"metric": "impressions", "value": 5198, "period_start": "2026-09-16", "period_end": "2026-09-29"}
+                ],
+            ),
+        }
+    )
     analyst_m = StubAnalyst([V1, V3])
     critic_m = StubCritic([CLEAN])
     with_memory = run_evidence_loop(
@@ -438,13 +456,27 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
         critic=critic_m,
         internal_tables=INTERNAL_TABLE_NAMES,
         external_tables=EXTERNAL_TABLE_NAMES,
-        past_decisions=[decision],
+        past_decisions=[decision, evaluated],
     )
-    assert with_memory.status == "converged" and with_memory.past_decision_ids == ["d-2026-10-01"]
+    assert with_memory.status == "converged"
+    assert with_memory.past_decision_ids == ["d-2026-10-01", "d-2026-09-10"]
     assert all("d-2026-10-01" in p and "NOT evidence" in p for p in analyst_m.prompts)
-    assert all("d-2026-10-01" not in p and "スクショ1枚目を差し替えた" not in p for p in critic_m.prompts)
+    assert all(
+        "outcome: developer's verdict = inconclusive (2026-09-30, implemented 2026-09-15)" in p
+        and "developer's note: 母数が小さい" in p
+        and "measured after the change, at evaluation time: impressions=5198.0" in p
+        and "never state it as a fact" in p
+        for p in analyst_m.prompts
+    )
+    for p in critic_m.prompts:
+        for leaked in (
+            "d-2026-10-01", "スクショ1枚目を差し替えた", "d-2026-09-10", "developer's verdict",
+            "母数が小さい",
+        ):
+            assert leaked not in p, leaked
     assert run.past_decision_ids == [] and "Past decisions" not in analyst.prompts[0]
     print("OK past decisions reach the Analyst as context only, never the Critic, ids kept in the run")
+    print("OK an evaluated decision adds its outcome: the developer's verdict apart from measured numbers")
 
     stuck = run_evidence_loop(
         run_id="t2",
