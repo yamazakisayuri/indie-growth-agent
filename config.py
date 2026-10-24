@@ -630,6 +630,23 @@ def get_openai_compatible_settings() -> OpenAICompatibleSettings:
     )
 
 
+DEFAULT_EVIDENCE_STORE = "sqlite"
+DEFAULT_EVIDENCE_SQLITE_PATH = "tmp/evidence.sqlite"
+
+
+def get_evidence_store_kind() -> str:
+    """Return the evidence store backend (EVIDENCE_STORE, default sqlite)."""
+    load_env()
+    return os.getenv("EVIDENCE_STORE", "").strip().lower() or DEFAULT_EVIDENCE_STORE
+
+
+def get_evidence_sqlite_path() -> Path:
+    """SQLite file for EVIDENCE_STORE=sqlite (EVIDENCE_SQLITE_PATH, relative to the repo)."""
+    load_env()
+    raw = os.getenv("EVIDENCE_SQLITE_PATH", "").strip() or DEFAULT_EVIDENCE_SQLITE_PATH
+    return _resolve_path(raw)
+
+
 DEFAULT_GROWTH_MD_FILENAME = "GROWTH.md"
 
 
