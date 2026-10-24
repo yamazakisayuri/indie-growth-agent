@@ -1074,6 +1074,39 @@ export const uiCopy = {
     ja: "操作できませんでした。",
     en: "Could not complete this step.",
   },
+  interventionsErrorSampleRun: {
+    ja: "架空のサンプルデータの提案は施策として採用できません。",
+    en: "Proposals from fictional sample data cannot be adopted.",
+  },
+  // --- Sample mode (Recorded Demo / Live Sample) ---
+  evidenceRecordedDemo: {
+    ja: "Recorded Demo・架空データ",
+    en: "Recorded Demo · fictional data",
+  },
+  evidenceLiveSample: {
+    ja: "Live Sample・架空データ",
+    en: "Live Sample · fictional data",
+  },
+  evidenceRecordedHint: {
+    ja: "架空のサンプルデータで実際にモデルを実行した記録です。表示するだけで、外部 API もモデルも呼びません。",
+    en: "A recorded real model run on fictional sample data. Viewing it calls no external API and no model.",
+  },
+  evidenceLiveSampleHint: {
+    ja: "架空のサンプルデータで、実際の Analyst と Critic を実行した結果です。実際のアプリの分析ではありません。",
+    en: "The real Analyst and Critic run on fictional sample data. Not an analysis of a real app.",
+  },
+  evidenceScenario: {
+    ja: "シナリオ",
+    en: "Scenario",
+  },
+  evidenceScenarioChanges: {
+    ja: "シナリオで変えた値",
+    en: "Values the scenario changed",
+  },
+  evidenceNoScenarioChanges: {
+    ja: "変更なし（基本のサンプル）",
+    en: "None (the base sample)",
+  },
 } as const;
 
 export type CopyKey = keyof typeof uiCopy;

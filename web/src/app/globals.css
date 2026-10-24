@@ -1758,6 +1758,14 @@ body {
   }
 }
 
+/* —— Sample mode —— */
+.evidence__sample {
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
 /* —— Interventions —— */
 .interventions__item {
   display: flex;

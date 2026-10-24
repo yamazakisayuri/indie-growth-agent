@@ -113,7 +113,34 @@ export interface RejectedAttempt {
   reason: string;
 }
 
-export interface EvidenceRun {
+/** One cell a sample scenario changed (sample_mode.py AppliedChange). */
+export interface SampleChange {
+  table: string;
+  match: Record<string, EvidenceValue>;
+  column: string;
+  before: EvidenceValue;
+  after: EvidenceValue;
+  reason: string;
+}
+
+/** Present only on runs over fictional sample data. */
+export interface SampleInfo {
+  dataKind: "fictional_sample";
+  note: string;
+  app: { productId: string; name: string; appId: string };
+  scenario: string;
+  scenarioDescription: string;
+  changes: SampleChange[];
+  recordedAt?: string;
+}
+
+interface SampleFields {
+  sample?: SampleInfo | null;
+  /** True for a Recorded Demo committed under samples/recorded/. */
+  recorded?: boolean;
+}
+
+export interface EvidenceRun extends SampleFields {
   runId: string;
   productId: string;
   startedAt: string;
@@ -130,7 +157,7 @@ export interface EvidenceRun {
   error: string | null;
 }
 
-export interface EvidenceRunSummary {
+export interface EvidenceRunSummary extends SampleFields {
   runId: string;
   productId: string;
   startedAt: string;

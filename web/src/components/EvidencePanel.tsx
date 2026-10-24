@@ -120,7 +120,54 @@ function runOptionLabel(
   copy: (key: CopyKey) => string,
 ): string {
   const versions = run.versions.length > 0 ? run.versions.join("→") : "—";
-  return `${formatTime(run.startedAt, language)} · ${copy(STATUS_COPY[run.status])} · ${versions}`;
+  const label = `${formatTime(run.startedAt, language)} · ${copy(STATUS_COPY[run.status])} · ${versions}`;
+  if (!run.sample) {
+    return label;
+  }
+  const kind = copy(run.recorded ? "evidenceRecordedDemo" : "evidenceLiveSample");
+  return `[${kind}: ${run.sample.scenario}] ${label}`;
+}
+
+/** Fictional sample data: say so, and list every value the scenario changed. */
+function SampleBanner({ run }: { run: EvidenceRun }) {
+  const { copy } = useLanguage();
+  if (!run.sample) {
+    return null;
+  }
+  const sample = run.sample;
+  return (
+    <div className="evidence__block evidence__sample" role="note">
+      <p className="evidence__block-title">
+        <Badge tone="muted">
+          {copy(run.recorded ? "evidenceRecordedDemo" : "evidenceLiveSample")}
+        </Badge>{" "}
+        {copy(run.recorded ? "evidenceRecordedHint" : "evidenceLiveSampleHint")}
+      </p>
+      <p className="evidence__note">{sample.note}</p>
+      <p className="evidence__note">
+        {copy("evidenceScenario")}: <strong>{sample.scenario}</strong> — {sample.scenarioDescription}
+      </p>
+      <h4 className="evidence__block-title">{copy("evidenceScenarioChanges")}</h4>
+      {sample.changes.length === 0 ? (
+        <p className="evidence__note">{copy("evidenceNoScenarioChanges")}</p>
+      ) : (
+        <ul className="evidence__changes">
+          {sample.changes.map((change, i) => (
+            <li key={`${change.table}-${change.column}-${i}`}>
+              <span className="evidence__claim-id">
+                {change.table} [
+                {Object.entries(change.match)
+                  .map(([k, v]) => `${k}=${String(v)}`)
+                  .join(", ")}
+                ] {change.column}
+              </span>{" "}
+              {formatValue(change.before)} → {formatValue(change.after)} — {change.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
@@ -610,6 +657,8 @@ export function EvidencePanel({ productId }: { productId: string }) {
             startedAt: shownRun.startedAt,
             status: shownRun.status,
             versions: shownRun.steps.map((s) => s.version),
+            sample: shownRun.sample,
+            recorded: shownRun.recorded,
           } as EvidenceRunSummary,
           ...runs,
         ]
@@ -727,6 +776,8 @@ export function EvidencePanel({ productId }: { productId: string }) {
             ) : null}
           </dl>
 
+          <SampleBanner run={shownRun} />
+
           {shownRun.status === "running" ? (
             <p className="experiments__status">{copy("evidenceRunningHint")}</p>
           ) : null}
@@ -763,6 +814,7 @@ export function EvidencePanel({ productId }: { productId: string }) {
               next={steps[selectedIndex + 1] ?? null}
               showSql={showSql}
               adoptRunId={
+                !shownRun.sample &&
                 (shownRun.status === "converged" || shownRun.status === "max_rounds") &&
                 selectedIndex === steps.length - 1
                   ? shownRun.runId

@@ -45,6 +45,7 @@ const ERROR_COPY: Record<string, CopyKey> = {
   run_in_progress: "interventionsErrorRunInProgress",
   invalid_input: "interventionsErrorInvalidInput",
   missing_plan: "interventionsNeedsPlan",
+  sample_run: "interventionsErrorSampleRun",
 };
 
 type Tone = "up" | "down" | "muted";
