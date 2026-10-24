@@ -133,6 +133,12 @@ def check_values_match() -> None:
     assert values_equal("35.63%", 0.35632)
     assert values_equal("NULL", None) and values_equal(None, None)
     assert not values_equal("NULL", 0) and not values_equal("Games", None)
+    listing = "◉ 不要に!!!\n◉ 把握 できる\n\n機能一覧"
+    assert values_equal("◉ 不要に!!!◉ 把握 できる 機能一覧", listing)
+    assert values_equal("◉不要に!!!◉把握できる機能一覧", listing)
+    assert not values_equal("◉ 不要に!!!!!!◉ 把握 できる 機能一覧", listing)
+    assert not values_equal("◉ 不要に!!!◉ 把握 できた 機能一覧", listing)
+    print("OK text values ignore only whitespace / line breaks; changed characters still mismatch")
     print("OK packed values like 'a=1, b=2' are detected; single texts compare as text")
 
 

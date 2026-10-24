@@ -73,14 +73,19 @@ def is_composite(value: Any) -> bool:
     return len(_NUMBER.findall(text)) >= 2 or any(ch in text for ch in "=;")
 
 
+def _text_key(value: Any) -> str:
+    """Text with spaces / line breaks removed and case folded; every other character kept."""
+    return "".join(str(value).split()).casefold()
+
+
 def values_equal(claimed: Any, actual: Any) -> bool:
-    """Numbers by values_match; single texts (e.g. a genre) by case-insensitive equality."""
+    """Numbers by values_match; texts by case-insensitive equality ignoring whitespace only."""
     if to_number(claimed) is not None:
         return values_match(claimed, actual)
     claimed_null = claimed is None or str(claimed).strip().casefold() in _NULL_WORDS
     if claimed_null or actual is None:
         return claimed_null and actual is None
-    return str(claimed).strip().casefold() == str(actual).strip().casefold()
+    return _text_key(claimed) == _text_key(actual)
 
 
 def run_logged(store: EvidenceStore, sql: str, role: str, log: list[SqlCall]):
