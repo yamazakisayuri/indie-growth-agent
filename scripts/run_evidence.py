@@ -6,6 +6,8 @@ Run (after scripts/export_evidence.py has loaded the tables):
 
 The model is LLM_PROVIDER (see .env.example). The store is EVIDENCE_STORE.
 The run is written to tmp/evidence_runs/<run_id>.json after every step.
+The first lines name the model provider, the evidence store (with the rows it holds),
+and the decision memory backend that this run actually used.
 """
 
 from __future__ import annotations
@@ -20,7 +22,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from config import get_llm_provider, get_openai_compatible_settings  # noqa: E402
 from evidence import build_store  # noqa: E402
 from evidence.agents import DEFAULT_MAX_QUERIES, StrandsAnalyst, StrandsCritic  # noqa: E402
 from evidence.loop import DEFAULT_MAX_CRITIC_ROUNDS, run_evidence_loop  # noqa: E402
@@ -29,6 +30,7 @@ from evidence.sources import EXTERNAL_TABLE_NAMES, INTERNAL_TABLE_NAMES  # noqa:
 from interventions import InterventionError, InterventionLedger  # noqa: E402
 from interventions.ledger import get_interventions_path  # noqa: E402
 from interventions.measure import METRICS  # noqa: E402
+from llm import describe_provider, model_label  # noqa: E402
 from memory import (  # noqa: E402
     RECALL_TAGS,
     DecisionMemory,
@@ -70,6 +72,10 @@ def recall_decisions(
     )
 
 
+MEMORY_LABELS = {"hmem": "hmem (Meterless H-MEM engine)", "local": "local (JSONL)"}
+MAX_ROUNDS_LIMIT = 3
+
+
 def _load_past_decisions(product: ProductConfig) -> list[DecisionRecord]:
     try:
         memory = build_memory()
@@ -79,16 +85,32 @@ def _load_past_decisions(product: ProductConfig) -> list[DecisionRecord]:
         return []
     try:
         ledger = InterventionLedger(get_interventions_path())
-        return recall_decisions(product, memory=memory, ledger=ledger)
+        decisions = recall_decisions(product, memory=memory, ledger=ledger)
     finally:
         memory.close()
+    print(
+        f"decision memory: {MEMORY_LABELS.get(memory.name, memory.name)}, "
+        f"recalled {len(decisions)} for product {product.id}"
+    )
+    return decisions
 
 
-def _model_label() -> str:
-    provider = get_llm_provider()
-    if provider == "openai_compatible":
-        return f"openai_compatible:{get_openai_compatible_settings().model_id}"
-    return provider
+def _print_store(store) -> None:
+    """Which store this run reads, and that it actually returns our daily rows."""
+    names = [t.name for t in store.tables()]
+    print(f"evidence store: {store.dialect}, tables: {', '.join(names) or '(none)'}")
+    if "asc_daily" in names:
+        count, first, last = store.query(
+            "SELECT COUNT(*), MIN(date), MAX(date) FROM asc_daily"
+        ).rows[0]
+        print(f"  asc_daily: {count} rows, {first} to {last}")
+
+
+def _max_rounds(raw: str) -> int:
+    value = int(raw)
+    if not 1 <= value <= MAX_ROUNDS_LIMIT:
+        raise argparse.ArgumentTypeError(f"must be 1 to {MAX_ROUNDS_LIMIT}")
+    return value
 
 
 def _context_note(product: ProductConfig) -> str:
@@ -117,6 +139,20 @@ def _print_summary(run: EvidenceRun, path: Path) -> None:
             )
             for f in step.critic.findings:
                 print(f"    [{f.kind} / {f.origin} / {f.resolution}] {f.claim_id}: {f.message}")
+    final = run.final
+    if final is not None and run.status != "error":
+        print(f"final Top {len(final.output.actions)} ({final.version}):")
+        for action in final.output.actions:
+            print(f"  {action.rank}. {action.title} [claims: {', '.join(action.claim_ids)}]")
+        unresolved = [
+            f for f in (final.critic.findings if final.critic else []) if f.resolution == "unresolved"
+        ]
+        if unresolved:
+            claims = sorted({f.claim_id for f in unresolved})
+            print(
+                f"NOT VERIFIED: {len(unresolved)} Critic finding(s) still unresolved after "
+                f"{run.max_critic_rounds} review round(s), on claims {', '.join(claims)}"
+            )
     print(f"trace: {path}")
 
 
@@ -124,7 +160,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--product-id", default=None)
     parser.add_argument("--language", choices=("ja", "en"), default="ja")
-    parser.add_argument("--max-rounds", type=int, default=DEFAULT_MAX_CRITIC_ROUNDS)
+    parser.add_argument("--max-rounds", type=_max_rounds, default=DEFAULT_MAX_CRITIC_ROUNDS)
     parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES)
     parser.add_argument(
         "--run-id", default=None, help="Trace file name (default: <product>-<timestamp>)"
@@ -142,6 +178,7 @@ def main() -> None:
     def save(run: EvidenceRun) -> None:
         path.write_text(run.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
 
+    print(f"model provider: {describe_provider()}")
     past_decisions = _load_past_decisions(product)
     print(
         f"past decisions from memory: {len(past_decisions)}"
@@ -150,6 +187,7 @@ def main() -> None:
 
     store = build_store()
     try:
+        _print_store(store)
         run = run_evidence_loop(
             run_id=run_id,
             product_id=product.id,
@@ -161,7 +199,7 @@ def main() -> None:
             external_tables=EXTERNAL_TABLE_NAMES,
             language=args.language,
             max_critic_rounds=args.max_rounds,
-            model=_model_label(),
+            model=model_label(),
             context_note=_context_note(product),
             past_decisions=past_decisions,
             on_update=save,
