@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { t, type CopyKey } from "./i18n";
+import { loadSelectedLanguage, saveSelectedLanguage } from "./report-cache";
 import type { Language } from "./types";
 
 interface LanguageContextValue {
@@ -31,8 +32,18 @@ export function LanguageProvider({
 }) {
   const [language, setLanguageState] = useState<Language>(initialLanguage);
 
+  // Each route mounts its own provider, so the choice is restored from localStorage.
+  useEffect(() => {
+    const saved = loadSelectedLanguage();
+    if (saved) {
+      /* eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage hydrate */
+      setLanguageState(saved);
+    }
+  }, []);
+
   const setLanguage = useCallback((next: Language) => {
     setLanguageState(next);
+    saveSelectedLanguage(next);
   }, []);
 
   useEffect(() => {

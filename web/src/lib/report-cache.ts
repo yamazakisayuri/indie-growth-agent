@@ -1,7 +1,8 @@
-import type { GrowthReport } from "@/lib/types";
+import type { GrowthReport, Language } from "@/lib/types";
 
 const REPORTS_KEY = "indie-growth-agent:lastReports";
 const PRODUCT_KEY = "indie-growth-agent:selectedProductId";
+const LANGUAGE_KEY = "indie-growth-agent:language";
 
 type ReportStore = Record<string, GrowthReport>;
 
@@ -77,6 +78,29 @@ export function saveSelectedProductId(productId: string) {
   }
   try {
     window.localStorage.setItem(PRODUCT_KEY, productId);
+  } catch {
+    // ignore
+  }
+}
+
+export function loadSelectedLanguage(): Language | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const saved = window.localStorage.getItem(LANGUAGE_KEY);
+    return saved === "ja" || saved === "en" ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSelectedLanguage(language: Language) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(LANGUAGE_KEY, language);
   } catch {
     // ignore
   }

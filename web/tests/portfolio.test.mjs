@@ -8,8 +8,10 @@ import {
 } from "../src/lib/portfolio.ts";
 import {
   loadCachedReport,
+  loadSelectedLanguage,
   loadSelectedProductId,
   saveCachedReport,
+  saveSelectedLanguage,
   saveSelectedProductId,
 } from "../src/lib/report-cache.ts";
 
@@ -158,6 +160,19 @@ describe("report cache (Portfolio → Dashboard handoff)", () => {
       JSON.stringify({ nextuta: report("mahjong") }),
     );
     assert.equal(loadCachedReport("nextuta"), null);
+  });
+
+  it("keeps the selected UI language for the next page", () => {
+    assert.equal(loadSelectedLanguage(), null);
+    saveSelectedLanguage("ja");
+    assert.equal(loadSelectedLanguage(), "ja");
+    saveSelectedLanguage("en");
+    assert.equal(loadSelectedLanguage(), "en");
+  });
+
+  it("ignores an unknown saved language", () => {
+    window.localStorage.setItem("indie-growth-agent:language", "fr");
+    assert.equal(loadSelectedLanguage(), null);
   });
 
   it("never returns mock or run-less reports", () => {
