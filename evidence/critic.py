@@ -248,25 +248,30 @@ def apply_critic_report(
 
     for check in report.checks:
         claim = claims.get(check.claim_id)
-        if claim is None or check.evidence_index >= len(claim.evidence):
-            continue
-        evidence = claim.evidence[check.evidence_index]
-        if is_composite(evidence.value):
-            outcomes.append(
-                CheckOutcome(
-                    claim_id=claim.id,
-                    sql=check.sql,
-                    claimed_value=evidence.value,
-                    matched=False,
-                    error="The claim's evidence value packs several numbers; not compared.",
-                )
-            )
+        if claim is None or not claim.evidence:
             continue
         actual, error = _scalar(store, check.sql, "critic", log)
-        matched = error is None and values_equal(evidence.value, actual)
+        # Models often omit evidence_index, so a check counts as matched when its value
+        # equals any of the claim's evidence values; evidence_index only picks what a
+        # mismatch is reported against.
+        index = next(
+            (
+                i
+                for i, e in enumerate(claim.evidence)
+                if error is None and not is_composite(e.value) and values_equal(e.value, actual)
+            ),
+            None,
+        )
+        matched = index is not None
+        if index is None:
+            index = min(check.evidence_index, len(claim.evidence) - 1)
+        evidence = claim.evidence[index]
+        if not matched and error is None and is_composite(evidence.value):
+            error = "The claim's evidence value packs several numbers; not compared."
         outcomes.append(
             CheckOutcome(
                 claim_id=claim.id,
+                evidence_index=index,
                 sql=check.sql,
                 claimed_value=evidence.value,
                 critic_value=actual,

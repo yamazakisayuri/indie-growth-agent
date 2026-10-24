@@ -203,6 +203,41 @@ def check_code_rules(store: SQLiteEvidenceStore) -> None:
     }
     print("OK Critic checks: code runs the Critic's SQL and decides matches; issues kept per claim")
 
+    two_periods = AnalystOutput.model_validate(
+        {
+            "most_important_finding": "f",
+            "claims": [
+                {
+                    "id": "p1",
+                    "text": "downloads 28 vs 35",
+                    "kind": "fact",
+                    "evidence": [
+                        {"table": "asc_daily", "sql": DOWNLOADS_SQL, "value": 28, "as_of": "2026-10-22", "source": "s"},
+                        {"table": "asc_daily", "sql": "SELECT 35", "value": 35, "as_of": "2026-10-15", "source": "s"},
+                    ],
+                }
+            ],
+            "actions": [],
+        }
+    )
+    previous_sql = (
+        "SELECT SUM(first_time_downloads) FROM asc_daily "
+        "WHERE date BETWEEN '2026-10-09' AND '2026-10-15'"
+    )
+    report = CriticReport.model_validate(
+        {
+            "summary": "s",
+            "checks": [
+                {"claim_id": "p1", "sql": previous_sql},
+                {"claim_id": "p1", "sql": "SELECT 99", "evidence_index": 1},
+            ],
+        }
+    )
+    found, outcomes = apply_critic_report(report, two_periods, store=store, ids=FindingIds("r1"), log=[])
+    assert [(o.matched, o.evidence_index) for o in outcomes] == [(True, 1), (False, 1)], outcomes
+    assert [(f.kind, f.claimed_value, f.critic_value) for f in found] == [("value_mismatch", 35, 99)]
+    print("OK a check matches whichever evidence item it reproduces, even without evidence_index")
+
     payload = critic_payload(V2)
     assert "SELECT" not in payload and "初心者向け" in payload
     print("OK Critic payload has claims and actions but none of the Analyst's SQL")

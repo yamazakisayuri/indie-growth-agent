@@ -157,6 +157,7 @@ class SqlCall(EvidenceModel):
 
 class CheckOutcome(EvidenceModel):
     claim_id: str
+    evidence_index: int | None = None
     sql: str
     claimed_value: float | str | None = None
     critic_value: float | str | None = None
