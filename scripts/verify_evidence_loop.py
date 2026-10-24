@@ -332,6 +332,15 @@ def check_source_text() -> None:
     assert "infeasible_action" in CRITIC_SYSTEM
     print("OK Analyst and Critic prompts state the App Store constraints")
 
+    infeasible = CRITIC_SYSTEM.split("- infeasible_action:", 1)[1].split("\n  Do not raise", 1)[0]
+    assert "PPO A/B test of the subtitle or keywords" in infeasible
+    assert "Search Ads feature used\n    for organic search" in infeasible
+    assert "Not infeasible" in infeasible and "dated before/after comparison" in infeasible
+    assert "overlap in time" in infeasible and "confounded or weak test design" in infeasible
+    assert "not causal_leap when the action only checks an effect" in infeasible
+    print("OK infeasible_action: App Store limits only; a feasible before/after with overlapping "
+          "changes or an unasserted effect is not flagged")
+
 
 class StubAnalyst:
     """Each item is an AnalystOutput (answered after one successful query) or (output, queries)."""

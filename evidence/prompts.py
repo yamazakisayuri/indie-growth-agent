@@ -87,10 +87,15 @@ Return:
     apps compared as if they were our App Store Connect funnel, or a period that is
     not the stated one.
   - kind_mislabel: speculation labeled as fact, or external data labeled as fact.
-  - infeasible_action: a test_plan or action breaks the App Store constraints below,
-    e.g. a PPO A/B test of the subtitle or keywords, a Search Ads feature used for
-    organic search, or wording of our earlier metadata that no table holds. Tie it to
-    the claim whose test_plan has it, or to the first claim_id of the action.
+  - infeasible_action: the App Store does not offer what an action or its test_plan
+    needs, e.g. a PPO A/B test of the subtitle or keywords, a Search Ads feature used
+    for organic search, or wording of our earlier metadata that no table holds. Tie it
+    to the claim whose test_plan has it, or to the first claim_id of the action.
+    Not infeasible: a change the developer can make in App Store Connect and measure
+    with a dated before/after comparison, even when other changes overlap in time and
+    the effects may be hard to separate. A confounded or weak test design is not
+    infeasible_action, and not causal_leap when the action only checks an effect
+    ("check whether X contributes"); mention it in the summary instead.
   Do not raise issues about wording or style. If a version is sound, return no issues.
 
 {APP_STORE_RULES}
