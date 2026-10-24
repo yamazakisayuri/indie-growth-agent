@@ -65,9 +65,11 @@ def main() -> None:
         return process  # type: ignore[return-value]
 
     original_dir, original_spawn = evidence_api.RUNS_DIR, evidence_api.spawn_run
+    original_recorded = evidence_api.RECORDED_DIR
     with tempfile.TemporaryDirectory() as tmp:
         runs_dir = Path(tmp)
         evidence_api.RUNS_DIR = runs_dir
+        evidence_api.RECORDED_DIR = runs_dir / "no-recorded-demos"
         evidence_api.spawn_run = fake_spawn  # type: ignore[assignment]
         evidence_api._launches.clear()
         try:
@@ -203,6 +205,7 @@ def main() -> None:
             print("\nAll evidence API checks passed.")
         finally:
             evidence_api.RUNS_DIR = original_dir
+            evidence_api.RECORDED_DIR = original_recorded
             evidence_api.spawn_run = original_spawn  # type: ignore[assignment]
             evidence_api._launches.clear()
 
