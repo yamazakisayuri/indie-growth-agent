@@ -26,12 +26,15 @@ def prediction_from_run(run: EvidenceRun, *, rank: int, version: str | None = No
     steps = [s for s in run.steps if version is None or s.version == version]
     if not steps:
         raise InterventionError(
-            f"Run {run.run_id} has no {'steps' if version is None else version}"
+            f"Run {run.run_id} has no {'steps' if version is None else version}",
+            code="not_found",
         )
     step = steps[-1]
     action = next((a for a in step.output.actions if a.rank == rank), None)
     if action is None:
-        raise InterventionError(f"Run {run.run_id} {step.version} has no action ranked {rank}")
+        raise InterventionError(
+            f"Run {run.run_id} {step.version} has no action ranked {rank}", code="not_found"
+        )
     by_id = {c.id: c for c in step.output.claims}
     claims = [by_id[cid] for cid in action.claim_ids if cid in by_id]
     test_plan = next((c.test_plan for c in claims if c.test_plan is not None), None)
@@ -79,7 +82,8 @@ def adopt(
     if missing:
         raise InterventionError(
             "The adopted action has no test plan for: " + ", ".join(missing)
-            + ". Pass them explicitly."
+            + ". Pass them explicitly.",
+            code="missing_plan",
         )
     return _create(
         ledger,
@@ -203,7 +207,8 @@ def implement(
     if evaluation_date < window_end:
         raise InterventionError(
             f"The {item.window_days}-day after window ends on {window_end}, after the "
-            f"evaluation date {evaluation_date}; pick a later date or a shorter --window-days"
+            f"evaluation date {evaluation_date}; pick a later date or a shorter --window-days",
+            code="invalid_dates",
         )
     baseline = _measure(
         store, app_id, before_window(implemented_on, item.window_days), ledger.now_iso()
@@ -235,7 +240,8 @@ def evaluate(
     if evaluated_on < item.decision.evaluation_date and not early:
         raise InterventionError(
             f"{intervention_id} is due for evaluation on {item.decision.evaluation_date}; "
-            "use --early to judge it sooner"
+            "use --early to judge it sooner",
+            code="not_due",
         )
     after = _measure(
         store,

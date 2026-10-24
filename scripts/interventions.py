@@ -26,7 +26,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from evidence import build_store  # noqa: E402
 from evidence.store import EvidenceStore  # noqa: E402
 from interventions import (  # noqa: E402
     VERDICTS,
@@ -44,6 +43,7 @@ from interventions import (  # noqa: E402
     remeasure,
     sync_memory,
 )
+from interventions.runtime import open_store, product_app_id, sync_memory_safely  # noqa: E402
 from memory import build_memory  # noqa: E402
 from product_config import load_product_by_id  # noqa: E402
 
@@ -104,30 +104,21 @@ def _describe(item: Intervention) -> str:
 def _open_store(skip: bool) -> EvidenceStore | None:
     if skip:
         return None
-    try:
-        return build_store()
-    except Exception as exc:  # noqa: BLE001 — the lifecycle change is still recorded
-        print(f"warning: evidence store unavailable, nothing measured ({exc})", file=sys.stderr)
-        return None
+    store, warning = open_store()
+    if warning:
+        print(f"warning: {warning}", file=sys.stderr)
+    return store
 
 
 def _app_id(product_id: str) -> str | None:
-    return load_product_by_id(product_id).app_store.app_id
+    return product_app_id(product_id)
 
 
 def _sync(ledger: InterventionLedger, item: Intervention) -> Intervention:
-    memory = build_memory()
-    try:
-        return sync_memory(ledger, memory, item)
-    except Exception as exc:  # noqa: BLE001 — the ledger already holds the change
-        print(
-            f"warning: decision memory not updated ({type(exc).__name__}: {exc}); "
-            "run sync-memory later",
-            file=sys.stderr,
-        )
-        return item
-    finally:
-        memory.close()
+    item, warning = sync_memory_safely(ledger, item)
+    if warning:
+        print(f"warning: {warning}", file=sys.stderr)
+    return item
 
 
 def _report(item: Intervention, changed: bool, verb: str) -> None:

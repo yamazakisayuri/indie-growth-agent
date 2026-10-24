@@ -24,7 +24,14 @@ DEFAULT_INTERVENTIONS_PATH = "tmp/interventions/ledger.jsonl"
 
 
 class InterventionError(RuntimeError):
-    """The requested lifecycle change is not allowed."""
+    """The requested lifecycle change is not allowed.
+
+    code: not_found | missing_plan | not_due | invalid_dates | invalid_transition | corrupt_ledger
+    """
+
+    def __init__(self, message: str, *, code: str = "invalid_transition") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def get_interventions_path() -> Path:
@@ -68,7 +75,8 @@ class InterventionLedger:
                 self._apply(event)
             except (ValueError, KeyError, TypeError) as exc:
                 raise InterventionError(
-                    f"{self._path}:{line_no} is not an intervention event: {exc}"
+                    f"{self._path}:{line_no} is not an intervention event: {exc}",
+                    code="corrupt_ledger",
                 ) from exc
 
     def _apply(self, event: dict[str, Any]) -> None:
@@ -142,7 +150,7 @@ class InterventionLedger:
         with self._lock:
             item = self._items.get(intervention_id)
         if item is None:
-            raise InterventionError(f"Unknown intervention {intervention_id}")
+            raise InterventionError(f"Unknown intervention {intervention_id}", code="not_found")
         return item
 
     def list_interventions(
@@ -197,7 +205,7 @@ class InterventionLedger:
         with self._lock:
             item = self._items.get(intervention_id)
             if item is None:
-                raise InterventionError(f"Unknown intervention {intervention_id}")
+                raise InterventionError(f"Unknown intervention {intervention_id}", code="not_found")
             if item.status in ("implemented", "evaluated") and item.implemented_on == implemented_on:
                 return item, False
             if item.status != "planned":
@@ -227,7 +235,7 @@ class InterventionLedger:
         with self._lock:
             item = self._items.get(intervention_id)
             if item is None:
-                raise InterventionError(f"Unknown intervention {intervention_id}")
+                raise InterventionError(f"Unknown intervention {intervention_id}", code="not_found")
             if item.status == "evaluated" and item.evaluation is not None:
                 if (item.evaluation.verdict, item.evaluation.note) == (
                     evaluation.verdict,
@@ -270,7 +278,7 @@ class InterventionLedger:
         with self._lock:
             item = self._items.get(intervention_id)
             if item is None:
-                raise InterventionError(f"Unknown intervention {intervention_id}")
+                raise InterventionError(f"Unknown intervention {intervention_id}", code="not_found")
             if item.status not in ("implemented", "evaluated"):
                 raise InterventionError(f"{intervention_id} is {item.status}; nothing to measure")
             if after is not None and item.status != "evaluated":
@@ -290,7 +298,7 @@ class InterventionLedger:
         with self._lock:
             item = self._items.get(intervention_id)
             if item is None:
-                raise InterventionError(f"Unknown intervention {intervention_id}")
+                raise InterventionError(f"Unknown intervention {intervention_id}", code="not_found")
             if item.status == "dropped":
                 return item, False
             if item.status == "evaluated":
@@ -302,7 +310,7 @@ class InterventionLedger:
         with self._lock:
             item = self._items.get(intervention_id)
             if item is None:
-                raise InterventionError(f"Unknown intervention {intervention_id}")
+                raise InterventionError(f"Unknown intervention {intervention_id}", code="not_found")
             if item.memory_ids.get(key) == memory_id:
                 return item
             return self._append(
