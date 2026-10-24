@@ -29,6 +29,7 @@ OFFLINE_CHECKS = (
     "scripts/verify_zetaris_store.py",
     "scripts/verify_evidence_loop.py",
     "scripts/verify_memory.py",
+    "scripts/verify_hmem.py",
 )
 
 

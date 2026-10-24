@@ -8,7 +8,7 @@ from .base import DecisionMemory
 from .local_memory import LocalMemory
 from .null_memory import NullMemory
 
-SUPPORTED_BACKENDS = ("none", "local")
+SUPPORTED_BACKENDS = ("none", "local", "hmem")
 
 
 def build_memory() -> DecisionMemory:
@@ -17,6 +17,10 @@ def build_memory() -> DecisionMemory:
         return NullMemory()
     if backend == "local":
         return LocalMemory(get_memory_local_dir())
+    if backend == "hmem":
+        from integrations.hmem import HmemMemory
+
+        return HmemMemory()
     raise ValueError(
         f"Unsupported MEMORY_BACKEND {backend!r}; expected one of: {', '.join(SUPPORTED_BACKENDS)}"
     )
