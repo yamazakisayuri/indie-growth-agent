@@ -21,6 +21,25 @@ export interface ProductSummary {
   type: string;
 }
 
+/** Local catalog used until GET /api/products answers (or when the API is offline). */
+export const FALLBACK_PRODUCTS: ProductSummary[] = [
+  {
+    id: "mahjong",
+    name: "Mahjong Score Calculator / 麻雀点数計算",
+    type: "hybrid",
+  },
+  {
+    id: "shopping-memo",
+    name: "Shopping List Memo / 買い物メモ",
+    type: "mobile_app",
+  },
+  {
+    id: "nextuta",
+    name: "次うた",
+    type: "hybrid",
+  },
+];
+
 export interface ProductsResponse {
   defaultProductId: string;
   products: ProductSummary[];

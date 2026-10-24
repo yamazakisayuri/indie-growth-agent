@@ -479,6 +479,63 @@ export const uiCopy = {
     ja: "Planner / MCP エラー（Analyzer 結果は有効）",
     en: "Planner / MCP error (Analyzer result still valid)",
   },
+  // --- Portfolio Overview ---
+  portfolioTitle: {
+    ja: "ポートフォリオ",
+    en: "Portfolio",
+  },
+  portfolioEyebrow: {
+    ja: "全アプリの概要",
+    en: "All apps at a glance",
+  },
+  portfolioOpen: {
+    ja: "ポートフォリオ",
+    en: "Portfolio",
+  },
+  portfolioBackToDashboard: {
+    ja: "ダッシュボードへ",
+    en: "Back to dashboard",
+  },
+  portfolioCountApps: {
+    ja: "アプリ",
+    en: "apps",
+  },
+  portfolioAnalyzed: {
+    ja: "分析済み",
+    en: "Analyzed",
+  },
+  portfolioNotAnalyzed: {
+    ja: "未分析",
+    en: "Not analyzed",
+  },
+  portfolioNotAnalyzedHint: {
+    ja: "このブラウザに保存された分析結果はありません。ダッシュボードで「最新データを分析」を実行してください。",
+    en: "No saved Analyze in this browser. Open the dashboard and run Analyze latest data.",
+  },
+  portfolioKpis: {
+    ja: "主要指標",
+    en: "Key metrics",
+  },
+  portfolioNoData: {
+    ja: "表示できる値がありません",
+    en: "No values to show",
+  },
+  portfolioTopAction: {
+    ja: "最優先の推奨",
+    en: "Top recommendation",
+  },
+  portfolioNoTopAction: {
+    ja: "この分析には推奨アクションがありません",
+    en: "This Analyze returned no recommended action",
+  },
+  portfolioOpenDashboard: {
+    ja: "詳細を開く",
+    en: "Open details",
+  },
+  portfolioDataNote: {
+    ja: "各アプリについて、このブラウザに保存された最後の Live Analyze の結果をそのまま表示しています。この画面では値や推奨を生成しません。",
+    en: "Each card shows the last successful Live Analyze saved in this browser, as-is. This view does not generate values or recommendations.",
+  },
 } as const;
 
 export type CopyKey = keyof typeof uiCopy;

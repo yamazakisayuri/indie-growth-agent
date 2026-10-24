@@ -1,9 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import type { ProductSummary } from "@/lib/analyze-client";
 import { useLanguage } from "@/lib/language-context";
 import { hasSuccessfulReport } from "@/lib/map-report";
+import { PORTFOLIO_PATH } from "@/lib/routes";
 import type { GrowthReport } from "@/lib/types";
 import { LanguageSelector } from "./LanguageSelector";
 
@@ -165,6 +167,20 @@ export function Header({
         >
           {analyzing ? copy("analyzing") : copy("analyze")}
         </button>
+        {/* Leaving mid-Analyze would abort the run. */}
+        <Link
+          href={PORTFOLIO_PATH}
+          className="analyze-btn portfolio__nav-link"
+          aria-disabled={analyzing || undefined}
+          tabIndex={analyzing ? -1 : undefined}
+          onClick={(event) => {
+            if (analyzing) {
+              event.preventDefault();
+            }
+          }}
+        >
+          {copy("portfolioOpen")}
+        </Link>
       </div>
     </header>
   );

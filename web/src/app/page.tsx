@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dashboard } from "@/components/Dashboard";
 import {
   AnalyzeRequestError,
+  FALLBACK_PRODUCTS,
   requestAnalyze,
   requestProducts,
   type ProductSummary,
@@ -22,24 +23,6 @@ import {
 } from "@/lib/report-cache";
 import type { GrowthReport } from "@/lib/types";
 
-const FALLBACK_PRODUCTS: ProductSummary[] = [
-  {
-    id: "mahjong",
-    name: "Mahjong Score Calculator / 麻雀点数計算",
-    type: "hybrid",
-  },
-  {
-    id: "shopping-memo",
-    name: "Shopping List Memo / 買い物メモ",
-    type: "mobile_app",
-  },
-  {
-    id: "nextuta",
-    name: "次うた",
-    type: "hybrid",
-  },
-];
-
 function DashboardApp() {
   const { language, copy } = useLanguage();
   const [products, setProducts] = useState<ProductSummary[]>(FALLBACK_PRODUCTS);
@@ -55,12 +38,9 @@ function DashboardApp() {
 
   // Hydrate last Product + last successful report from localStorage (client only).
   useEffect(() => {
-    const savedProductId = loadSelectedProductId();
-    const initialProductId =
-      savedProductId &&
-      FALLBACK_PRODUCTS.some((item) => item.id === savedProductId)
-        ? savedProductId
-        : "mahjong";
+    // Not validated against FALLBACK_PRODUCTS: the API catalog may list more
+    // products, and it re-validates the id once it loads.
+    const initialProductId = loadSelectedProductId() || "mahjong";
     const cached = loadCachedReport(initialProductId);
     /* External store (localStorage) → React state; intentional one-shot hydrate. */
     /* eslint-disable react-hooks/set-state-in-effect -- localStorage hydrate */
@@ -96,7 +76,17 @@ function DashboardApp() {
         });
       })
       .catch(() => {
-        // Keep local fallback catalog when API is offline.
+        if (controller.signal.aborted) {
+          return;
+        }
+        // Keep local fallback catalog when API is offline; drop ids it does not list.
+        setProductId((current) => {
+          if (FALLBACK_PRODUCTS.some((item) => item.id === current)) {
+            return current;
+          }
+          setLiveReport(loadCachedReport("mahjong"));
+          return "mahjong";
+        });
       });
     return () => controller.abort();
   }, []);
@@ -152,8 +142,11 @@ function DashboardApp() {
     if (liveReport && hasSuccessfulReport(liveReport)) {
       return liveReport;
     }
-    const selected =
-      products.find((item) => item.id === productId) ?? FALLBACK_PRODUCTS[0];
+    const selected = products.find((item) => item.id === productId) ?? {
+      id: productId,
+      name: productId,
+      type: "unknown",
+    };
     return buildEmptyReport(language, {
       id: selected.id,
       name: selected.name,

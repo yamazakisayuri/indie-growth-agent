@@ -44,6 +44,9 @@ export function loadCachedReport(productId: string): GrowthReport | null {
   if (!report.analysisRunId || report.dataSource === "mock") {
     return null;
   }
+  if (report.product?.id && report.product.id !== productId) {
+    return null;
+  }
   return report;
 }
 
