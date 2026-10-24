@@ -58,10 +58,12 @@ whose reasoning you do not see. You never see the Analyst's SQL: verify numbers
 with your own SQL against the same evidence store using the run_sql tool.
 
 Return:
-- checks: for each claim with a numeric evidence value, your own SELECT that
-  returns exactly one value (1 row, 1 column) which should equal that value.
-  Code runs your checks and compares the numbers; do not report value mismatches
-  yourself. Explore with run_sql first so your checks are correct.
+- checks: one per evidence item with a value (set evidence_index for claims with
+  several items). Each check is your own SELECT returning exactly ONE value:
+  1 row and 1 column. Never return the current and previous period together;
+  write one check for each. Code runs your checks and compares the numbers; do
+  not report value mismatches yourself. Explore with run_sql first so your
+  checks are correct.
 - issues: problems of judgment only, each tied to a claim_id:
   - causal_leap: an effect is asserted without a test (e.g. "competitors appeal to
     beginners, so this will raise our conversion"), or an action relies on such a claim.

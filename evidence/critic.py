@@ -26,6 +26,7 @@ from .store import EvidenceStore, EvidenceStoreError
 _SCALES = (1.0, 100.0, 0.01)
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
+_NULL_WORDS = frozenset({"null", "none", "n/a", ""})
 
 
 def to_number(value: Any) -> float | None:
@@ -76,8 +77,9 @@ def values_equal(claimed: Any, actual: Any) -> bool:
     """Numbers by values_match; single texts (e.g. a genre) by case-insensitive equality."""
     if to_number(claimed) is not None:
         return values_match(claimed, actual)
-    if claimed is None or actual is None:
-        return False
+    claimed_null = claimed is None or str(claimed).strip().casefold() in _NULL_WORDS
+    if claimed_null or actual is None:
+        return claimed_null and actual is None
     return str(claimed).strip().casefold() == str(actual).strip().casefold()
 
 

@@ -125,6 +125,8 @@ def check_values_match() -> None:
     assert not is_composite("Games") and not is_composite("2026-10-11") and not is_composite(2258)
     assert values_equal("Games", "games ") and not values_equal("Games", "Utilities")
     assert values_equal("35.63%", 0.35632)
+    assert values_equal("NULL", None) and values_equal(None, None)
+    assert not values_equal("NULL", 0) and not values_equal("Games", None)
     print("OK packed values like 'a=1, b=2' are detected; single texts compare as text")
 
 
