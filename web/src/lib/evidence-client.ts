@@ -9,7 +9,8 @@ export type FindingKind =
   | "unverifiable"
   | "kind_mislabel"
   | "scope_mismatch"
-  | "causal_leap";
+  | "causal_leap"
+  | "infeasible_action";
 export type FindingResolution = "open" | "resolved" | "downgraded" | "unresolved";
 export type RevisionStage = "internal" | "competitive" | "critic_revision";
 export type EvidenceRunStatus = "running" | "converged" | "max_rounds" | "error";

@@ -252,7 +252,7 @@ def run_evidence_loop(
         ids = FindingIds(f"r{round_no}")
         code_log: list[SqlCall] = []
         findings = structural_findings(
-            step.output, table_names=table_names, external_tables=external, ids=ids
+            step.output, table_names=table_names, external_tables=external, ids=ids, store=store
         )
         findings += recheck_cited_sql(step.output, store=store, ids=ids, log=code_log)
         report, critic_log = critic(

@@ -34,13 +34,14 @@ from evidence.critic import (  # noqa: E402
     values_match,
 )
 from evidence.loop import comparison_periods, run_evidence_loop  # noqa: E402
-from evidence.prompts import past_decisions_text  # noqa: E402
+from evidence.prompts import ANALYST_SYSTEM, CRITIC_SYSTEM, past_decisions_text  # noqa: E402
 from evidence.schema import DecisionOutcome  # noqa: E402
 from evidence.sources import (  # noqa: E402
     ASC_DAILY,
     COMPETITOR_LISTING,
     EXTERNAL_TABLE_NAMES,
     INTERNAL_TABLE_NAMES,
+    KNOWN_EVENTS,
 )
 from evidence.sql_tool import make_sql_tool  # noqa: E402
 
@@ -255,6 +256,81 @@ def check_code_rules(store: SQLiteEvidenceStore) -> None:
     payload = critic_payload(V2)
     assert "SELECT" not in payload and "初心者向け" in payload
     print("OK Critic payload has claims and actions but none of the Analyst's SQL")
+
+
+SHOTS = "スクリーンショット1〜3枚目を新しいデザインに差し替えた。"
+SHOTS_SQL = "SELECT description FROM known_events WHERE date = '2026-10-16'"
+
+
+def check_source_text() -> None:
+    store = SQLiteEvidenceStore()
+    try:
+        store.replace_table(
+            KNOWN_EVENTS,
+            [
+                {"date": "2026-10-15", "type": "store", "product": "mahjong", "description": "キーワードを変更した。"},
+                {"date": "2026-10-16", "type": "store", "product": "mahjong", "description": SHOTS},
+            ],
+        )
+        store.replace_table(
+            COMPETITOR_LISTING,
+            [{"fetched_on": "2026-10-22", "country": "jp", "app_id": "2", "is_self": 0, "rating_count": 2860}],
+        )
+        output = AnalystOutput.model_validate(
+            {
+                "most_important_finding": "f",
+                "claims": [
+                    _claim("q1", "observation", SHOTS, SHOTS_SQL, table="known_events"),
+                    _claim("q2", "observation", SHOTS.replace("3", "4"), SHOTS_SQL, table="known_events"),
+                    _claim("q3", "observation", "2026-10-15 store; 2026-10-16 store",
+                           "SELECT date FROM known_events", table="known_events"),
+                    _claim("q4", "observation", "Games: 2860, 1180, 960",
+                           "SELECT rating_count FROM competitor_listing", table="competitor_listing"),
+                    _claim("q5", "observation", "impressions=2248, downloads=37",
+                           "SELECT 'impressions=2248, downloads=37' AS description FROM known_events",
+                           table="known_events"),
+                    _claim("q6", "observation", SHOTS,
+                           "SELECT description FROM known_events WHERE date = '2026-10-15'",
+                           table="known_events"),
+                ],
+                "actions": [],
+            }
+        )
+
+        def flagged(found) -> set[str]:
+            return {f.claim_id for f in found if f.kind == "unverifiable" and "packs" in f.message}
+
+        tables = ["known_events", "competitor_listing"]
+        found = structural_findings(output, table_names=tables, external_tables=EXTERNAL_TABLE_NAMES,
+                                    ids=FindingIds("r1"), store=store)
+        assert flagged(found) == {"q2", "q3", "q4", "q5"}, flagged(found)
+        without_store = structural_findings(output, table_names=tables,
+                                            external_tables=EXTERNAL_TABLE_NAMES, ids=FindingIds("r1"))
+        assert flagged(without_store) == {"q1", "q2", "q3", "q4", "q5", "q6"}
+        print("OK text quoted verbatim from a text column passes; packed or altered values are still flagged")
+
+        recheck = recheck_cited_sql(output, store=store, ids=FindingIds("r1"), log=[])
+        assert [(f.claim_id, f.kind) for f in recheck] == [("q6", "value_mismatch")], recheck
+        report = CriticReport.model_validate(
+            {
+                "summary": "s",
+                "checks": [{"claim_id": "q1", "sql": SHOTS_SQL}],
+                "issues": [{"claim_id": "q1", "kind": "infeasible_action",
+                            "message": "PPO ではサブタイトルを A/B テストできない"}],
+            }
+        )
+        found, outcomes = apply_critic_report(report, output, store=store, ids=FindingIds("r1"), log=[])
+        assert [o.matched for o in outcomes] == [True], outcomes
+        assert [(f.claim_id, f.kind, f.origin) for f in found] == [("q1", "infeasible_action", "critic")]
+        print("OK quoted text is still compared with what its SQL returns; Critic can flag infeasible actions")
+    finally:
+        store.close()
+
+    for system in (ANALYST_SYSTEM, CRITIC_SYSTEM):
+        assert "cannot be A/B tested" in system and "Apple Search Ads" in system
+        assert "earlier metadata" in system and "every\n  competitor row" in system
+    assert "infeasible_action" in CRITIC_SYSTEM
+    print("OK Analyst and Critic prompts state the App Store constraints")
 
 
 class StubAnalyst:
@@ -530,6 +606,7 @@ def main() -> None:
     store = _store()
     try:
         check_code_rules(store)
+        check_source_text()
         check_loop(store)
         check_sql_tool(store)
     finally:

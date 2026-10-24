@@ -24,6 +24,7 @@ FindingKind = Literal[
     "kind_mislabel",
     "scope_mismatch",
     "causal_leap",
+    "infeasible_action",
 ]
 FindingResolution = Literal["open", "resolved", "downgraded", "unresolved"]
 RevisionStage = Literal["internal", "competitive", "critic_revision"]
@@ -121,7 +122,7 @@ class CriticIssue(EvidenceModel):
     """A judgment-type problem the Critic sees in a claim or action."""
 
     claim_id: str
-    kind: Literal["kind_mislabel", "scope_mismatch", "causal_leap"]
+    kind: Literal["kind_mislabel", "scope_mismatch", "causal_leap", "infeasible_action"]
     message: str
 
 

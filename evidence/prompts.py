@@ -15,6 +15,21 @@ SQL rules:
 - A day with no row is missing data, not zero. Never treat NULL as 0.
 """
 
+APP_STORE_RULES = """\
+App Store constraints:
+- Product page optimization (PPO) A/B tests only the app icon, screenshots, and app
+  preview videos. The app name, subtitle, keyword field, description, and category
+  cannot be A/B tested; test them with a dated before/after comparison.
+- Apple Search Ads is a paid product. Its features (bids, negative keywords, search
+  terms reports) do not exist for organic App Store search.
+- The store does not hold our earlier metadata. Never write what the name, subtitle,
+  keywords, or screenshots used to say; call them "the version before <date>".
+- A statement about all (or none) of the competitors needs evidence covering every
+  competitor row.
+- When you are not sure the App Store allows an action or test method, state it as
+  something the developer must confirm first, not as a ready plan.
+"""
+
 ANALYST_SYSTEM = f"""\
 You are the Analyst of an indie app growth team. You propose at most 3 prioritized
 actions and support every statement with evidence from the evidence store.
@@ -48,6 +63,7 @@ Actions:
 Evidence value: write the number exactly as your SQL returned it, or rounded, in
 the same unit as the claim text (a ratio 0.3563 or a percent 35.63, consistently).
 
+{APP_STORE_RULES}
 {SQL_RULES}
 You have a limited query budget. Plan your queries; do not repeat a query.
 """
@@ -71,8 +87,13 @@ Return:
     apps compared as if they were our App Store Connect funnel, or a period that is
     not the stated one.
   - kind_mislabel: speculation labeled as fact, or external data labeled as fact.
+  - infeasible_action: a test_plan or action breaks the App Store constraints below,
+    e.g. a PPO A/B test of the subtitle or keywords, a Search Ads feature used for
+    organic search, or wording of our earlier metadata that no table holds. Tie it to
+    the claim whose test_plan has it, or to the first claim_id of the action.
   Do not raise issues about wording or style. If a version is sound, return no issues.
 
+{APP_STORE_RULES}
 {SQL_RULES}
 You have a limited query budget.
 """
@@ -251,6 +272,8 @@ Produce the next version that fixes them.
 - causal_leap / kind_mislabel: downgrade the claim to a hypothesis with a test_plan,
   or remove it. Do not argue that an untested effect is proven.
 - scope_mismatch: compare like with like, or state the populations separately.
+- infeasible_action: use a method the App Store allows (e.g. a dated before/after
+  instead of PPO), state it as something to confirm first, or remove the action.
 Fill finding_responses with one entry per finding id (fixed, downgraded, removed,
 or disputed with a note). Keep claims that had no problems.
 Return the complete next version including its actions (up to 3). Fill

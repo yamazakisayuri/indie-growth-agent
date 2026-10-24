@@ -48,6 +48,7 @@ const FINDING_COPY: Record<CriticFinding["kind"], CopyKey> = {
   kind_mislabel: "evidenceFindingKindMislabel",
   scope_mismatch: "evidenceFindingScopeMismatch",
   causal_leap: "evidenceFindingCausalLeap",
+  infeasible_action: "evidenceFindingInfeasibleAction",
 };
 
 const RESOLUTION_COPY: Record<CriticFinding["resolution"], CopyKey> = {

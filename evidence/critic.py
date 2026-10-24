@@ -19,6 +19,7 @@ from .schema import (
     CheckOutcome,
     CriticFinding,
     CriticReport,
+    Evidence,
     SqlCall,
 )
 from .store import EvidenceStore, EvidenceStoreError
@@ -71,6 +72,39 @@ def is_composite(value: Any) -> bool:
     if _ISO_DATE.match(text) and len(text) <= 25:
         return False
     return len(_NUMBER.findall(text)) >= 2 or any(ch in text for ch in "=;")
+
+
+def is_source_text(value: Any, table: str, store: EvidenceStore | None) -> bool:
+    """True when value is the exact content of a text column in the cited table.
+
+    Wording quoted from a source row (e.g. a known_events description mentioning
+    "1〜3枚目") may contain digits; they are part of the text, not packed numbers.
+    """
+    if store is None or not isinstance(value, str) or not value.strip():
+        return False
+    spec = next((s for s in store.tables() if s.name.lower() == table.strip().lower()), None)
+    if spec is None:
+        return False
+    literal = "'" + value.replace("'", "''") + "'"
+    for column in spec.columns:
+        if column.type != "text":
+            continue
+        try:
+            found = store.query(
+                f"SELECT COUNT(*) FROM {spec.name} WHERE {column.name} = {literal}"
+            ).scalar()
+        except (EvidenceStoreError, ValueError):
+            continue
+        if found:
+            return True
+    return False
+
+
+def packs_numbers(evidence: Evidence, store: EvidenceStore | None) -> bool:
+    """is_composite, except for text quoted verbatim from a text column of the cited table."""
+    return is_composite(evidence.value) and not is_source_text(
+        evidence.value, evidence.table, store
+    )
 
 
 def _text_key(value: Any) -> str:
@@ -138,8 +172,12 @@ def structural_findings(
     table_names: Iterable[str],
     external_tables: Iterable[str],
     ids: FindingIds,
+    store: EvidenceStore | None = None,
 ) -> list[CriticFinding]:
-    """Rules that need no model: evidence present, tables exist, external data not a fact."""
+    """Rules that need no model: evidence present, tables exist, external data not a fact.
+
+    store lets quoted source text (see is_source_text) pass the packed-numbers rule.
+    """
     tables = {t.lower() for t in table_names}
     external = {t.lower() for t in external_tables}
     claim_ids = {c.id for c in output.claims}
@@ -157,7 +195,7 @@ def structural_findings(
             add(claim.id, "unverifiable", f"Evidence cites tables that do not exist: {unknown}.")
         if claim.kind in ("fact", "observation") and not claim.evidence:
             add(claim.id, "unverifiable", f"A {claim.kind} needs at least one evidence item.")
-        if any(is_composite(e.value) for e in claim.evidence):
+        if any(packs_numbers(e, store) for e in claim.evidence):
             add(
                 claim.id,
                 "unverifiable",
@@ -207,7 +245,7 @@ def recheck_cited_sql(
     findings: list[CriticFinding] = []
     for claim in output.claims:
         for evidence in claim.evidence:
-            if not evidence.sql.strip() or evidence.value is None or is_composite(evidence.value):
+            if not evidence.sql.strip() or evidence.value is None or packs_numbers(evidence, store):
                 continue
             actual, error = _scalar(store, evidence.sql, "code", log)
             if error is not None:
@@ -263,7 +301,7 @@ def apply_critic_report(
             (
                 i
                 for i, e in enumerate(claim.evidence)
-                if error is None and not is_composite(e.value) and values_equal(e.value, actual)
+                if error is None and not packs_numbers(e, store) and values_equal(e.value, actual)
             ),
             None,
         )
@@ -271,7 +309,7 @@ def apply_critic_report(
         if index is None:
             index = min(check.evidence_index, len(claim.evidence) - 1)
         evidence = claim.evidence[index]
-        if not matched and error is None and is_composite(evidence.value):
+        if not matched and error is None and packs_numbers(evidence, store):
             error = "The claim's evidence value packs several numbers; not compared."
         outcomes.append(
             CheckOutcome(

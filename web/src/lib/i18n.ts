@@ -793,6 +793,10 @@ export const uiCopy = {
     ja: "因果の飛躍",
     en: "Causal leap",
   },
+  evidenceFindingInfeasibleAction: {
+    ja: "App Store の機能制約に反する",
+    en: "Not possible on the App Store",
+  },
   evidenceOriginCode: {
     ja: "コード判定",
     en: "Code",
