@@ -1393,6 +1393,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   font-size: 0.8125rem;
   color: var(--text-subtle);
 }
@@ -1405,7 +1407,9 @@ body {
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   color: var(--text);
+  min-width: 0;
   max-width: 100%;
+  text-overflow: ellipsis;
 }
 
 .evidence__meta {

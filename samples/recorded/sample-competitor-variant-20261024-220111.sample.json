@@ -54,5 +54,20 @@
     "r2-f1（C7）と r2-f2（C9）の value_mismatch は誤判定。Critic は「Games の競合数 = 3」「スクリーンショット6枚以上の競合数 = 3」を数え、claim 本文の「3本」はデータどおり正しい。Analyst がこの件数を根拠の項目に持たず、アプリごとの値（'Games'、4）と照合されたため不一致と判定された。",
     "残る6件（C5・C6・C12 の因果の飛躍、C5 の他社の評価数をコンバージョン実績と混同した scope_mismatch、C6・C13 の観測していない競合スクリーンショットの中身を前提にした kind_mislabel）は妥当な指摘で、v3 でも解消されていない。"
   ],
-  "comparisonNote": "base（sample-base-20261024-214121）との提案の違いを、競合データの変更による因果効果として扱わないこと。v1 は自社の3表（asc_daily, asc_daily_by_source, known_events）だけを使い、その内容は両シナリオで同一だが、v1 の1位の提案がすでに異なる（base: スクリーンショットの PPO、variant: キーワードの絞り込み）。各シナリオ1回ずつの実行では、モデルのばらつきと競合データの違いを切り分けられない。比較条件も同一ではない。3e0991f（モデル呼び出しの接続リトライ追加）は base の実行後・variant の実行前に入ったが、variant の実行中には発動していない。e47b6ad（Critic プロンプトの infeasible_action の範囲変更）は variant の実行中にコミットされ、variant に反映されたかはトレースから確認できない。このため、base と variant の差を競合データ変更の因果効果とは断定できない。"
+  "comparisonNote": "base（sample-base-20261024-214121）との提案の違いを、競合データの変更による因果効果として扱わないこと。v1 は自社の3表（asc_daily, asc_daily_by_source, known_events）だけを使い、その内容は両シナリオで同一だが、v1 の1位の提案がすでに異なる（base: スクリーンショットの PPO、variant: キーワードの絞り込み）。各シナリオ1回ずつの実行では、モデルのばらつきと競合データの違いを切り分けられない。比較条件も同一ではない。3e0991f（モデル呼び出しの接続リトライ追加）は base の実行後・variant の実行前に入ったが、variant の実行中には発動していない。e47b6ad（Critic プロンプトの infeasible_action の範囲変更）は variant の実行中にコミットされ、variant に反映されたかはトレースから確認できない。このため、base と variant の差を競合データ変更の因果効果とは断定できない。",
+  "en": {
+    "note": "Fictional sample data. It is not a real app, not App Store Connect results, and not real competitor listings.",
+    "scenarioDescription": "Only the top competitor (fictional-101) loses its lead in rating count, screenshot count, and latest version release date. Checks how proposals that rest on competitor gaps change by v3. Our app's data and the other competitors are the same as base.",
+    "changeReasons": [
+      "Lower the rating count to about our app's level (18) so the rating lead disappears",
+      "Give it fewer screenshots than our app (5) so the lead in listing images disappears",
+      "Leave it un-updated for almost two years so the update recency lead disappears"
+    ],
+    "reviewOutcome": "max_rounds (stopped at the review limit). Eight findings are still unresolved in v3; not every finding is resolved. Two of the eight (r2-f1, r2-f2) are known false judgments.",
+    "knownLimitations": [
+      "The value_mismatch findings r2-f1 (C7) and r2-f2 (C9) are false. The Critic counted \"competitors in Games = 3\" and \"competitors with 6+ screenshots = 3\", and the claims' \"3 apps\" matches the data. The Analyst did not give these counts as evidence items, so they were compared with per-app values ('Games', 4) and judged as mismatches.",
+      "The other six (causal leaps in C5, C6, and C12; a scope_mismatch in C5 that treats other apps' rating counts as conversions; kind_mislabel in C6 and C13 that rely on competitor screenshot content never observed) are valid and remain unresolved in v3."
+    ],
+    "comparisonNote": "Do not treat the differences from base (sample-base-20261024-214121) as a causal effect of the competitor data change. v1 uses only our own three tables (asc_daily, asc_daily_by_source, known_events), identical in both scenarios, yet its #1 proposal already differs (base: screenshot PPO; variant: narrowing keywords). With one run per scenario, model variance cannot be separated from the data difference. The run conditions also differed: 3e0991f (retry on model connection errors) landed after the base run and before the variant run, and did not fire during the variant run. e47b6ad (narrower Critic prompt for infeasible_action) was committed while the variant ran, and the trace cannot show whether it applied. So the base / variant difference cannot be called a causal effect of the competitor data change."
+  }
 }

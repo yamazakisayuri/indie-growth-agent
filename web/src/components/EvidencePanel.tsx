@@ -18,7 +18,7 @@ import {
   type RevisionStep,
 } from "@/lib/evidence-client";
 import { useLanguage } from "@/lib/language-context";
-import { sampleCaveats } from "@/lib/sample-caveats";
+import { sampleText } from "@/lib/sample-text";
 import { AdoptActionButton } from "./AdoptActionButton";
 
 const POLL_MS = 4000;
@@ -130,14 +130,21 @@ function runOptionLabel(
   return `[${kind}: ${run.sample.scenario}] ${label}`;
 }
 
-/** Fictional sample data: say so, list every value the scenario changed, and the review notes. */
+/**
+ * Fictional sample data: say so, with the review outcome and unresolved count up front.
+ * The scenario, changed values, known limitations, and comparison note sit in details.
+ */
 function SampleBanner({ run }: { run: EvidenceRun }) {
-  const { copy } = useLanguage();
+  const { copy, language } = useLanguage();
   if (!run.sample) {
     return null;
   }
   const sample = run.sample;
-  const caveats = sampleCaveats(sample);
+  const text = sampleText(sample, language);
+  const finalCritic = run.steps.at(-1)?.critic;
+  const unresolved = finalCritic
+    ? finalCritic.findings.filter((f) => f.resolution === "unresolved").length
+    : null;
   return (
     <div className="evidence__block evidence__sample" role="note">
       <p className="evidence__block-title">
@@ -146,58 +153,60 @@ function SampleBanner({ run }: { run: EvidenceRun }) {
         </Badge>{" "}
         {copy(run.recorded ? "evidenceRecordedHint" : "evidenceLiveSampleHint")}
       </p>
-      <p className="evidence__note">{sample.note}</p>
-      <p className="evidence__note">
-        {copy("evidenceScenario")}: <strong>{sample.scenario}</strong> — {sample.scenarioDescription}
-      </p>
-      <h4 className="evidence__block-title">{copy("evidenceScenarioChanges")}</h4>
-      {sample.changes.length === 0 ? (
-        <p className="evidence__note">{copy("evidenceNoScenarioChanges")}</p>
-      ) : (
-        <ul className="evidence__changes">
-          {sample.changes.map((change, i) => (
-            <li key={`${change.table}-${change.column}-${i}`}>
-              <span className="evidence__claim-id">
-                {change.table} [
-                {Object.entries(change.match)
-                  .map(([k, v]) => `${k}=${String(v)}`)
-                  .join(", ")}
-                ] {change.column}
-              </span>{" "}
-              {formatValue(change.before)} → {formatValue(change.after)} — {change.reason}
-            </li>
-          ))}
-        </ul>
-      )}
-      {caveats?.reviewOutcome ? (
+      {text.reviewOutcome ? (
         <p className="evidence__note">
-          <strong>{copy("evidenceReviewOutcome")}</strong>: {caveats.reviewOutcome}
+          <strong>{copy("evidenceReviewOutcome")}</strong>: {text.reviewOutcome}
         </p>
       ) : null}
-      {caveats && (caveats.knownLimitations.length > 0 || caveats.comparisonNote) ? (
-        <details className="evidence__collapsible">
-          <summary className="evidence__block-title">
-            {copy("evidenceSampleCaveats")}{" "}
-            <span className="evidence__summary-counts">{caveats.knownLimitations.length}</span>
-          </summary>
-          {caveats.knownLimitations.length > 0 ? (
-            <>
-              <h4 className="evidence__block-title">{copy("evidenceKnownLimitations")}</h4>
-              <ul className="evidence__changes">
-                {caveats.knownLimitations.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          {caveats.comparisonNote ? (
-            <>
-              <h4 className="evidence__block-title">{copy("evidenceComparisonNote")}</h4>
-              <p className="evidence__note">{caveats.comparisonNote}</p>
-            </>
-          ) : null}
-        </details>
+      {unresolved !== null ? (
+        <p className="evidence__note">
+          <strong>{copy("evidenceUnresolvedFindings")}</strong>: {unresolved}
+        </p>
       ) : null}
+      <details className="evidence__collapsible">
+        <summary className="evidence__block-title">{copy("evidenceSampleDetails")}</summary>
+        {text.note ? <p className="evidence__note">{text.note}</p> : null}
+        <p className="evidence__note">
+          {copy("evidenceScenario")}: <strong>{sample.scenario}</strong>
+          {text.scenarioDescription ? ` — ${text.scenarioDescription}` : null}
+        </p>
+        <h4 className="evidence__block-title">{copy("evidenceScenarioChanges")}</h4>
+        {sample.changes.length === 0 ? (
+          <p className="evidence__note">{copy("evidenceNoScenarioChanges")}</p>
+        ) : (
+          <ul className="evidence__changes">
+            {sample.changes.map((change, i) => (
+              <li key={`${change.table}-${change.column}-${i}`}>
+                <span className="evidence__claim-id">
+                  {change.table} [
+                  {Object.entries(change.match)
+                    .map(([k, v]) => `${k}=${String(v)}`)
+                    .join(", ")}
+                  ] {change.column}
+                </span>{" "}
+                {formatValue(change.before)} → {formatValue(change.after)} —{" "}
+                {text.changeReasons[i] || change.reason}
+              </li>
+            ))}
+          </ul>
+        )}
+        {text.knownLimitations.length > 0 ? (
+          <>
+            <h4 className="evidence__block-title">{copy("evidenceKnownLimitations")}</h4>
+            <ul className="evidence__changes">
+              {text.knownLimitations.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+        {text.comparisonNote ? (
+          <>
+            <h4 className="evidence__block-title">{copy("evidenceComparisonNote")}</h4>
+            <p className="evidence__note">{text.comparisonNote}</p>
+          </>
+        ) : null}
+      </details>
     </div>
   );
 }

@@ -137,6 +137,15 @@ export interface SampleInfo {
   reviewOutcome?: string;
   knownLimitations?: string[];
   comparisonNote?: string;
+  /** English versions of the text fields above; the Japanese fields are the originals. */
+  en?: {
+    note?: string;
+    scenarioDescription?: string;
+    changeReasons?: string[];
+    reviewOutcome?: string;
+    knownLimitations?: string[];
+    comparisonNote?: string;
+  };
 }
 
 interface SampleFields {

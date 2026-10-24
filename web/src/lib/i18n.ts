@@ -1115,9 +1115,13 @@ export const uiCopy = {
     ja: "レビュー結果",
     en: "Review outcome",
   },
-  evidenceSampleCaveats: {
-    ja: "既知の限界と比較上の注意",
-    en: "Known limitations and comparison notes",
+  evidenceUnresolvedFindings: {
+    ja: "未解決の指摘",
+    en: "Unresolved findings",
+  },
+  evidenceSampleDetails: {
+    ja: "詳細（シナリオ・変更値・既知の限界・比較上の注意）",
+    en: "Details (scenario, changed values, known limitations, comparison note)",
   },
   evidenceKnownLimitations: {
     ja: "既知の限界",
