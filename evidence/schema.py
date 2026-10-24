@@ -220,6 +220,9 @@ class EvidenceRun(EvidenceModel):
     current_period: tuple[str, str] | None = None
     previous_period: tuple[str, str] | None = None
     max_critic_rounds: int = 2
+    past_decision_ids: list[str] = Field(
+        default_factory=list, description="Decision records given to the Analyst as context."
+    )
     status: Literal["running", "converged", "max_rounds", "error"] = "running"
     steps: list[RevisionStep] = Field(default_factory=list)
     error: str | None = None

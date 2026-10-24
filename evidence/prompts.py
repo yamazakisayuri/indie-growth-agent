@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
-from .schema import AnalystOutput, CriticFinding
+from .schema import AnalystOutput, CriticFinding, DecisionRecord
 
 SQL_RULES = """\
 SQL rules:
@@ -91,6 +91,29 @@ def _language_rule(language: str) -> str:
             "table and column names, and App Store / App Store Connect as they are."
         )
     return "Write all prose fields in English."
+
+
+def past_decisions_text(decisions: Sequence[DecisionRecord]) -> str:
+    """Past decisions as Analyst context. They are not evidence and are never sent to the Critic."""
+    if not decisions:
+        return ""
+    lines = [
+        "Past decisions (context only, NOT evidence: never cite them as a claim's evidence;",
+        "re-query the store for any number. Avoid re-proposing a change whose evaluation",
+        "date has not passed; when it has, consider proposing to measure it):",
+    ]
+    for d in decisions:
+        baseline = ", ".join(
+            f"{b.metric}={b.value} ({b.period_start}..{b.period_end})" for b in d.baseline
+        )
+        lines.append(
+            f"- [{d.id}] {d.created_at[:10]} {d.origin}: {d.action_title}"
+            + (f" — {d.change_description}" if d.change_description else "")
+            + f" | method: {d.method} | success: {d.success_criterion}"
+            + f" | evaluate on {d.evaluation_date}"
+            + (f" | baseline: {baseline}" if baseline else "")
+        )
+    return "\n".join(lines)
 
 
 def _periods_text(current: tuple[str, str], previous: tuple[str, str]) -> str:

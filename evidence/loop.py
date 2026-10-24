@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from datetime import date, datetime, timedelta, timezone
 
 from .critic import (
@@ -27,8 +27,17 @@ from .prompts import (
     analyst_initial_prompt,
     analyst_revision_prompt,
     critic_prompt,
+    past_decisions_text,
 )
-from .schema import AnalystOutput, CriticReport, CriticReview, EvidenceRun, RevisionStep, SqlCall
+from .schema import (
+    AnalystOutput,
+    CriticReport,
+    CriticReview,
+    DecisionRecord,
+    EvidenceRun,
+    RevisionStep,
+    SqlCall,
+)
 from .store import EvidenceStore, describe_tables
 
 logger = logging.getLogger(__name__)
@@ -70,9 +79,18 @@ def run_evidence_loop(
     max_critic_rounds: int = DEFAULT_MAX_CRITIC_ROUNDS,
     model: str = "",
     context_note: str = "",
+    past_decisions: Sequence[DecisionRecord] | None = None,
     on_update: Callable[[EvidenceRun], None] | None = None,
 ) -> EvidenceRun:
-    """context_note: identifiers the models need, e.g. our app_id, appended to the schema."""
+    """Run the loop and return the stored run.
+
+    context_note: identifiers the models need (e.g. our app_id), appended to the schema.
+    past_decisions: earlier DecisionRecords for this product, shown to the Analyst as
+    context only (not evidence). The Critic never receives them. Retrieval and storage
+    are the caller's job.
+    """
+    decisions = list(past_decisions or ())
+    decisions_text = past_decisions_text(decisions)
     internal = list(internal_tables)
     external = list(external_tables)
     current, previous = comparison_periods(store)
@@ -85,6 +103,7 @@ def run_evidence_loop(
         current_period=current,
         previous_period=previous,
         max_critic_rounds=max_critic_rounds,
+        past_decision_ids=[d.id for d in decisions],
     )
     def schema(only: list[str]) -> str:
         text = describe_tables(store, only=only)
@@ -100,7 +119,7 @@ def run_evidence_loop(
     def analyst_step(version: str, stage: str, prompt: str) -> RevisionStep:
         logger.info("Analyst %s (%s) started", version, stage)
         started = time.monotonic()
-        output, queries = analyst(prompt)
+        output, queries = analyst(f"{prompt}\n{decisions_text}\n" if decisions_text else prompt)
         step = RevisionStep(
             version=version,
             stage=stage,

@@ -16,7 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from evidence import AnalystOutput, CriticReport, SQLiteEvidenceStore, SqlCall  # noqa: E402
+from evidence import (  # noqa: E402
+    AnalystOutput,
+    CriticReport,
+    DecisionRecord,
+    SQLiteEvidenceStore,
+    SqlCall,
+)
 from evidence.critic import (  # noqa: E402
     FindingIds,
     apply_critic_report,
@@ -308,6 +314,38 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
     assert all(DOWNLOADS_SQL not in p for p in critic.prompts), "Critic must not see Analyst SQL"
     assert json.loads(saved[-1])["status"] == "converged" and len(saved) >= 6
     print("OK loop converges: v1 -> v2 -> Critic -> v3 -> Critic, findings resolved / downgraded")
+
+    decision = DecisionRecord(
+        id="d-2026-10-01",
+        product_id="mahjong",
+        origin="manual",
+        action_title="スクショ1枚目を差し替えた",
+        baseline=[
+            {"metric": "page_view_to_download", "value": 0.4868, "period_start": "2026-09-24", "period_end": "2026-09-30"}
+        ],
+        method="before/after",
+        success_criterion="CVR +10%",
+        evaluation_date="2026-10-29",
+        created_at="2026-10-01T10:00:00+09:00",
+    )
+    analyst_m = StubAnalyst([V1, V3])
+    critic_m = StubCritic([CLEAN])
+    with_memory = run_evidence_loop(
+        run_id="t-mem",
+        product_id="mahjong",
+        product_name="麻雀",
+        store=store,
+        analyst=analyst_m,
+        critic=critic_m,
+        internal_tables=INTERNAL_TABLE_NAMES,
+        external_tables=EXTERNAL_TABLE_NAMES,
+        past_decisions=[decision],
+    )
+    assert with_memory.status == "converged" and with_memory.past_decision_ids == ["d-2026-10-01"]
+    assert all("d-2026-10-01" in p and "NOT evidence" in p for p in analyst_m.prompts)
+    assert all("d-2026-10-01" not in p and "スクショ1枚目を差し替えた" not in p for p in critic_m.prompts)
+    assert run.past_decision_ids == [] and "Past decisions" not in analyst.prompts[0]
+    print("OK past decisions reach the Analyst as context only, never the Critic, ids kept in the run")
 
     stuck = run_evidence_loop(
         run_id="t2",
