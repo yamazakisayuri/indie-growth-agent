@@ -74,6 +74,14 @@ class AdMobChannelConfig:
 
 
 @dataclass(frozen=True)
+class CompetitorConfig:
+    """Fixed list of competitor App Store apps, compared on public listing data only."""
+
+    country: str = "jp"
+    app_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ProductConfig:
     """Logical product that may own multiple channels (App Store, Web, GA4, AdMob)."""
 
@@ -87,6 +95,7 @@ class ProductConfig:
     ga4_web: Ga4ChannelConfig
     admob: AdMobChannelConfig
     capabilities: tuple[str, ...] = ()
+    competitors: CompetitorConfig = field(default_factory=CompetitorConfig)
 
 
 @dataclass(frozen=True)
@@ -256,6 +265,14 @@ def _parse_admob(raw: Any) -> AdMobChannelConfig:
     )
 
 
+def _parse_competitors(raw: Any) -> CompetitorConfig:
+    data = raw if isinstance(raw, dict) else {}
+    return CompetitorConfig(
+        country=(_as_str(data.get("country")) or "jp").lower(),
+        app_ids=_as_str_tuple(data.get("appIds") or data.get("app_ids")),
+    )
+
+
 def products_dir() -> Path:
     return ROOT_DIR / PRODUCTS_DIRNAME
 
@@ -364,6 +381,7 @@ def _parse_product_dict(raw: dict[str, Any], *, path: Path) -> ProductConfig:
         ga4_web=_parse_ga4(channels.get("ga4_web"), default_enabled=False),
         admob=_parse_admob(channels.get("admob")),
         capabilities=top_capabilities,
+        competitors=_parse_competitors(raw.get("competitors")),
     )
 
 

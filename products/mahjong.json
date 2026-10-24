@@ -3,6 +3,11 @@
   "name": "Mahjong Score Calculator / 麻雀点数計算",
   "type": "hybrid",
   "capabilities": [],
+  "competitors": {
+    "country": "jp",
+    "appIds": ["1672476966", "1279110013", "1329138513", "1403452009", "6751792528"],
+    "note": "Top results for 麻雀 点数計算 in the JP App Store (fixed list, public listing data only)."
+  },
   "channels": {
     "app_store": {
       "enabled": true,

@@ -25,6 +25,7 @@ OFFLINE_CHECKS = (
     "scripts/verify_structured_output_lists.py",
     "scripts/verify_evidence_schema.py",
     "scripts/verify_evidence_store.py",
+    "scripts/verify_evidence_sources.py",
 )
 
 
