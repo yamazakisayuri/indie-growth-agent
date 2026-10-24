@@ -14,9 +14,11 @@ from .decisions import decision_tags, entry_from_decision, format_recalled
 from .factory import SUPPORTED_BACKENDS, build_memory
 from .local_memory import LocalMemory
 from .null_memory import NullMemory
+from .recall import RECALL_TAGS, recall_past_decisions, recall_tags
 
 __all__ = [
     "DEFAULT_RECALL_LIMIT",
+    "RECALL_TAGS",
     "SUPPORTED_BACKENDS",
     "AuditEntry",
     "DecisionMemory",
@@ -31,4 +33,6 @@ __all__ = [
     "decision_tags",
     "entry_from_decision",
     "format_recalled",
+    "recall_past_decisions",
+    "recall_tags",
 ]

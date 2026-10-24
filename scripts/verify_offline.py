@@ -30,6 +30,7 @@ OFFLINE_CHECKS = (
     "scripts/verify_evidence_loop.py",
     "scripts/verify_memory.py",
     "scripts/verify_hmem.py",
+    "scripts/verify_memory_loop.py",
 )
 
 

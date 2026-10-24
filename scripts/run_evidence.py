@@ -24,11 +24,63 @@ from config import get_llm_provider, get_openai_compatible_settings  # noqa: E40
 from evidence import build_store  # noqa: E402
 from evidence.agents import DEFAULT_MAX_QUERIES, StrandsAnalyst, StrandsCritic  # noqa: E402
 from evidence.loop import DEFAULT_MAX_CRITIC_ROUNDS, run_evidence_loop  # noqa: E402
-from evidence.schema import EvidenceRun  # noqa: E402
+from evidence.schema import DecisionRecord, EvidenceRun  # noqa: E402
 from evidence.sources import EXTERNAL_TABLE_NAMES, INTERNAL_TABLE_NAMES  # noqa: E402
+from interventions import InterventionError, InterventionLedger  # noqa: E402
+from interventions.ledger import get_interventions_path  # noqa: E402
+from interventions.measure import METRICS  # noqa: E402
+from memory import (  # noqa: E402
+    RECALL_TAGS,
+    DecisionMemory,
+    build_memory,
+    recall_past_decisions,
+    recall_tags,
+)
 from product_config import ProductConfig, load_product_by_id  # noqa: E402
 
 RUNS_DIR = ROOT / "tmp" / "evidence_runs"
+logger = logging.getLogger(__name__)
+
+
+def recall_decisions(
+    product: ProductConfig, *, memory: DecisionMemory, ledger: InterventionLedger
+) -> list[DecisionRecord]:
+    """Past decisions for this product: found in memory, read back from the intervention ledger.
+
+    Read-only. Decisions reach memory only when a person adopts or registers one
+    (scripts/interventions.py); running an analysis never writes memory.
+    """
+
+    def lookup(ref_id: str) -> DecisionRecord | None:
+        try:
+            item = ledger.get(ref_id)
+        except InterventionError:
+            return None
+        return None if item.status == "dropped" else item.decision
+
+    # product_id already scopes the recall; extra query words (e.g. the English app
+    # name) only dilute tag matches in engines that read the first few query words.
+    return recall_past_decisions(
+        memory,
+        product_id=product.id,
+        query="",
+        lookup=lookup,
+        tag_sets=(RECALL_TAGS, recall_tags(METRICS)),
+    )
+
+
+def _load_past_decisions(product: ProductConfig) -> list[DecisionRecord]:
+    try:
+        memory = build_memory()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Decision memory unavailable (%s: %s); running without past decisions",
+                       type(exc).__name__, exc)
+        return []
+    try:
+        ledger = InterventionLedger(get_interventions_path())
+        return recall_decisions(product, memory=memory, ledger=ledger)
+    finally:
+        memory.close()
 
 
 def _model_label() -> str:
@@ -86,6 +138,12 @@ def main() -> None:
     def save(run: EvidenceRun) -> None:
         path.write_text(run.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
 
+    past_decisions = _load_past_decisions(product)
+    print(
+        f"past decisions from memory: {len(past_decisions)}"
+        + (f" ({', '.join(d.id for d in past_decisions)})" if past_decisions else "")
+    )
+
     store = build_store()
     try:
         run = run_evidence_loop(
@@ -101,6 +159,7 @@ def main() -> None:
             max_critic_rounds=args.max_rounds,
             model=_model_label(),
             context_note=_context_note(product),
+            past_decisions=past_decisions,
             on_update=save,
         )
     finally:
