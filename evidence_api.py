@@ -23,9 +23,12 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, ValidationError
 
 from evidence.schema import EvidenceRun
+from sample_mode import read_sample_meta
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "tmp" / "evidence_runs"
+# Recorded Demo traces of fictional sample data, committed to the repo. Read-only.
+RECORDED_DIR = ROOT / "samples" / "recorded"
 RUN_SCRIPT = ROOT / "scripts" / "run_evidence.py"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")
 DEFAULT_LIST_LIMIT = 20
@@ -133,9 +136,15 @@ def _with_launch_state(run: EvidenceRun | None, launch: Launch | None) -> Eviden
     return run
 
 
-def _summary(run: EvidenceRun) -> dict:
+def _sample_fields(path: Path) -> dict:
+    """sample: fictional-data scenario and changes, or None for a real-data run."""
+    return {"sample": read_sample_meta(path), "recorded": path.parent == RECORDED_DIR}
+
+
+def _summary(run: EvidenceRun, path: Path) -> dict:
     last_review = next((s.critic for s in reversed(run.steps) if s.critic), None)
     return {
+        **_sample_fields(path),
         "runId": run.run_id,
         "productId": run.product_id,
         "startedAt": run.started_at,
@@ -168,29 +177,37 @@ def list_runs(
     with _lock:
         launches = dict(_launches)
         active = _active_launch()
-    runs: dict[str, EvidenceRun] = {}
-    paths = sorted(RUNS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    runs: dict[str, tuple[EvidenceRun, Path]] = {}
+    paths = [
+        *sorted(RECORDED_DIR.glob("*.json")),
+        *sorted(RUNS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True),
+    ]
     for path in paths:
-        if not RUN_ID_PATTERN.match(path.stem):
+        if not RUN_ID_PATTERN.match(path.stem) or path.stem in runs:
             continue
         run = _with_launch_state(_read_run(path), launches.get(path.stem))
         if run is not None:
-            runs[run.run_id] = run
+            runs[run.run_id] = (run, path)
     for run_id, launch in launches.items():
         if run_id not in runs:
-            runs[run_id] = _with_launch_state(None, launch)  # type: ignore[assignment]
-    selected = [r for r in runs.values() if not product_id or r.product_id == product_id]
-    selected.sort(key=lambda r: r.started_at, reverse=True)
+            placeholder = _with_launch_state(None, launch)
+            runs[run_id] = (placeholder, RUNS_DIR / f"{run_id}.json")  # type: ignore[assignment]
+    selected = [
+        (r, p) for r, p in runs.values() if not product_id or r.product_id == product_id
+    ]
+    selected.sort(key=lambda item: item[0].started_at, reverse=True)
     return {
         "activeRunId": active.run_id if active else None,
-        "runs": [_summary(r) for r in selected[:limit]],
+        "runs": [_summary(r, p) for r, p in selected[:limit]],
     }
 
 
 @router.get("/runs/{run_id}")
 def get_run(run_id: str) -> dict:
     _check_run_id(run_id)
-    path = RUNS_DIR / f"{run_id}.json"
+    path = RECORDED_DIR / f"{run_id}.json"
+    if not path.is_file():
+        path = RUNS_DIR / f"{run_id}.json"
     with _lock:
         launch = _launches.get(run_id)
     run = _with_launch_state(_read_run(path), launch)
@@ -198,7 +215,7 @@ def get_run(run_id: str) -> dict:
         if path.exists():
             raise _error(503, "run_unreadable", "The run trace is being written; try again")
         raise _error(404, "run_not_found", "Run not found")
-    return run.model_dump(by_alias=True, mode="json")
+    return {**run.model_dump(by_alias=True, mode="json"), **_sample_fields(path)}
 
 
 @router.post("/runs", status_code=202)

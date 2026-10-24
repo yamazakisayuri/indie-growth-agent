@@ -33,6 +33,7 @@ from interventions import (
     remeasure,
 )
 from interventions.runtime import open_store, product_app_id, sync_memory_safely
+from sample_mode import RUN_PREFIX, read_sample_meta
 
 logger = logging.getLogger("indie_growth_api.interventions")
 router = APIRouter(prefix="/api/interventions")
@@ -171,6 +172,8 @@ def adopt_action(body: AdoptRequest) -> dict:
     if not evidence_api.RUN_ID_PATTERN.match(body.run_id):
         raise _error(400, "invalid_run_id", "Invalid run id")
     path = evidence_api.RUNS_DIR / f"{body.run_id}.json"
+    if body.run_id.startswith(RUN_PREFIX) or read_sample_meta(path) is not None:
+        raise _error(409, "sample_run", "A run on fictional sample data cannot be adopted")
     if not path.is_file():
         raise _error(404, "run_not_found", "Run not found")
     try:
