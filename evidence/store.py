@@ -110,10 +110,13 @@ def normalize_rows(spec: TableSpec, rows: Iterable[Mapping[str, Any]]) -> list[t
     return out
 
 
-def describe_tables(store: EvidenceStore) -> str:
-    """Plain-text schema for Analyst / Critic prompts."""
+def describe_tables(store: EvidenceStore, only: Iterable[str] | None = None) -> str:
+    """Plain-text schema for Analyst / Critic prompts, optionally limited to some tables."""
+    allowed = None if only is None else {name.lower() for name in only}
     lines = [f"SQL dialect: {store.dialect} (write ANSI SQL; SELECT only)."]
     for spec in store.tables():
+        if allowed is not None and spec.name.lower() not in allowed:
+            continue
         header = f"- {spec.name}"
         if spec.description:
             header += f": {spec.description}"

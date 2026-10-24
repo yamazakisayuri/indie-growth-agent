@@ -103,6 +103,9 @@ COMPETITOR_LISTING = TableSpec(
 )
 
 ALL_TABLES = (ASC_DAILY, ASC_DAILY_BY_SOURCE, KNOWN_EVENTS, COMPETITOR_LISTING)
+INTERNAL_TABLE_NAMES = frozenset({ASC_DAILY.name, ASC_DAILY_BY_SOURCE.name, KNOWN_EVENTS.name})
+# Public data about other apps: claims citing these are observations, never facts.
+EXTERNAL_TABLE_NAMES = frozenset({COMPETITOR_LISTING.name})
 
 
 def asc_daily_rows(

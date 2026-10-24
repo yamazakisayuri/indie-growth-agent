@@ -1,8 +1,8 @@
 """Claims with sources, Critic findings, revision runs, and decision records.
 
 LLM output models (AnalystOutput, CriticReport) are sent to the model as
-structured-output tools. Stored models (RevisionStep, EvidenceRun,
-DecisionRecord) are written by code and returned to the Web UI.
+structured-output tools. Stored models (RevisionStep, CriticReview,
+EvidenceRun, DecisionRecord) are written by code and returned to the Web UI.
 
 Decision records hold the content of a change (baseline, evaluation date,
 method). Task status (todo / done) is intentionally not stored here.
@@ -105,33 +105,82 @@ class AnalystOutput(EvidenceModel):
     )(decode_json_list)
 
 
+class CriticIssue(EvidenceModel):
+    """A judgment-type problem the Critic sees in a claim or action."""
+
+    claim_id: str
+    kind: Literal["kind_mislabel", "scope_mismatch", "causal_leap"]
+    message: str
+
+
+class CriticCheck(EvidenceModel):
+    """Critic's own SQL for one numeric claim. Code runs it and compares the value."""
+
+    claim_id: str
+    sql: str = Field(description="Your own SELECT returning exactly one value (1 row, 1 column).")
+    evidence_index: int = Field(default=0, ge=0, description="Which evidence item of the claim.")
+
+
+class CriticReport(EvidenceModel):
+    """Structured Critic output (LLM). Value mismatches are decided by code from checks."""
+
+    summary: str
+    issues: list[CriticIssue] = Field(default_factory=list)
+    checks: list[CriticCheck] = Field(default_factory=list)
+
+    _decode_lists = field_validator("issues", "checks", mode="before")(decode_json_list)
+
+
 class CriticFinding(EvidenceModel):
-    """One problem the Critic found in a claim, checked with its own SQL."""
+    """One problem found in a version, by code rules or the Critic's judgment."""
 
     id: str
     claim_id: str
     kind: FindingKind
     message: str
+    origin: Literal["code", "critic"]
     critic_sql: str = ""
     critic_value: float | str | None = None
     claimed_value: float | str | None = None
+    analyst_sql: str = Field(default="", description="Shown only to explain a mismatch.")
     resolution: FindingResolution = "open"
 
 
-class CriticReport(EvidenceModel):
-    """Structured Critic output. An empty findings list means the version passed."""
+class SqlCall(EvidenceModel):
+    role: Literal["analyst", "critic", "code"]
+    sql: str
+    ok: bool
+    row_count: int = 0
+    error: str | None = None
+    duration_ms: int = 0
+
+
+class CheckOutcome(EvidenceModel):
+    claim_id: str
+    sql: str
+    claimed_value: float | str | None = None
+    critic_value: float | str | None = None
+    matched: bool
+    error: str | None = None
+
+
+class CriticReview(EvidenceModel):
+    """Stored result of reviewing one version: Critic output plus code verdicts."""
 
     summary: str
     findings: list[CriticFinding] = Field(default_factory=list)
-
-    _decode_lists = field_validator("findings", mode="before")(decode_json_list)
+    checks: list[CheckOutcome] = Field(default_factory=list)
+    queries: list[SqlCall] = Field(default_factory=list)
+    duration_seconds: float = 0.0
 
 
 class RevisionStep(EvidenceModel):
     version: str = Field(pattern=r"^v\d+$")
     stage: RevisionStage
     output: AnalystOutput
-    critic: CriticReport | None = None
+    queries: list[SqlCall] = Field(default_factory=list)
+    duration_seconds: float = 0.0
+    critic: CriticReview | None = None
 
 
 class BaselineMetric(EvidenceModel):
@@ -165,6 +214,11 @@ class EvidenceRun(EvidenceModel):
     product_id: str
     started_at: str
     finished_at: str | None = None
+    model: str = ""
+    language: Literal["ja", "en"] = "ja"
+    current_period: tuple[str, str] | None = None
+    previous_period: tuple[str, str] | None = None
+    max_critic_rounds: int = 2
     status: Literal["running", "converged", "max_rounds", "error"] = "running"
     steps: list[RevisionStep] = Field(default_factory=list)
     error: str | None = None

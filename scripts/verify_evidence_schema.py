@@ -20,10 +20,14 @@ from strands.tools.structured_output.structured_output_utils import (  # noqa: E
 
 from evidence import (  # noqa: E402
     AnalystOutput,
+    CheckOutcome,
+    CriticFinding,
     CriticReport,
+    CriticReview,
     DecisionRecord,
     EvidenceRun,
     RevisionStep,
+    SqlCall,
 )
 
 FACT = {
@@ -115,20 +119,43 @@ def main() -> None:
     critic = CriticReport.model_validate(
         {
             "summary": "1件差し戻し",
-            "findings": '[{"id": "f1", "claim_id": "c3", "kind": "causal_leap", '
+            "issues": '[{"claim_id": "c3", "kind": "causal_leap", '
             '"message": "競合の訴求から効果は断定できない"}]',
+            "checks": '[{"claim_id": "c1", "sql": "SELECT 1"}]',
         }
     )
-    assert critic.findings[0].resolution == "open"
-    print("OK CriticReport decodes findings and defaults resolution to open")
+    assert critic.issues[0].kind == "causal_leap" and critic.checks[0].evidence_index == 0
+    print("OK CriticReport decodes JSON-string issues and checks")
+    _expect_invalid(
+        CriticReport,
+        {"summary": "s", "issues": [{"claim_id": "c1", "kind": "value_mismatch", "message": "m"}]},
+        "Critic reporting a value mismatch itself (code decides those)",
+    )
+
+    review = CriticReview(
+        summary=critic.summary,
+        findings=[
+            CriticFinding(
+                id="r1-f1",
+                claim_id="c3",
+                kind="causal_leap",
+                message=critic.issues[0].message,
+                origin="critic",
+            )
+        ],
+        checks=[CheckOutcome(claim_id="c1", sql="SELECT 1", claimed_value=1, critic_value=1, matched=True)],
+        queries=[SqlCall(role="critic", sql="SELECT 1", ok=True, row_count=1)],
+    )
+    assert review.findings[0].resolution == "open"
 
     run = EvidenceRun(
         run_id="run-1",
         product_id="mahjong",
         started_at="2026-10-24T16:00:00+09:00",
+        current_period=("2026-10-16", "2026-10-22"),
         status="converged",
         steps=[
-            RevisionStep(version="v2", stage="competitive", output=v2, critic=critic),
+            RevisionStep(version="v2", stage="competitive", output=v2, critic=review),
             RevisionStep(version="v3", stage="critic_revision", output=v2),
         ],
         decision=DecisionRecord(
@@ -165,7 +192,7 @@ def main() -> None:
 
     for model in (AnalystOutput, CriticReport):
         props = convert_pydantic_to_tool_spec(model)["inputSchema"]["json"]["properties"]
-        list_field = "claims" if model is AnalystOutput else "findings"
+        list_field = "claims" if model is AnalystOutput else "checks"
         assert "array" in json.dumps(props[list_field]), (model.__name__, props[list_field])
     print("OK tool specs for AnalystOutput and CriticReport declare list fields as arrays")
 
