@@ -536,6 +536,299 @@ export const uiCopy = {
     ja: "各アプリについて、このブラウザに保存された最後の Live Analyze の結果をそのまま表示しています。この画面では値や推奨を生成しません。",
     en: "Each card shows the last successful Live Analyze saved in this browser, as-is. This view does not generate values or recommendations.",
   },
+  // --- Evidence revision panel ---
+  evidenceEyebrow: {
+    ja: "Grounding Critic",
+    en: "Grounding Critic",
+  },
+  evidenceTitle: {
+    ja: "根拠を検証して改訂する",
+    en: "Verify the evidence and revise",
+  },
+  evidenceHint: {
+    ja: "v1（自アプリの実績）→ v2（＋競合の公開情報）→ Critic が自分で書いた SQL で数字を照合 → 指摘を受けて v3。提案に出てくる数字は、すべて根拠ストアへの SQL で再現できるかを確かめます。",
+    en: "v1 (own app data) → v2 (+ public competitor data) → the Critic re-checks every number with its own SQL → v3 answers the findings. Every number in a proposal must be reproducible by SQL on the evidence store.",
+  },
+  evidenceRun: {
+    ja: "実行",
+    en: "Run",
+  },
+  evidenceStart: {
+    ja: "新しく検証を実行",
+    en: "Run a new verification",
+  },
+  evidenceStarting: {
+    ja: "開始しています…",
+    en: "Starting…",
+  },
+  evidenceStartConfirm: {
+    ja: "v1 → v2 → Critic → v3 を新しく実行します。モデルを何度も呼ぶため、10〜20 分ほどかかり、クレジットを消費します。実行しますか？",
+    en: "This starts a new v1 → v2 → Critic → v3 run. It calls the model many times, takes about 10–20 minutes, and spends credits. Start now?",
+  },
+  evidenceBusy: {
+    ja: "別の検証を実行中です。終わってから再度お試しください。",
+    en: "Another verification is still running. Try again when it finishes.",
+  },
+  evidenceStartError: {
+    ja: "検証を開始できませんでした。",
+    en: "Could not start the verification.",
+  },
+  evidenceApiUnreachable: {
+    ja: "Agent API に接続できません。api_server.py が起動しているか確認してください。",
+    en: "Cannot reach the Agent API. Check that api_server.py is running.",
+  },
+  evidenceLoadError: {
+    ja: "検証結果を読み込めませんでした。",
+    en: "Could not load the verification results.",
+  },
+  evidenceNoRuns: {
+    ja: "このアプリの検証結果はまだありません。",
+    en: "No verification runs for this app yet.",
+  },
+  evidenceLoading: {
+    ja: "読み込んでいます…",
+    en: "Loading…",
+  },
+  evidenceStatus: {
+    ja: "状態",
+    en: "Status",
+  },
+  evidenceStatusRunning: {
+    ja: "実行中",
+    en: "Running",
+  },
+  evidenceStatusConverged: {
+    ja: "指摘なしで完了",
+    en: "Converged",
+  },
+  evidenceStatusMaxRounds: {
+    ja: "再チェック上限で終了",
+    en: "Stopped at review limit",
+  },
+  evidenceStatusError: {
+    ja: "エラー",
+    en: "Error",
+  },
+  evidenceRunningHint: {
+    ja: "各版ができるたびに表示が更新されます。このページを開いたままでも、閉じても実行は続きます。",
+    en: "The view updates as each version is ready. The run continues even if you close this page.",
+  },
+  evidenceModel: {
+    ja: "モデル",
+    en: "Model",
+  },
+  evidencePeriod: {
+    ja: "比較期間",
+    en: "Periods",
+  },
+  evidencePastDecisions: {
+    ja: "参照した過去の判断",
+    en: "Past decisions recalled",
+  },
+  evidenceRejected: {
+    ja: "コードが差し戻した回答",
+    en: "Answers rejected by code",
+  },
+  evidenceTopActionTrail: {
+    ja: "1位の提案の推移",
+    en: "Top proposal by version",
+  },
+  evidenceNoActions: {
+    ja: "（提案なし）",
+    en: "(no proposals)",
+  },
+  evidenceStageInternal: {
+    ja: "自アプリの実績",
+    en: "Own app data",
+  },
+  evidenceStageCompetitive: {
+    ja: "＋競合の公開情報",
+    en: "+ competitor data",
+  },
+  evidenceStageRevision: {
+    ja: "指摘を受けて改訂",
+    en: "Revised for findings",
+  },
+  evidenceCritic: {
+    ja: "Critic",
+    en: "Critic",
+  },
+  evidenceFindingsCount: {
+    ja: "指摘",
+    en: "findings",
+  },
+  evidenceNoFindings: {
+    ja: "指摘なし",
+    en: "no findings",
+  },
+  evidencePending: {
+    ja: "実行中…",
+    en: "running…",
+  },
+  evidenceMostImportant: {
+    ja: "最も重要な発見",
+    en: "Most important finding",
+  },
+  evidenceActions: {
+    ja: "提案",
+    en: "Proposals",
+  },
+  evidenceChanges: {
+    ja: "前の版からの変化",
+    en: "Changes from the previous version",
+  },
+  evidenceTopSame: {
+    ja: "1位の提案は前の版と同じ",
+    en: "Top proposal unchanged",
+  },
+  evidenceTopChanged: {
+    ja: "1位の提案が変わった。前の版：",
+    en: "Top proposal changed. Previous:",
+  },
+  evidenceDecisionKept: {
+    ja: "維持",
+    en: "Kept",
+  },
+  evidenceDecisionModified: {
+    ja: "修正",
+    en: "Modified",
+  },
+  evidenceDecisionRemoved: {
+    ja: "取り下げ",
+    en: "Removed",
+  },
+  evidenceClaims: {
+    ja: "主張と根拠",
+    en: "Claims and evidence",
+  },
+  evidenceShowSql: {
+    ja: "SQL を見る",
+    en: "Show SQL",
+  },
+  evidenceHideSql: {
+    ja: "SQL を隠す",
+    en: "Hide SQL",
+  },
+  evidenceKindFact: {
+    ja: "事実",
+    en: "Fact",
+  },
+  evidenceKindObservation: {
+    ja: "観察",
+    en: "Observation",
+  },
+  evidenceKindHypothesis: {
+    ja: "仮説",
+    en: "Hypothesis",
+  },
+  evidenceBadgeVerified: {
+    ja: "✓ SQL 照合済み",
+    en: "✓ Verified by SQL",
+  },
+  evidenceBadgeFlagged: {
+    ja: "指摘あり",
+    en: "Flagged",
+  },
+  evidenceBadgeUnchecked: {
+    ja: "照合なし",
+    en: "Not checked",
+  },
+  evidenceBadgeNotReviewed: {
+    ja: "未レビュー",
+    en: "Not reviewed",
+  },
+  evidenceBadgeTestPlan: {
+    ja: "検証計画あり",
+    en: "Test plan",
+  },
+  evidenceBadgeNoTestPlan: {
+    ja: "検証計画なし",
+    en: "No test plan",
+  },
+  evidenceDays: {
+    ja: "日",
+    en: "days",
+  },
+  evidenceReview: {
+    ja: "Critic のレビュー",
+    en: "Critic review",
+  },
+  evidenceChecksMatched: {
+    ja: "Critic の SQL と一致",
+    en: "Critic SQL matched",
+  },
+  evidenceResolutionResolved: {
+    ja: "解消",
+    en: "Resolved",
+  },
+  evidenceResolutionDowngraded: {
+    ja: "格下げ",
+    en: "Downgraded",
+  },
+  evidenceResolutionUnresolved: {
+    ja: "未解決",
+    en: "Unresolved",
+  },
+  evidenceResolutionOpen: {
+    ja: "次の版で残存",
+    en: "Still open",
+  },
+  evidenceFindingValueMismatch: {
+    ja: "数値の不一致",
+    en: "Value mismatch",
+  },
+  evidenceFindingUnverifiable: {
+    ja: "検証できない",
+    en: "Unverifiable",
+  },
+  evidenceFindingKindMislabel: {
+    ja: "種別の誤り",
+    en: "Wrong claim kind",
+  },
+  evidenceFindingScopeMismatch: {
+    ja: "母集団の不一致",
+    en: "Scope mismatch",
+  },
+  evidenceFindingCausalLeap: {
+    ja: "因果の飛躍",
+    en: "Causal leap",
+  },
+  evidenceOriginCode: {
+    ja: "コード判定",
+    en: "Code",
+  },
+  evidenceOriginCritic: {
+    ja: "Critic 判断",
+    en: "Critic",
+  },
+  evidenceClaimed: {
+    ja: "主張の値",
+    en: "Claimed",
+  },
+  evidenceCriticValue: {
+    ja: "Critic の SQL の結果",
+    en: "Critic SQL result",
+  },
+  evidenceAnalystAnswer: {
+    ja: "次の版での回答",
+    en: "Answer in the next version",
+  },
+  evidenceResponseFixed: {
+    ja: "修正",
+    en: "Fixed",
+  },
+  evidenceResponseDowngraded: {
+    ja: "格下げ",
+    en: "Downgraded",
+  },
+  evidenceResponseRemoved: {
+    ja: "削除",
+    en: "Removed",
+  },
+  evidenceResponseDisputed: {
+    ja: "反論",
+    en: "Disputed",
+  },
 } as const;
 
 export type CopyKey = keyof typeof uiCopy;

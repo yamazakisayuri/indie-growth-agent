@@ -4,6 +4,7 @@ import type { ProductSummary } from "@/lib/analyze-client";
 import type { GrowthReport } from "@/lib/types";
 import { AnalysisDetails } from "./AnalysisDetails";
 import { DataScope } from "./DataScope";
+import { EvidencePanel } from "./EvidencePanel";
 import { GrowthExperiments } from "./GrowthExperiments";
 import { Header } from "./Header";
 import { MetricsSummary } from "./MetricsSummary";
@@ -49,6 +50,7 @@ export function Dashboard({
       />
       <MetricsSummary report={report} />
       <TopActions report={report} />
+      <EvidencePanel key={productId} productId={productId} />
       <GrowthExperiments key={experimentsKey} report={report} />
       <AnalysisDetails report={report} />
       <DataScope report={report} />

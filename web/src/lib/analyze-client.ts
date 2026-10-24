@@ -9,7 +9,7 @@ export class AnalyzeRequestError extends Error {
 
 const DEFAULT_AGENT_API_URL = "http://127.0.0.1:8000";
 
-function agentApiBaseUrl(): string {
+export function agentApiBaseUrl(): string {
   const raw =
     process.env.NEXT_PUBLIC_AGENT_API_URL?.trim() || DEFAULT_AGENT_API_URL;
   return raw.replace(/\/$/, "");
