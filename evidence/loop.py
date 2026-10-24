@@ -4,11 +4,16 @@ Each Critic round runs code rules, re-runs the Analyst's cited SQL, asks the
 Critic model for its own checks and judgment, and lets code decide value
 matches. The loop stops when a version has no findings or after
 max_critic_rounds reviews; findings still open then become "unresolved".
+
+A v1 or v2 answer that states numeric facts without any successful SQL in that
+answer is rejected before review and retried once; a second rejection stops
+the run, so invented numbers never reach the Critic or the stored steps.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections.abc import Callable, Iterable, Sequence
 from datetime import date, datetime, timedelta, timezone
@@ -18,15 +23,18 @@ from .critic import (
     apply_critic_report,
     critic_payload,
     dedupe,
+    is_composite,
     recheck_cited_sql,
     resolve_previous,
     structural_findings,
+    to_number,
 )
 from .prompts import (
     analyst_competitive_prompt,
     analyst_initial_prompt,
     analyst_revision_prompt,
     critic_prompt,
+    grounding_retry_text,
     past_decisions_text,
 )
 from .schema import (
@@ -35,6 +43,7 @@ from .schema import (
     CriticReview,
     DecisionRecord,
     EvidenceRun,
+    RejectedAttempt,
     RevisionStep,
     SqlCall,
 )
@@ -45,6 +54,34 @@ logger = logging.getLogger(__name__)
 AnalystFn = Callable[[str], tuple[AnalystOutput, list[SqlCall]]]
 CriticFn = Callable[[str], tuple[CriticReport, list[SqlCall]]]
 DEFAULT_MAX_CRITIC_ROUNDS = 2
+# Stages whose numbers must come from the Analyst's own queries in that same answer.
+GROUNDED_STAGES = ("internal", "competitive")
+_DIGIT = re.compile(r"\d")
+
+
+class AnalystGroundingError(RuntimeError):
+    """The Analyst kept stating numeric facts without running any SQL."""
+
+
+def ungrounded_reason(output: AnalystOutput, queries: Sequence[SqlCall]) -> str | None:
+    """Why an answer must be rejected: numeric fact claims but no successful Analyst query."""
+    if any(q.ok for q in queries if q.role == "analyst"):
+        return None
+    numeric_facts = [
+        claim.id
+        for claim in output.claims
+        if claim.kind == "fact"
+        and (
+            any(to_number(e.value) is not None or is_composite(e.value) for e in claim.evidence)
+            or _DIGIT.search(claim.text)
+        )
+    ]
+    if not numeric_facts:
+        return None
+    return (
+        f"fact claims {', '.join(numeric_facts)} state numbers, "
+        "but no SQL query succeeded in this answer."
+    )
 
 
 def _now() -> str:
@@ -105,6 +142,7 @@ def run_evidence_loop(
         max_critic_rounds=max_critic_rounds,
         past_decision_ids=[d.id for d in decisions],
     )
+
     def schema(only: list[str]) -> str:
         text = describe_tables(store, only=only)
         return f"{text}\n\nIdentifiers:\n{context_note}" if context_note else text
@@ -117,20 +155,46 @@ def run_evidence_loop(
             on_update(run)
 
     def analyst_step(version: str, stage: str, prompt: str) -> RevisionStep:
-        logger.info("Analyst %s (%s) started", version, stage)
-        started = time.monotonic()
-        output, queries = analyst(f"{prompt}\n{decisions_text}\n" if decisions_text else prompt)
-        step = RevisionStep(
-            version=version,
-            stage=stage,
-            output=output,
-            queries=queries,
-            duration_seconds=round(time.monotonic() - started, 1),
+        base_prompt = f"{prompt}\n{decisions_text}\n" if decisions_text else prompt
+        attempt_prompt = base_prompt
+        max_attempts = 2 if stage in GROUNDED_STAGES else 1
+        for attempt in range(1, max_attempts + 1):
+            logger.info("Analyst %s (%s) attempt %d started", version, stage, attempt)
+            started = time.monotonic()
+            output, queries = analyst(attempt_prompt)
+            duration = round(time.monotonic() - started, 1)
+            reason = ungrounded_reason(output, queries) if stage in GROUNDED_STAGES else None
+            if reason is None:
+                step = RevisionStep(
+                    version=version,
+                    stage=stage,
+                    output=output,
+                    queries=queries,
+                    duration_seconds=duration,
+                    attempts=attempt,
+                )
+                run.steps.append(step)
+                save()
+                logger.info("Analyst %s done in %.1fs", version, duration)
+                return step
+            run.rejected_attempts.append(
+                RejectedAttempt(
+                    version=version,
+                    stage=stage,
+                    attempt=attempt,
+                    reason=reason,
+                    output=output,
+                    queries=queries,
+                    duration_seconds=duration,
+                )
+            )
+            save()
+            logger.warning("Analyst %s attempt %d rejected: %s", version, attempt, reason)
+            attempt_prompt = base_prompt + grounding_retry_text(reason, store.dialect)
+        raise AnalystGroundingError(
+            f"Analyst {version} stated numeric facts without running SQL in {max_attempts} "
+            "attempts; stopped without using those numbers."
         )
-        run.steps.append(step)
-        save()
-        logger.info("Analyst %s done in %.1fs", version, step.duration_seconds)
-        return step
 
     def review(step: RevisionStep, round_no: int) -> CriticReview:
         logger.info("Critic round %d on %s started", round_no, step.version)

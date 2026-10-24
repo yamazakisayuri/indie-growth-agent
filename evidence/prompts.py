@@ -116,6 +116,15 @@ def past_decisions_text(decisions: Sequence[DecisionRecord]) -> str:
     return "\n".join(lines)
 
 
+def grounding_retry_text(reason: str, store_dialect: str) -> str:
+    return f"""
+RETRY: your previous answer was rejected and will not be used. Reason: {reason}
+Before answering, run run_sql against the evidence store ({store_dialect}) and take
+every number in a fact claim from those results. Do not reuse any number from the
+rejected answer.
+"""
+
+
 def _periods_text(current: tuple[str, str], previous: tuple[str, str]) -> str:
     return (
         f"Current period: {current[0]} to {current[1]} (inclusive).\n"

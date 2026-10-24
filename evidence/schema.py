@@ -181,7 +181,20 @@ class RevisionStep(EvidenceModel):
     output: AnalystOutput
     queries: list[SqlCall] = Field(default_factory=list)
     duration_seconds: float = 0.0
+    attempts: int = Field(default=1, ge=1, description="2 when a rejected attempt was retried.")
     critic: CriticReview | None = None
+
+
+class RejectedAttempt(EvidenceModel):
+    """An Analyst answer refused by code before review, kept for the trace."""
+
+    version: str = Field(pattern=r"^v\d+$")
+    stage: RevisionStage
+    attempt: int = Field(ge=1)
+    reason: str
+    output: AnalystOutput
+    queries: list[SqlCall] = Field(default_factory=list)
+    duration_seconds: float = 0.0
 
 
 class BaselineMetric(EvidenceModel):
@@ -225,6 +238,7 @@ class EvidenceRun(EvidenceModel):
     )
     status: Literal["running", "converged", "max_rounds", "error"] = "running"
     steps: list[RevisionStep] = Field(default_factory=list)
+    rejected_attempts: list[RejectedAttempt] = Field(default_factory=list)
     error: str | None = None
     decision: DecisionRecord | None = None
 

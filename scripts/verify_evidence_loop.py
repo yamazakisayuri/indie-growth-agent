@@ -250,13 +250,18 @@ def check_code_rules(store: SQLiteEvidenceStore) -> None:
 
 
 class StubAnalyst:
+    """Each item is an AnalystOutput (answered after one successful query) or (output, queries)."""
+
     def __init__(self, versions):
         self.versions = list(versions)
         self.prompts: list[str] = []
 
     def __call__(self, prompt):
         self.prompts.append(prompt)
-        return self.versions.pop(0), [SqlCall(role="analyst", sql="SELECT 1", ok=True, row_count=1)]
+        item = self.versions.pop(0)
+        if isinstance(item, tuple):
+            return item
+        return item, [SqlCall(role="analyst", sql="SELECT 1", ok=True, row_count=1)]
 
 
 class StubCritic:
@@ -313,7 +318,55 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
     assert "r1-f" in analyst.prompts[2] and "因果は未確認" in analyst.prompts[2]
     assert all(DOWNLOADS_SQL not in p for p in critic.prompts), "Critic must not see Analyst SQL"
     assert json.loads(saved[-1])["status"] == "converged" and len(saved) >= 6
+    assert run.rejected_attempts == [] and len(analyst.prompts) == 3
+    assert all(s.attempts == 1 for s in run.steps) and "RETRY" not in "".join(analyst.prompts)
     print("OK loop converges: v1 -> v2 -> Critic -> v3 -> Critic, findings resolved / downgraded")
+    print("OK grounded answers are accepted on the first attempt (no extra retry)")
+
+    def loop(analyst_stub, critic_stub, run_id):
+        return run_evidence_loop(
+            run_id=run_id,
+            product_id="mahjong",
+            product_name="麻雀",
+            store=store,
+            analyst=analyst_stub,
+            critic=critic_stub,
+            internal_tables=INTERNAL_TABLE_NAMES,
+            external_tables=EXTERNAL_TABLE_NAMES,
+        )
+
+    failed_query = [SqlCall(role="analyst", sql="SELECT nope", ok=False, error="no such column")]
+    retried = StubAnalyst([(V1, failed_query), V1, (V2, []), V2, V3])
+    run_r = loop(retried, StubCritic([ROUND1, CLEAN]), "t-retry")
+    assert run_r.status == "converged", (run_r.status, run_r.error)
+    assert [s.version for s in run_r.steps] == ["v1", "v2", "v3"]
+    assert [s.attempts for s in run_r.steps] == [2, 2, 1]
+    assert [(r.version, r.attempt) for r in run_r.rejected_attempts] == [("v1", 1), ("v2", 1)]
+    assert "c1" in run_r.rejected_attempts[0].reason
+    assert run_r.rejected_attempts[0].queries[0].ok is False
+    assert run_r.rejected_attempts[1].output == V2
+    assert "RETRY" not in retried.prompts[0] and "RETRY" in retried.prompts[1]
+    assert "sqlite" in retried.prompts[1] and "RETRY" in retried.prompts[3]
+    print("OK v1 / v2 with numeric facts but no successful SQL are rejected, kept in the trace, "
+          "and retried once; the retry that runs SQL continues normally")
+
+    gave_up_critic = StubCritic([])
+    gave_up = loop(StubAnalyst([(V1, []), (V1, [])]), gave_up_critic, "t-gave-up")
+    assert gave_up.status == "error" and gave_up.error.startswith("AnalystGroundingError")
+    assert gave_up.steps == [] and len(gave_up.rejected_attempts) == 2
+    assert gave_up_critic.prompts == [] and gave_up.finished_at
+    print("OK two ungrounded attempts stop the run with a clear error; no step, no Critic call")
+
+    no_numbers = AnalystOutput.model_validate(
+        {
+            "most_important_finding": "f",
+            "claims": [_claim("h1", "hypothesis", test_plan=TEST_PLAN)],
+            "actions": [],
+        }
+    )
+    lenient = loop(StubAnalyst([(no_numbers, []), V2, (V3, [])]), StubCritic([ROUND1, CLEAN]), "t-ok")
+    assert lenient.rejected_attempts == [] and lenient.status == "converged", lenient.error
+    print("OK no retry when there are no numeric facts, or in revision stages (v3)")
 
     decision = DecisionRecord(
         id="d-2026-10-01",
