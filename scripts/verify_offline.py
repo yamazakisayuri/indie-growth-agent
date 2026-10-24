@@ -23,6 +23,7 @@ OFFLINE_CHECKS = (
     "scripts/verify_llm_provider.py",
     "scripts/verify_openai_compatible.py",
     "scripts/verify_structured_output_lists.py",
+    "scripts/verify_evidence_schema.py",
 )
 
 
