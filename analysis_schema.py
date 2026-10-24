@@ -2,9 +2,26 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def decode_json_list(value: Any) -> Any:
+    """Accept a list field sent as a JSON-encoded string instead of an array.
+
+    Some OpenAI-compatible models (seen with Nemotron when tool_choice is auto)
+    put '["a", "b"]' in tool-call arguments. Anything that is not a JSON array
+    string is returned unchanged so normal validation still reports it.
+    """
+    if not isinstance(value, str) or not value.lstrip().startswith("["):
+        return value
+    try:
+        decoded = json.loads(value)
+    except ValueError:
+        return value
+    return decoded if isinstance(decoded, list) else value
 
 
 class AnalysisAction(BaseModel):
@@ -26,6 +43,10 @@ class StructuredAnalysis(BaseModel):
     facts: list[str] = Field(default_factory=list)
     speculation: list[str] = Field(default_factory=list)
     actions: list[AnalysisAction] = Field(default_factory=list)
+
+    _decode_lists = field_validator("facts", "speculation", "actions", mode="before")(
+        decode_json_list
+    )
 
 
 class GrowthExperiment(BaseModel):
@@ -62,6 +83,10 @@ class PlannerStructuredOutput(BaseModel):
         description="Short labels of Known Events that influenced this plan (date + type).",
     )
     experiments: list[GrowthExperiment] = Field(default_factory=list)
+
+    _decode_lists = field_validator(
+        "playbooks_consulted", "known_events_used", "experiments", mode="before"
+    )(decode_json_list)
 
 
 class ScreenshotDraftItem(BaseModel):
@@ -107,6 +132,10 @@ class ActionDraft(BaseModel):
             "do not invent changes just because Planner suggested screenshots."
         ),
     )
+
+    _decode_lists = field_validator(
+        "screenshots", "missing_inputs", "playbooks_used", mode="before"
+    )(decode_json_list)
 
 
 class DraftGeneratorOutput(BaseModel):
