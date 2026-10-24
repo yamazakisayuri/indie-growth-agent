@@ -92,6 +92,14 @@ class FindingResponse(EvidenceModel):
     note: str = ""
 
 
+class ActionChange(EvidenceModel):
+    """What happened to one action of the previous version, and why."""
+
+    previous_rank: int = Field(ge=1, le=3)
+    decision: Literal["kept", "modified", "removed"]
+    reason: str
+
+
 class AnalystOutput(EvidenceModel):
     """Structured Analyst output for one version (v1, v2, v3, ...)."""
 
@@ -99,9 +107,13 @@ class AnalystOutput(EvidenceModel):
     claims: list[Claim] = Field(default_factory=list)
     actions: list[ProposedAction] = Field(default_factory=list)
     finding_responses: list[FindingResponse] = Field(default_factory=list)
+    action_changes: list[ActionChange] = Field(
+        default_factory=list,
+        description="In a revision: one entry per action of the previous version.",
+    )
 
     _decode_lists = field_validator(
-        "claims", "actions", "finding_responses", mode="before"
+        "claims", "actions", "finding_responses", "action_changes", mode="before"
     )(decode_json_list)
 
 

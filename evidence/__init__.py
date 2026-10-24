@@ -2,6 +2,7 @@
 
 from .factory import SUPPORTED_STORES, build_store
 from .schema import (
+    ActionChange,
     AnalystOutput,
     BaselineMetric,
     CheckOutcome,
@@ -36,6 +37,7 @@ from .store import (
 __all__ = [
     "DEFAULT_MAX_ROWS",
     "SUPPORTED_STORES",
+    "ActionChange",
     "AnalystOutput",
     "BaselineMetric",
     "CheckOutcome",

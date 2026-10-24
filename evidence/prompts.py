@@ -125,6 +125,15 @@ rejected answer.
 """
 
 
+def revision_retry_text(reason: str) -> str:
+    return f"""
+RETRY: your previous answer was rejected and will not be used. Reason: {reason}
+Return the complete next version. Keep, modify, or remove each action of your last
+version, and fill action_changes with one entry per previous action (previous_rank,
+decision, reason). Remove an action only with a stated reason.
+"""
+
+
 def _periods_text(current: tuple[str, str], previous: tuple[str, str]) -> str:
     return (
         f"Current period: {current[0]} to {current[1]} (inclusive).\n"
@@ -221,6 +230,10 @@ Produce the next version that fixes them.
 - scope_mismatch: compare like with like, or state the populations separately.
 Fill finding_responses with one entry per finding id (fixed, downgraded, removed,
 or disputed with a note). Keep claims that had no problems.
+Return the complete next version including its actions (up to 3). Fill
+action_changes with one entry per action of your last version: kept, modified, or
+removed, with the reason. Withdrawing an action for lack of evidence is fine, but
+say why.
 
 App: {product_name}
 {_periods_text(current, previous)}

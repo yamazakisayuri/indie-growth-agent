@@ -374,6 +374,46 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
     assert lenient.rejected_attempts == [] and lenient.status == "converged", lenient.error
     print("OK no retry when there are no numeric facts, or in revision stages (v3)")
 
+    def v3_with(**fields):
+        return AnalystOutput.model_validate({**V3.model_dump(), **fields})
+
+    v3_empty = v3_with(actions=[])
+    v3_withdrawn = v3_with(
+        actions=[],
+        action_changes=[
+            {"previous_rank": 1, "decision": "removed", "reason": "根拠の c3 が仮説に格下げされたため"}
+        ],
+    )
+    v3_blank_reason = v3_with(
+        actions=[],
+        action_changes=[{"previous_rank": 1, "decision": "removed", "reason": " "}],
+    )
+
+    refilled = StubAnalyst([V1, V2, v3_empty, V3])
+    run_e = loop(refilled, StubCritic([ROUND1, CLEAN]), "t-empty-retry")
+    assert run_e.status == "converged", (run_e.status, run_e.error)
+    assert [(r.version, r.attempt) for r in run_e.rejected_attempts] == [("v3", 1)]
+    assert "previous action(s) 1" in run_e.rejected_attempts[0].reason
+    assert run_e.rejected_attempts[0].output.actions == []
+    assert run_e.steps[-1].attempts == 2 and run_e.steps[-1].output.actions
+    assert "RETRY" in refilled.prompts[3] and "action_changes" in refilled.prompts[3]
+    assert "RETRY" not in refilled.prompts[2]
+    print("OK a revision that drops every action without a reason is rejected and retried once")
+
+    explained = loop(StubAnalyst([V1, V2, v3_withdrawn]), StubCritic([ROUND1, CLEAN]), "t-withdrawn")
+    assert explained.status == "converged" and explained.rejected_attempts == []
+    assert explained.steps[-1].output.actions == [] and explained.steps[-1].attempts == 1
+    print("OK withdrawing every action is accepted when each has a stated reason")
+
+    empty_critic = StubCritic([ROUND1])
+    empty_twice = loop(StubAnalyst([V1, V2, v3_empty, v3_blank_reason]), empty_critic, "t-empty-x2")
+    assert empty_twice.status == "error", empty_twice.status
+    assert empty_twice.error.startswith("AnalystRevisionError")
+    assert [s.version for s in empty_twice.steps] == ["v1", "v2"]
+    assert [(r.version, r.attempt) for r in empty_twice.rejected_attempts] == [("v3", 1), ("v3", 2)]
+    assert len(empty_critic.prompts) == 1
+    print("OK two unexplained empty revisions stop with an error; no empty final step is stored")
+
     decision = DecisionRecord(
         id="d-2026-10-01",
         product_id="mahjong",

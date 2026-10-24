@@ -7,7 +7,8 @@ max_critic_rounds reviews; findings still open then become "unresolved".
 
 A v1 or v2 answer that states numeric facts without any successful SQL in that
 answer is rejected before review and retried once; a second rejection stops
-the run, so invented numbers never reach the Critic or the stored steps.
+the run, so invented numbers never reach the Critic or the stored steps. A
+revision that drops every action without a stated reason is handled the same way.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from .prompts import (
     critic_prompt,
     grounding_retry_text,
     past_decisions_text,
+    revision_retry_text,
 )
 from .schema import (
     AnalystOutput,
@@ -61,6 +63,33 @@ _DIGIT = re.compile(r"\d")
 
 class AnalystGroundingError(RuntimeError):
     """The Analyst kept stating numeric facts without running any SQL."""
+
+
+class AnalystRevisionError(RuntimeError):
+    """A revision kept dropping every action without saying why."""
+
+
+def unexplained_drop_reason(output: AnalystOutput, previous: AnalystOutput) -> str | None:
+    """Why a revision must be rejected: all previous actions gone without a stated reason.
+
+    Withdrawing actions is allowed when action_changes marks every previous action
+    as removed with a non-empty reason.
+    """
+    if output.actions or not previous.actions:
+        return None
+    explained = {
+        change.previous_rank
+        for change in output.action_changes
+        if change.decision == "removed" and change.reason.strip()
+    }
+    missing = [a.rank for a in previous.actions if a.rank not in explained]
+    if not missing:
+        return None
+    ranks = ", ".join(str(rank) for rank in missing)
+    return (
+        "the revision has no actions, and action_changes gives no removal reason "
+        f"for previous action(s) {ranks}."
+    )
 
 
 def ungrounded_reason(output: AnalystOutput, queries: Sequence[SqlCall]) -> str | None:
@@ -154,16 +183,40 @@ def run_evidence_loop(
         if on_update is not None:
             on_update(run)
 
-    def analyst_step(version: str, stage: str, prompt: str) -> RevisionStep:
+    def analyst_step(
+        version: str, stage: str, prompt: str, prior_output: AnalystOutput | None = None
+    ) -> RevisionStep:
         base_prompt = f"{prompt}\n{decisions_text}\n" if decisions_text else prompt
         attempt_prompt = base_prompt
-        max_attempts = 2 if stage in GROUNDED_STAGES else 1
+        if stage in GROUNDED_STAGES:
+
+            def check(output: AnalystOutput, queries: list[SqlCall]) -> str | None:
+                return ungrounded_reason(output, queries)
+
+            retry_text = lambda reason: grounding_retry_text(reason, store.dialect)  # noqa: E731
+            failure = AnalystGroundingError(
+                f"Analyst {version} stated numeric facts without running SQL in 2 attempts; "
+                "stopped without using those numbers."
+            )
+        elif prior_output is not None:
+
+            def check(output: AnalystOutput, queries: list[SqlCall]) -> str | None:
+                return unexplained_drop_reason(output, prior_output)
+
+            retry_text = revision_retry_text
+            failure = AnalystRevisionError(
+                f"Analyst {version} dropped every action without a reason in 2 attempts; "
+                "an empty final proposal is not accepted."
+            )
+        else:
+            check = None
+        max_attempts = 1 if check is None else 2
         for attempt in range(1, max_attempts + 1):
             logger.info("Analyst %s (%s) attempt %d started", version, stage, attempt)
             started = time.monotonic()
             output, queries = analyst(attempt_prompt)
             duration = round(time.monotonic() - started, 1)
-            reason = ungrounded_reason(output, queries) if stage in GROUNDED_STAGES else None
+            reason = None if check is None else check(output, queries)
             if reason is None:
                 step = RevisionStep(
                     version=version,
@@ -190,11 +243,8 @@ def run_evidence_loop(
             )
             save()
             logger.warning("Analyst %s attempt %d rejected: %s", version, attempt, reason)
-            attempt_prompt = base_prompt + grounding_retry_text(reason, store.dialect)
-        raise AnalystGroundingError(
-            f"Analyst {version} stated numeric facts without running SQL in {max_attempts} "
-            "attempts; stopped without using those numbers."
-        )
+            attempt_prompt = base_prompt + retry_text(reason)
+        raise failure
 
     def review(step: RevisionStep, round_no: int) -> CriticReview:
         logger.info("Critic round %d on %s started", round_no, step.version)
@@ -287,6 +337,7 @@ def run_evidence_loop(
                     findings=result.findings,
                     language=run.language,
                 ),
+                prior_output=step.output,
             )
             previous_findings = result.findings
             round_no += 1
