@@ -1,0 +1,15 @@
+date,app_id,territory,impressions,product_page_views,first_time_downloads,source
+2026-10-09,fictional-001,ALL,4430,263,45,fictional_sample
+2026-10-10,fictional-001,ALL,5071,304,70,fictional_sample
+2026-10-11,fictional-001,ALL,4636,281,51,fictional_sample
+2026-10-12,fictional-001,ALL,3772,231,40,fictional_sample
+2026-10-13,fictional-001,ALL,3816,230,48,fictional_sample
+2026-10-14,fictional-001,ALL,4133,251,58,fictional_sample
+2026-10-15,fictional-001,ALL,4142,240,48,fictional_sample
+2026-10-16,fictional-001,ALL,5254,254,48,fictional_sample
+2026-10-17,fictional-001,ALL,6353,304,55,fictional_sample
+2026-10-18,fictional-001,ALL,6293,302,46,fictional_sample
+2026-10-19,fictional-001,ALL,5420,275,38,fictional_sample
+2026-10-20,fictional-001,ALL,5860,296,40,fictional_sample
+2026-10-21,fictional-001,ALL,6158,325,40,fictional_sample
+2026-10-22,fictional-001,ALL,6662,344,48,fictional_sample

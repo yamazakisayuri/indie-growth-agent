@@ -1,0 +1,7 @@
+fetched_on,country,app_id,is_self,name,seller,primary_genre,rating_avg,rating_count,version,current_version_released_on,first_released_on,price,screenshot_count,description_head,url,source
+2026-10-22,jp,fictional-001,1,麻雀スコア帳（架空のサンプルアプリ）,架空スタジオ,Utilities,4.3,18,1.4.0,2026-10-01,2025-05-01,0.0,5,【架空データ】三麻・四麻の点数計算と対局の記録ができるサンプルアプリです。,https://example.com/fictional/fictional-001,fictional_sample
+2026-10-22,jp,fictional-101,0,点数計算マスターズ（架空）,架空スタジオ 101,Games,4.6,2860,5.2.0,2026-10-18,2019-04-01,0.0,10,【架空データ】点数計算マスターズ（架空）は、役と符を選ぶだけで点数が分かるサンプルの競合アプリです。,https://example.com/fictional/fictional-101,fictional_sample
+2026-10-22,jp,fictional-102,0,雀卓スコアラー（架空）,架空スタジオ 102,Games,4.4,1180,3.8.1,2026-10-06,2020-07-15,0.0,8,【架空データ】雀卓スコアラー（架空）は、役と符を選ぶだけで点数が分かるサンプルの競合アプリです。,https://example.com/fictional/fictional-102,fictional_sample
+2026-10-22,jp,fictional-103,0,かんたん麻雀計算（架空）,架空スタジオ 103,Games,4.3,960,2.9.4,2026-09-24,2018-11-20,0.0,9,【架空データ】かんたん麻雀計算（架空）は、役と符を選ぶだけで点数が分かるサンプルの競合アプリです。,https://example.com/fictional/fictional-103,fictional_sample
+2026-10-22,jp,fictional-104,0,符計算ノート（架空）,架空スタジオ 104,Utilities,4.1,410,1.12.0,2026-08-02,2021-02-10,0.0,6,【架空データ】符計算ノート（架空）は、役と符を選ぶだけで点数が分かるサンプルの競合アプリです。,https://example.com/fictional/fictional-104,fictional_sample
+2026-10-22,jp,fictional-105,0,麻雀点数ナビ（架空）,架空スタジオ 105,Utilities,3.9,35,1.0.3,2025-12-10,2025-06-30,0.0,4,【架空データ】麻雀点数ナビ（架空）は、役と符を選ぶだけで点数が分かるサンプルの競合アプリです。,https://example.com/fictional/fictional-105,fictional_sample

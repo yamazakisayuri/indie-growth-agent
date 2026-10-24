@@ -1,0 +1,59 @@
+{
+  "dataKind": "fictional_sample",
+  "note": "架空のサンプルデータです。実在のアプリ、App Store Connect の実績、競合の掲載情報のいずれでもありません。",
+  "app": {
+    "productId": "mahjong",
+    "name": "麻雀スコア帳（架空のサンプルアプリ）",
+    "appId": "fictional-001"
+  },
+  "scenarios": {
+    "base": {
+      "description": "基本のサンプル（2026-10-09〜2026-10-22 の14日間）。直近7日は前7日より表示回数が40%増えたが、ページビュー率と初回ダウンロードは下がった。経路別では browse の表示回数が大きく増えている。上位の競合は評価数・スクリーンショット数・更新の新しさで自アプリを上回る。",
+      "overrides": []
+    },
+    "competitor-variant": {
+      "description": "上位競合（fictional-101）1件だけ、評価数・スクリーンショット数・最新バージョン公開日の優位をなくしたサンプル。競合との差を根拠にした提案が v3 でどう変わるかを確かめる。自アプリのデータと他の競合は base と同じ。",
+      "overrides": [
+        {
+          "table": "competitor_listing",
+          "match": {
+            "app_id": "fictional-101"
+          },
+          "before": {
+            "rating_count": 2860
+          },
+          "set": {
+            "rating_count": 24
+          },
+          "reason": "評価数を自アプリ（18件）と大差ない水準に下げ、評価数の優位をなくす"
+        },
+        {
+          "table": "competitor_listing",
+          "match": {
+            "app_id": "fictional-101"
+          },
+          "before": {
+            "screenshot_count": 10
+          },
+          "set": {
+            "screenshot_count": 4
+          },
+          "reason": "スクリーンショット数を自アプリ（5枚）より少なくし、掲載画像の量の優位をなくす"
+        },
+        {
+          "table": "competitor_listing",
+          "match": {
+            "app_id": "fictional-101"
+          },
+          "before": {
+            "current_version_released_on": "2026-10-18"
+          },
+          "set": {
+            "current_version_released_on": "2024-11-02"
+          },
+          "reason": "2年近く更新していない状態にし、更新の新しさの優位をなくす"
+        }
+      ]
+    }
+  }
+}
