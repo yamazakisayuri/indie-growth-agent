@@ -1,0 +1,58 @@
+{
+  "dataKind": "fictional_sample",
+  "note": "架空のサンプルデータです。実在のアプリ、App Store Connect の実績、競合の掲載情報のいずれでもありません。",
+  "app": {
+    "productId": "mahjong",
+    "name": "麻雀スコア帳（架空のサンプルアプリ）",
+    "appId": "fictional-001"
+  },
+  "scenario": "competitor-variant",
+  "scenarioDescription": "上位競合（fictional-101）1件だけ、評価数・スクリーンショット数・最新バージョン公開日の優位をなくしたサンプル。競合との差を根拠にした提案が v3 でどう変わるかを確かめる。自アプリのデータと他の競合は base と同じ。",
+  "changes": [
+    {
+      "table": "competitor_listing",
+      "match": {
+        "app_id": "fictional-101"
+      },
+      "column": "rating_count",
+      "before": 2860,
+      "after": 24,
+      "reason": "評価数を自アプリ（18件）と大差ない水準に下げ、評価数の優位をなくす"
+    },
+    {
+      "table": "competitor_listing",
+      "match": {
+        "app_id": "fictional-101"
+      },
+      "column": "screenshot_count",
+      "before": 10,
+      "after": 4,
+      "reason": "スクリーンショット数を自アプリ（5枚）より少なくし、掲載画像の量の優位をなくす"
+    },
+    {
+      "table": "competitor_listing",
+      "match": {
+        "app_id": "fictional-101"
+      },
+      "column": "current_version_released_on",
+      "before": "2026-10-18",
+      "after": "2024-11-02",
+      "reason": "2年近く更新していない状態にし、更新の新しさの優位をなくす"
+    }
+  ],
+  "sampleDir": "samples/mahjong",
+  "csvSha256": {
+    "asc_daily.csv": "460a3b93f9e04a4c8b6998fc76378f6743d9406e7a61ede480b931ac19af6554",
+    "asc_daily_by_source.csv": "0797154f0dae86b8bc4c3401b3f71f8fd7ead67ea3d77cb1c50cf656bfb56a19",
+    "competitor_listing.csv": "f737182e442783247884a718092b7f932dfcab1fa5a575180b15d55ee6189a5f",
+    "known_events.csv": "fe17eef87602a2003521e23d9e9a21256d17535361281ab6f165d6f967d024fc",
+    "scenarios.json": "6894c7d6da918c8f12c19199ef058e9c8c1bedf4c704a7c585cd16ed239ae0c5"
+  },
+  "recordedAt": "2026-10-24T22:27:39+09:00",
+  "reviewOutcome": "max_rounds（再チェック上限で終了）。v3 に未解決の指摘が8件残っており、全指摘解消済みではない。8件のうち2件（r2-f1, r2-f2）は既知の誤判定。",
+  "knownLimitations": [
+    "r2-f1（C7）と r2-f2（C9）の value_mismatch は誤判定。Critic は「Games の競合数 = 3」「スクリーンショット6枚以上の競合数 = 3」を数え、claim 本文の「3本」はデータどおり正しい。Analyst がこの件数を根拠の項目に持たず、アプリごとの値（'Games'、4）と照合されたため不一致と判定された。",
+    "残る6件（C5・C6・C12 の因果の飛躍、C5 の他社の評価数をコンバージョン実績と混同した scope_mismatch、C6・C13 の観測していない競合スクリーンショットの中身を前提にした kind_mislabel）は妥当な指摘で、v3 でも解消されていない。"
+  ],
+  "comparisonNote": "base（sample-base-20261024-214121）との提案の違いを、競合データの変更による因果効果として扱わないこと。v1 は自社の3表（asc_daily, asc_daily_by_source, known_events）だけを使い、その内容は両シナリオで同一だが、v1 の1位の提案がすでに異なる（base: スクリーンショットの PPO、variant: キーワードの絞り込み）。各シナリオ1回ずつの実行では、モデルのばらつきと競合データの違いを切り分けられない。"
+}
