@@ -647,6 +647,23 @@ def get_evidence_sqlite_path() -> Path:
     return _resolve_path(raw)
 
 
+DEFAULT_MEMORY_BACKEND = "none"
+DEFAULT_MEMORY_LOCAL_DIR = "tmp/memory"
+
+
+def get_memory_backend() -> str:
+    """Return the decision memory backend (MEMORY_BACKEND, default none)."""
+    load_env()
+    return os.getenv("MEMORY_BACKEND", "").strip().lower() or DEFAULT_MEMORY_BACKEND
+
+
+def get_memory_local_dir() -> Path:
+    """Directory for MEMORY_BACKEND=local (MEMORY_LOCAL_DIR, relative to the repo)."""
+    load_env()
+    raw = os.getenv("MEMORY_LOCAL_DIR", "").strip() or DEFAULT_MEMORY_LOCAL_DIR
+    return _resolve_path(raw)
+
+
 DEFAULT_GROWTH_MD_FILENAME = "GROWTH.md"
 
 
