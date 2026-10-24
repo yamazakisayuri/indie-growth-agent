@@ -18,6 +18,7 @@ import {
   type RevisionStep,
 } from "@/lib/evidence-client";
 import { useLanguage } from "@/lib/language-context";
+import { AdoptActionButton } from "./AdoptActionButton";
 
 const POLL_MS = 4000;
 const VALUE_PREVIEW_CHARS = 160;
@@ -386,11 +387,14 @@ function StepView({
   previous,
   next,
   showSql,
+  adoptRunId,
 }: {
   step: RevisionStep;
   previous: RevisionStep | null;
   next: RevisionStep | null;
   showSql: boolean;
+  /** Set on the final version of a finished run: its actions can be adopted. */
+  adoptRunId: string | null;
 }) {
   const { copy } = useLanguage();
   const top = step.output.actions[0]?.title ?? null;
@@ -420,6 +424,16 @@ function StepView({
                   <p className="evidence__note">{action.reason}</p>
                   {action.claimIds.length > 0 ? (
                     <p className="evidence__claim-refs">{action.claimIds.join(" · ")}</p>
+                  ) : null}
+                  {adoptRunId ? (
+                    <AdoptActionButton
+                      key={`${adoptRunId}:${action.rank}`}
+                      runId={adoptRunId}
+                      rank={action.rank}
+                      hasTestPlan={step.output.claims.some(
+                        (c) => action.claimIds.includes(c.id) && c.testPlan !== null,
+                      )}
+                    />
                   ) : null}
                 </div>
               </li>
@@ -748,6 +762,12 @@ export function EvidencePanel({ productId }: { productId: string }) {
               previous={selectedIndex > 0 ? steps[selectedIndex - 1] : null}
               next={steps[selectedIndex + 1] ?? null}
               showSql={showSql}
+              adoptRunId={
+                (shownRun.status === "converged" || shownRun.status === "max_rounds") &&
+                selectedIndex === steps.length - 1
+                  ? shownRun.runId
+                  : null
+              }
             />
           ) : null}
         </>

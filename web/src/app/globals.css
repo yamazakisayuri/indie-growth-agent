@@ -1757,3 +1757,124 @@ body {
     content: none;
   }
 }
+
+/* —— Interventions —— */
+.interventions__item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.interventions__badges {
+  margin: 0;
+}
+
+.interventions__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: flex-end;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.interventions__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.interventions__field--short {
+  flex: 0 1 180px;
+}
+
+.interventions__input {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  width: 100%;
+}
+
+.interventions__check {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.interventions__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.interventions__adopt {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.interventions__plan {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  font-size: 0.8125rem;
+}
+
+.interventions__plan dt {
+  color: var(--text-muted);
+}
+
+.interventions__plan dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.interventions__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.interventions__table th,
+.interventions__table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.interventions__table th[scope="row"] {
+  text-align: left;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-weight: 400;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.interventions__table thead th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .interventions__field--short {
+    flex: 1 1 100%;
+  }
+}

@@ -7,6 +7,7 @@ import { DataScope } from "./DataScope";
 import { EvidencePanel } from "./EvidencePanel";
 import { GrowthExperiments } from "./GrowthExperiments";
 import { Header } from "./Header";
+import { InterventionsPanel } from "./InterventionsPanel";
 import { MetricsSummary } from "./MetricsSummary";
 import { TopActions } from "./TopActions";
 
@@ -51,6 +52,7 @@ export function Dashboard({
       <MetricsSummary report={report} />
       <TopActions report={report} />
       <EvidencePanel key={productId} productId={productId} />
+      <InterventionsPanel key={`interventions:${productId}`} productId={productId} />
       <GrowthExperiments key={experimentsKey} report={report} />
       <AnalysisDetails report={report} />
       <DataScope report={report} />

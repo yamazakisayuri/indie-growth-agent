@@ -829,6 +829,251 @@ export const uiCopy = {
     ja: "反論",
     en: "Disputed",
   },
+  // --- Interventions ---
+  interventionsEyebrow: {
+    ja: "施策の記録と効果測定",
+    en: "Interventions and outcomes",
+  },
+  interventionsTitle: {
+    ja: "施策",
+    en: "Interventions",
+  },
+  interventionsHint: {
+    ja: "AI の提案を採用するか、自分で登録します。実施日を記録すると変更前の数値を、評価すると変更後の数値を App Store Connect の日次データから SQL で計測します。効いたかどうかの判定はあなたが行います。",
+    en: "Adopt an AI proposal or add your own. Recording the implementation date measures the days before the change, and evaluating measures the days after, with SQL on App Store Connect daily data. You make the verdict.",
+  },
+  interventionsEmpty: {
+    ja: "まだ施策はありません。上の改訂履歴から採用するか、自分で登録してください。",
+    en: "No interventions yet. Adopt one from the revision history above, or add your own.",
+  },
+  interventionsLoading: {
+    ja: "読み込み中…",
+    en: "Loading…",
+  },
+  interventionsLoadError: {
+    ja: "施策を読み込めませんでした。",
+    en: "Could not load interventions.",
+  },
+  interventionsNew: {
+    ja: "施策を自分で登録",
+    en: "Add your own",
+  },
+  interventionsFieldTitle: {
+    ja: "施策",
+    en: "Change",
+  },
+  interventionsFieldChange: {
+    ja: "変更内容（任意）",
+    en: "What changes (optional)",
+  },
+  interventionsFieldMetric: {
+    ja: "評価指標",
+    en: "Evaluation metric",
+  },
+  interventionsFieldMethod: {
+    ja: "判定方法",
+    en: "How it is judged",
+  },
+  interventionsFieldCriterion: {
+    ja: "成功基準",
+    en: "Success criterion",
+  },
+  interventionsFieldDays: {
+    ja: "評価までの日数",
+    en: "Days until evaluation",
+  },
+  interventionsMetricHint: {
+    ja: "自動で計測する指標: impressions / product_page_views / first_time_downloads / impression_to_page_view_pct / page_view_to_download_pct",
+    en: "Measured automatically: impressions / product_page_views / first_time_downloads / impression_to_page_view_pct / page_view_to_download_pct",
+  },
+  interventionsSubmit: {
+    ja: "登録する",
+    en: "Add",
+  },
+  interventionsSubmitting: {
+    ja: "登録中…",
+    en: "Adding…",
+  },
+  interventionsCancel: {
+    ja: "キャンセル",
+    en: "Cancel",
+  },
+  interventionsStatusPlanned: {
+    ja: "予定",
+    en: "Planned",
+  },
+  interventionsStatusImplemented: {
+    ja: "実施済み",
+    en: "Implemented",
+  },
+  interventionsStatusEvaluated: {
+    ja: "評価済み",
+    en: "Evaluated",
+  },
+  interventionsStatusDropped: {
+    ja: "中止",
+    en: "Dropped",
+  },
+  interventionsOriginAi: {
+    ja: "AI の提案を採用",
+    en: "Adopted from AI",
+  },
+  interventionsOriginManual: {
+    ja: "手動で登録",
+    en: "Added by hand",
+  },
+  interventionsImplementedOn: {
+    ja: "実施日",
+    en: "Implemented on",
+  },
+  interventionsEvaluationDate: {
+    ja: "評価日",
+    en: "Evaluation date",
+  },
+  interventionsDue: {
+    ja: "評価日です",
+    en: "Due",
+  },
+  interventionsAiPrediction: {
+    ja: "AI の提案",
+    en: "AI proposal",
+  },
+  interventionsAiCriterion: {
+    ja: "AI の成功基準",
+    en: "AI success criterion",
+  },
+  interventionsMeasured: {
+    ja: "計測値（SQL）",
+    en: "Measured (SQL)",
+  },
+  interventionsBefore: {
+    ja: "変更前",
+    en: "Before",
+  },
+  interventionsAfter: {
+    ja: "変更後",
+    en: "After",
+  },
+  interventionsNotMeasured: {
+    ja: "未計測",
+    en: "Not measured",
+  },
+  interventionsSkipped: {
+    ja: "計測できなかったもの",
+    en: "Not measured",
+  },
+  interventionsHumanVerdict: {
+    ja: "あなたの判定",
+    en: "Your verdict",
+  },
+  interventionsVerdictImproved: {
+    ja: "改善した",
+    en: "Improved",
+  },
+  interventionsVerdictNoChange: {
+    ja: "変化なし",
+    en: "No change",
+  },
+  interventionsVerdictWorse: {
+    ja: "悪化した",
+    en: "Worse",
+  },
+  interventionsVerdictInconclusive: {
+    ja: "判定不能",
+    en: "Inconclusive",
+  },
+  interventionsMarkImplemented: {
+    ja: "実施した",
+    en: "Mark implemented",
+  },
+  interventionsEvaluate: {
+    ja: "評価を記録",
+    en: "Record verdict",
+  },
+  interventionsNote: {
+    ja: "メモ（任意）",
+    en: "Note (optional)",
+  },
+  interventionsEarly: {
+    ja: "評価日より前に評価する",
+    en: "Evaluate before the evaluation date",
+  },
+  interventionsMeasure: {
+    ja: "もう一度計測",
+    en: "Measure again",
+  },
+  interventionsDrop: {
+    ja: "中止する",
+    en: "Drop",
+  },
+  interventionsDropPrompt: {
+    ja: "中止する理由を入力してください",
+    en: "Why are you dropping this?",
+  },
+  interventionsDropReason: {
+    ja: "中止の理由",
+    en: "Reason dropped",
+  },
+  interventionsWorking: {
+    ja: "処理中…",
+    en: "Working…",
+  },
+  interventionsUnchanged: {
+    ja: "すでに記録済みでした（変更なし）。",
+    en: "Already recorded (no change).",
+  },
+  interventionsWarning: {
+    ja: "注意",
+    en: "Note",
+  },
+  interventionsAdopt: {
+    ja: "施策として採用",
+    en: "Adopt",
+  },
+  interventionsAdopting: {
+    ja: "採用中…",
+    en: "Adopting…",
+  },
+  interventionsAdopted: {
+    ja: "施策に追加しました",
+    en: "Added to interventions",
+  },
+  interventionsAlreadyAdopted: {
+    ja: "採用済みです",
+    en: "Already adopted",
+  },
+  interventionsNeedsPlan: {
+    ja: "この提案には検証計画がありません。評価指標・判定方法・成功基準・日数を入力してください。",
+    en: "This proposal has no test plan. Enter the metric, method, success criterion, and days.",
+  },
+  interventionsErrorNotDue: {
+    ja: "まだ評価日になっていません。「評価日より前に評価する」を選ぶと記録できます。",
+    en: "Not due yet. Tick “Evaluate before the evaluation date” to record it anyway.",
+  },
+  interventionsErrorInvalidDates: {
+    ja: "評価日が変更後の計測期間より前になっています。",
+    en: "The evaluation date is before the end of the after window.",
+  },
+  interventionsErrorTransition: {
+    ja: "今の状態ではこの操作はできません。",
+    en: "This step is not possible in the current state.",
+  },
+  interventionsErrorStoreUnavailable: {
+    ja: "根拠ストアに接続できないため計測できません。",
+    en: "The evidence store is unavailable, so nothing was measured.",
+  },
+  interventionsErrorRunInProgress: {
+    ja: "実行が終わってから採用してください。",
+    en: "Wait for the run to finish before adopting.",
+  },
+  interventionsErrorInvalidInput: {
+    ja: "入力内容を確認してください。",
+    en: "Check the fields and try again.",
+  },
+  interventionsErrorGeneric: {
+    ja: "操作できませんでした。",
+    en: "Could not complete this step.",
+  },
 } as const;
 
 export type CopyKey = keyof typeof uiCopy;
