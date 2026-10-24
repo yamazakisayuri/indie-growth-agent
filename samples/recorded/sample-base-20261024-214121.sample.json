@@ -23,5 +23,5 @@
     "Critic の指摘 r2-f1 は infeasible_action（App Store の機能制約違反）として出ているが、内容はキーワード変更とスクリーンショット差し替えの効果を切り分けられないという比較設計（因果）の問題で、指摘の種類が合っていない。",
     "v3 の提案 #1 の理由に「競合は1枚目で即時計算を訴求している」とあるが、competitor_listing にあるのは説明文の冒頭だけで、競合のスクリーンショットの内容はデータにない。claim-7 本体は「説明文冒頭で」と正しく書いており、Critic はこの食い違いを指摘していない。"
   ],
-  "comparisonNote": "competitor-variant（sample-competitor-variant-20261024-220111）との提案の違いを、競合データの変更による因果効果として扱わないこと。v1 は自社の3表（asc_daily, asc_daily_by_source, known_events）だけを使い、その内容は両シナリオで同一だが、v1 の1位の提案がすでに異なる（base: スクリーンショットの PPO、variant: キーワードの絞り込み）。各シナリオ1回ずつの実行では、モデルのばらつきと競合データの違いを切り分けられない。"
+  "comparisonNote": "competitor-variant（sample-competitor-variant-20261024-220111）との提案の違いを、競合データの変更による因果効果として扱わないこと。v1 は自社の3表（asc_daily, asc_daily_by_source, known_events）だけを使い、その内容は両シナリオで同一だが、v1 の1位の提案がすでに異なる（base: スクリーンショットの PPO、variant: キーワードの絞り込み）。各シナリオ1回ずつの実行では、モデルのばらつきと競合データの違いを切り分けられない。比較条件も同一ではない。3e0991f（モデル呼び出しの接続リトライ追加）は base の実行後・variant の実行前に入ったが、variant の実行中には発動していない。e47b6ad（Critic プロンプトの infeasible_action の範囲変更）は variant の実行中にコミットされ、variant に反映されたかはトレースから確認できない。このため、base と variant の差を競合データ変更の因果効果とは断定できない。"
 }

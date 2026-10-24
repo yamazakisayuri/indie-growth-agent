@@ -323,7 +323,17 @@ def main() -> None:
         assert "Recorded Demo / fictional sample data" in text
         assert "rating_count: 900 -> 3 (remove the rating lead)" in text
         assert show_sample_demo.recorded_runs(tmp_path / "empty") == []
-        print("OK show_sample_demo lists recorded traces with their scenario changes")
+        assert "review outcome" not in text and "known limitations" not in text
+        noted = {
+            **shown[0][1],
+            "reviewOutcome": "max_rounds; 1 unresolved",
+            "knownLimitations": ["limit a", " ", 3],
+            "comparisonNote": "not a causal effect",
+        }
+        noted_text = "\n".join(show_sample_demo.describe(shown[0][0], noted))
+        assert "review outcome: max_rounds; 1 unresolved" in noted_text
+        assert "known limitations:\n    - limit a\n  comparison note: not a causal effect" in noted_text
+        print("OK show_sample_demo lists recorded traces with their scenario changes and review notes")
 
     print("\nAll sample mode checks passed.")
 

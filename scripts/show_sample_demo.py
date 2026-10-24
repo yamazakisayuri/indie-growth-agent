@@ -56,6 +56,26 @@ def describe(run: EvidenceRun, meta: dict) -> list[str]:
     if final:
         lines.append("  final actions:")
         lines += [f"    {a.rank}. {a.title}" for a in final.output.actions] or ["    (none)"]
+    lines += review_notes(meta)
+    return lines
+
+
+def review_notes(meta: dict) -> list[str]:
+    """reviewOutcome, knownLimitations, and comparisonNote from the .sample.json, if any."""
+    lines = []
+    outcome = meta.get("reviewOutcome")
+    if isinstance(outcome, str) and outcome.strip():
+        lines.append(f"  review outcome: {outcome.strip()}")
+    limitations = meta.get("knownLimitations")
+    if not isinstance(limitations, list):
+        limitations = []
+    items = [i.strip() for i in limitations if isinstance(i, str) and i.strip()]
+    if items:
+        lines.append("  known limitations:")
+        lines += [f"    - {item}" for item in items]
+    note = meta.get("comparisonNote")
+    if isinstance(note, str) and note.strip():
+        lines.append(f"  comparison note: {note.strip()}")
     return lines
 
 

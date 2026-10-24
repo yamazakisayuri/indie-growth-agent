@@ -1111,6 +1111,22 @@ export const uiCopy = {
     ja: "変更なし（基本のサンプル）",
     en: "None (the base sample)",
   },
+  evidenceReviewOutcome: {
+    ja: "レビュー結果",
+    en: "Review outcome",
+  },
+  evidenceSampleCaveats: {
+    ja: "既知の限界と比較上の注意",
+    en: "Known limitations and comparison notes",
+  },
+  evidenceKnownLimitations: {
+    ja: "既知の限界",
+    en: "Known limitations",
+  },
+  evidenceComparisonNote: {
+    ja: "比較上の注意",
+    en: "Comparison note",
+  },
 } as const;
 
 export type CopyKey = keyof typeof uiCopy;

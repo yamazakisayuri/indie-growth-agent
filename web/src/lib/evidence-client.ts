@@ -133,6 +133,10 @@ export interface SampleInfo {
   scenarioDescription: string;
   changes: SampleChange[];
   recordedAt?: string;
+  /** Recorded Demo notes written by a person after reviewing the run. */
+  reviewOutcome?: string;
+  knownLimitations?: string[];
+  comparisonNote?: string;
 }
 
 interface SampleFields {

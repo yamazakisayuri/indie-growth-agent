@@ -18,6 +18,7 @@ import {
   type RevisionStep,
 } from "@/lib/evidence-client";
 import { useLanguage } from "@/lib/language-context";
+import { sampleCaveats } from "@/lib/sample-caveats";
 import { AdoptActionButton } from "./AdoptActionButton";
 
 const POLL_MS = 4000;
@@ -129,13 +130,14 @@ function runOptionLabel(
   return `[${kind}: ${run.sample.scenario}] ${label}`;
 }
 
-/** Fictional sample data: say so, and list every value the scenario changed. */
+/** Fictional sample data: say so, list every value the scenario changed, and the review notes. */
 function SampleBanner({ run }: { run: EvidenceRun }) {
   const { copy } = useLanguage();
   if (!run.sample) {
     return null;
   }
   const sample = run.sample;
+  const caveats = sampleCaveats(sample);
   return (
     <div className="evidence__block evidence__sample" role="note">
       <p className="evidence__block-title">
@@ -167,6 +169,35 @@ function SampleBanner({ run }: { run: EvidenceRun }) {
           ))}
         </ul>
       )}
+      {caveats?.reviewOutcome ? (
+        <p className="evidence__note">
+          <strong>{copy("evidenceReviewOutcome")}</strong>: {caveats.reviewOutcome}
+        </p>
+      ) : null}
+      {caveats && (caveats.knownLimitations.length > 0 || caveats.comparisonNote) ? (
+        <details className="evidence__collapsible">
+          <summary className="evidence__block-title">
+            {copy("evidenceSampleCaveats")}{" "}
+            <span className="evidence__summary-counts">{caveats.knownLimitations.length}</span>
+          </summary>
+          {caveats.knownLimitations.length > 0 ? (
+            <>
+              <h4 className="evidence__block-title">{copy("evidenceKnownLimitations")}</h4>
+              <ul className="evidence__changes">
+                {caveats.knownLimitations.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {caveats.comparisonNote ? (
+            <>
+              <h4 className="evidence__block-title">{copy("evidenceComparisonNote")}</h4>
+              <p className="evidence__note">{caveats.comparisonNote}</p>
+            </>
+          ) : null}
+        </details>
+      ) : null}
     </div>
   );
 }
