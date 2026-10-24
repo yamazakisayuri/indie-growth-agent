@@ -18,6 +18,7 @@ from agent import run_analysis
 from analysis_schema import AnalyzeResponse
 from analyze_cache import analyze_cache_key, get_or_run_analyze
 from draft_generator import run_draft_generator
+from evidence_api import router as evidence_router
 
 logger = logging.getLogger("indie_growth_api")
 
@@ -52,6 +53,7 @@ app.add_middleware(
     allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
+app.include_router(evidence_router)
 
 
 class AnalyzeRequest(BaseModel):

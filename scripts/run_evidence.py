@@ -125,13 +125,16 @@ def main() -> None:
     parser.add_argument("--language", choices=("ja", "en"), default="ja")
     parser.add_argument("--max-rounds", type=int, default=DEFAULT_MAX_CRITIC_ROUNDS)
     parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES)
+    parser.add_argument(
+        "--run-id", default=None, help="Trace file name (default: <product>-<timestamp>)"
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("strands").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     product = load_product_by_id(args.product_id)
-    run_id = f"{product.id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_id = args.run_id or f"{product.id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     path = RUNS_DIR / f"{run_id}.json"
 
