@@ -6,7 +6,7 @@ Growth-analysis agent for indie apps (Hackathon MVP, extended for **Open Agent H
 
 ## Quick Demo (30 seconds)
 
-**What it does.** The agent proposes the next growth actions for an indie app. Every number behind a proposal must come with SQL that reproduces it. An independent **Critic** re-checks the numbers with SQL it writes itself, **code** decides whether they match, and the Analyst revises (v1 → v2 → Critic → v3 → Critic). Actions a person adopts are measured before/after by SQL, and the result feeds the next analysis.
+**What it does.** The agent proposes the next growth actions for an indie app. Every evidence value behind a proposal must come with SQL that reproduces it. An independent **Critic** re-checks those values with SQL it writes itself, **code** decides whether they match, and the Analyst revises (v1 → v2 → Critic → v3 → Critic). Numbers written only in claim text or action reasons are not checked ([SQL check scope](#what-the-checks-cover-and-what-converged--resolved-mean)). Actions a person adopts are measured before/after by SQL, and the result feeds the next analysis.
 
 **What it caught.** In the `competitor-variant` Recorded Demo, v2 reported the page-view → download rate as 5.0 → 6.67, which reads as an improvement. The Analyst's SQL had numerator and denominator swapped, and re-running that SQL returns the same wrong numbers. The Critic's own SQL found the real rate: it **fell from 20.0% to 15.0%**. The wrong numbers had also reached the #1 action's success criterion. v3 fixed both, and the second review matched every value ([details](#example-what-the-critic-caught-and-how-the-analyst-fixed-it)).
 
@@ -19,7 +19,7 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -r requirement
 python scripts/show_sample_demo.py     # every Recorded Demo: v1/v2/v3 Top 3, Critic counts, review notes
 ```
 
-To see the proposals, the Critic's findings, and the SQL behind them, use the Web UI. The Recorded Demo page needs **no model call and no API key**, but it reads the saved runs from the local API server, so `api_server.py` must be running:
+To see the proposals, the Critic's findings, and the SQL behind them, use the Web UI. The Recorded Demo page needs **no model call and no API key**, but it reads the saved runs from the local API server, so `api_server.py` must be running. The API starts without any model settings (`scripts/verify_api_without_model.py` checks this for each provider); only Analyze needs them:
 
 ```bash
 python api_server.py                       # terminal 1
@@ -47,15 +47,15 @@ cd web && npm install && npm run dev       # terminal 2
 
 It pulls observed metrics from **connected Product channels** (App Store Connect Analytics, optional ASC Sales, GA4 App, GA4 Web, AdMob), then returns **prioritized Top 3 Actions**—not a bare metric summary. The runtime is **Strands Agents SDK** with a selectable model provider (**Amazon Bedrock** by default; **Meterless Nightshift → NVIDIA Nemotron** for the hackathon runs), with a **Next.js static Web UI** (Japanese / English) and a **Multi-Product** catalog (`products/`).
 
-For the hackathon it adds an **evidence revision loop**: an Analyst proposes actions with claims, every number in a claim must come with SQL that reproduces it on an evidence store (**Zetaris** for real data), an independent **Grounding Critic** checks the claims with its own SQL, and the Analyst revises (v1 → v2 → Critic → v3 → Critic). Adopted actions are tracked as **interventions** with before/after numbers measured by SQL and a human verdict, and those outcomes are fed back to the next Analyst through **Meterless H-MEM** decision memory.
+For the hackathon it adds an **evidence revision loop**: an Analyst proposes actions with claims, every evidence value in a claim must come with SQL that reproduces it on an evidence store (**Zetaris** for real data; see [what this repository can show](#meterless-and-zetaris-what-this-repository-can-show)), an independent **Grounding Critic** checks the claims with its own SQL, and the Analyst revises (v1 → v2 → Critic → v3 → Critic). Adopted actions are tracked as **interventions** with before/after numbers measured by SQL and a human verdict, and those outcomes are fed back to the next Analyst through **Meterless H-MEM** decision memory.
 
 ## Open Agent Hackathon 2026 — Track 2: The Agent That Can Explain Why
 
 The track asks for an agent that can show **why** it recommends something, not just what. In this project "why" means:
 
 - Each proposed action points at **claims**, and each claim is labeled **fact** (our own data), **observation** (public data about other apps), or **hypothesis** (needs a test plan)
-- Every number in a fact or observation carries the **SQL that reproduces it** on the evidence store
-- A separate **Critic** re-checks those numbers with SQL it writes itself; whether a number matches is decided by **code**, never by a model
+- Every evidence value of a fact or observation carries the **SQL that reproduces it** on the evidence store (numbers written only in claim text or action reasons are not checked)
+- A separate **Critic** re-checks those values with SQL it writes itself; whether a value matches is decided by **code**, never by a model
 - The full revision history (v1, v2, Critic findings, v3, the second review, unresolved findings) is saved as a trace and shown in the Web UI
 - After a person acts on a proposal, the measured result and their verdict become context for the next analysis
 
@@ -70,7 +70,7 @@ The track asks for an agent that can show **why** it recommends something, not j
 | API | `/api/evidence` (list / read / start runs), `/api/interventions` (adopt, add, implement, evaluate, measure, drop) |
 | Web UI | Sample Workspace / My Workspace on `/`, Grounding Critic revision-history panel, Interventions panel, Portfolio Overview (`/portfolio`), Recorded Demo page (`/demo`) |
 | Sample mode | Fictional mahjong sample CSVs with two scenarios, Live Sample runs on a dedicated SQLite file, three committed Recorded Demo traces with review notes (English `base`; Japanese `base` and `competitor-variant`) |
-| Tests | `scripts/verify_offline.py` runs 18 offline checks (no credentials, network, or model) |
+| Tests | `scripts/verify_offline.py` runs 19 offline checks (no credentials, network, or model) |
 
 Everything before the hackathon (Analyze, Data Grounding, Multi-Product, ASC / GA4 / AdMob fetchers, Planner, Draft, AWS deployment) is listed in [`docs/pre-existing-work.md`](docs/pre-existing-work.md).
 
@@ -83,7 +83,7 @@ This agent:
 1. Fetches last-N-day vs prior-N-day facts from the Product’s connected sources
 2. Embeds a Data Grounding contract (periods, populations, missing data, no unstated causes, no ungrounded revenue summing)
 3. Returns observation-based **Top 3 Actions** (and does not propose unconfirmed analytics features)
-4. (Evidence loop) Makes every number behind a proposal reproducible by SQL, has an independent Critic check it, and keeps the revision history
+4. (Evidence loop) Requires SQL that reproduces every evidence value behind a proposal, has an independent Critic check those values, and keeps the revision history
 
 The point is not to summarize several dashboards into one narrative. It is to decide **where to start next**, with an explicit priority order, from the facts that are actually connected—for the selected Product.
 
@@ -102,9 +102,19 @@ Implemented in `evidence/loop.py`, `evidence/critic.py`, `evidence/agents.py`. R
 **What each Critic round does**
 
 1. **Structural rules (code)**: evidence present, cited tables exist, one number per evidence item, facts need SQL, public data about other apps cannot be a fact, a hypothesis needs a test plan, an action cannot rest only on competitor observations
-2. **Re-run the Analyst's cited SQL (code)**: the result must equal the written value at the precision it was written (a ratio written as a percent also matches)
+2. **Re-run the Analyst's cited SQL (code)**: the result must equal the written value at the precision it was written. Units are not converted (see below)
 3. **Independent Critic (model)**: a fresh Strands Agent with no shared conversation. It sees claims and actions **without the Analyst's SQL or reasoning**, and never sees past decisions. It writes its own SQL checks and can raise `causal_leap`, `scope_mismatch`, `kind_mislabel`, `unverifiable`, or `infeasible_action` (an App Store limit the action or test plan breaks)
-4. **Compare values (code)**: each Critic SQL result is compared with the claim's evidence values by code; a mismatch becomes a `value_mismatch` finding
+4. **Compare values (code)**: each Critic SQL result is compared by code with the evidence item the check names (`evidence_index`); a mismatch becomes a `value_mismatch` finding. A check that returns the value of a different item than the one it names is counted as unverifiable, not as a match. Only a check without `evidence_index` is compared with every item of the claim. Two mismatches in one claim stay two findings
+
+#### What the checks cover, and what converged / resolved mean
+
+- **Compared**: the value of each evidence item that has SQL and a single value (re-run by code), and each Critic check (compared with its evidence item)
+- **Not compared**: numbers written only in claim text, action reasons, or test plans; evidence values that pack several numbers; checks whose SQL does not return exactly one value (shown as unverifiable). The Critic chooses its own checks, so not every evidence item gets one
+- **Units**: counts, ratings, and amounts are never compared at 100x / 0.01x, and zero never matches a non-zero value. A rate converts between ratio and percent only when the unit is visible: the claimed value is written with `%` and the SQL returns a ratio (a division), or the SQL returns a percent (a division multiplied by 100)
+- **`converged`**: the last review raised no findings. It does not mean every number is verified: unverifiable checks and numbers outside evidence items can remain
+- **`resolved`**: the next review raised no finding of the same kind on the same claim. That includes a claim that was rewritten or removed, so it does not prove the fix is correct. `downgraded`: the claim became a hypothesis. `unresolved`: still open after the last round (not verified, not proven wrong)
+
+These rules were tightened after the Recorded Demos were recorded. Their stored results are shown as recorded; see [the note below the table](#sample-data-live-sample-and-recorded-demo) for what changes when the stored values are compared with the current rules.
 
 **Guards before review**
 
@@ -139,14 +149,25 @@ Adopt AI action / register by hand → planned
 
 | Technology | Role in this project | Where |
 |------------|----------------------|-------|
-| **Zetaris** | Evidence store for real data (`EVIDENCE_STORE=zetaris`). Evidence tables are staged as CSV into the local Zetaris platform and registered as Lightning filestore tables; Analyst SQL, Critic SQL, code re-checks, and intervention before/after measurement all run there over JDBC (Spark SQL) | `integrations/zetaris/` |
-| **Meterless Nightshift** | Local OpenAI-compatible model runtime (`LLM_PROVIDER=meterless`). Every Strands Agent (Analyst, Critic, Analyzer, Planner, Draft) sends requests to it with a `meterless-app` header so runs are recorded per app. Analyst / Critic requests that fail for a retryable reason are retried once, and provider errors are logged with their details | `integrations/meterless/`, `llm/` |
+| **Zetaris** | Evidence store for real data when `EVIDENCE_STORE=zetaris`. Evidence tables are staged as CSV into the local Zetaris platform and registered as Lightning filestore tables; Analyst SQL, Critic SQL, code re-checks, and intervention before/after measurement then all run there over JDBC (Spark SQL) | `integrations/zetaris/` |
+| **Meterless Nightshift** | Local OpenAI-compatible model runtime (`LLM_PROVIDER=meterless`). Every Strands Agent (Analyst, Critic, Analyzer, Planner, Draft) sends requests to it with a `meterless-app` header that names this app. Analyst / Critic requests that fail for a retryable reason are retried once, and provider errors are logged with their details | `integrations/meterless/`, `llm/` |
 | **NVIDIA Nemotron** | The model behind the Analyst and Critic in the hackathon runs: `nvidia/nemotron-3-ultra-550b-a55b`, reached through Nightshift's NVIDIA provider (pinned because `meterless/auto` routed to a model that returned 404 on this machine) | `METERLESS_MODEL` |
 | **Meterless H-MEM** | Decision memory backend (`MEMORY_BACKEND=hmem`). The official reference implementation is vendored and run as a Node.js sidecar; decisions and outcomes are stored per product and recalled before each evidence run | `integrations/hmem/` |
 | Strands Agents SDK | Agent runtime for every model call, including structured output and the SQL tool | `agent.py`, `evidence/agents.py` |
 | Amazon Bedrock | Default model provider (`LLM_PROVIDER` unset or `bedrock`) and the provider used in the past AWS deployment | `llm/factory.py` |
 
 The Live Sample and Recorded Demo use a dedicated SQLite file, not Zetaris, so fictional data never enters the real evidence store.
+
+### Meterless and Zetaris: what this repository can show
+
+| | Meterless Nightshift | Zetaris |
+|-|----------------------|---------|
+| Code path | `LLM_PROVIDER=meterless` → `llm/factory.py`, `integrations/meterless/` | `EVIDENCE_STORE=zetaris` → `evidence/factory.py`, `integrations/zetaris/` |
+| Offline test (in `verify_offline.py`) | `verify_meterless.py`: provider settings, the status check, and model error handling against a local fake server, not Nightshift | `verify_zetaris_store.py`: CSV staging, table registration, name qualification, and the read-only guard against a fake engine, not Zetaris |
+| Live check (not in the offline suite) | `check_meterless.py` (`--chat` sends one request) | `verify_zetaris_live.py` (needs the local Zetaris platform, Java 17+, and the JDBC jar) |
+| Committed run results | None recorded with `LLM_PROVIDER=meterless`. The three Recorded Demo traces record the model as `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b`; the trace does not record the endpoint URL, so that they went through Nightshift's OpenAI-compatible endpoint is the developer's account, not something the files show | None. The Recorded Demos use SQLite. Evidence runs on real app data with Zetaris were run locally, but their traces hold real data and are not committed, so the repository cannot show their results |
+
+The repository therefore shows how each integration is wired and tested against fakes; it does not by itself prove a successful live run of either.
 
 ## Multi-Product
 
@@ -240,7 +261,9 @@ In the same round, v3 also fixed a test plan that asked PPO for a search-only co
 | `sample-base-20261024-214121` | Japanese | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`, 1 unresolved finding in v3 | about 15 min |
 | `sample-competitor-variant-20261024-220111` | Japanese | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`, 8 unresolved findings in v3 (2 are known false judgments) | about 24 min |
 
-All three were run through Nightshift's OpenAI-compatible endpoint, so the trace says `openai_compatible`. Each `.sample.json` carries a review outcome and known limitations (in Japanese and English); the Japanese runs also carry a comparison note. The English `base` is marked `"representative": true`, so `/demo` and the Sample Workspace show it in either UI language; the Japanese `base` stays committed and is shown by the CLI viewer and the API. One converged run does not show that runs converge in general. The difference between the two scenarios must **not** be read as a causal effect of the competitor data change: one run per scenario cannot separate model variance from the data difference, and the run conditions differed.
+The traces record the model as `openai_compatible` with the model id. According to the developer, the endpoint was Nightshift's OpenAI-compatible endpoint; the traces do not record the endpoint URL. Each `.sample.json` carries a review outcome and known limitations (in Japanese and English); the Japanese runs also carry a comparison note.
+
+**Recorded results vs the current check rules.** The counts in the table are as recorded, judged by the code at record time, which allowed 100x / 0.01x matches even for counts and did not use the `evidence_index` the Critic named. Comparing the stored values again with the current rules (no model run) changes only the final Critic round of `competitor-variant`: the C16 check (number of free competitors, 5, against each app's price, 0.0) becomes a mismatch, so its checks become 40 matched / 3 mismatched instead of 41 / 2. The C8 check (an average rating of 4.1) was paired with the rating-count item 410 and now matches the 4.1 item instead. In its first round, C1 and C2 each had two mismatched checks, but the old deduplication recorded one finding each. The base runs' counts do not change. The `evidence_index` the Critic named is not stored, so whether each match was against the named item cannot be checked. The traces are unchanged; these notes are in each `.sample.json` under known limitations. The English `base` is marked `"representative": true`, so `/demo` and the Sample Workspace show it in either UI language; the Japanese `base` stays committed and is shown by the CLI viewer and the API. One converged run does not show that runs converge in general. The difference between the two scenarios must **not** be read as a causal effect of the competitor data change: one run per scenario cannot separate model variance from the data difference, and the run conditions differed.
 
 **Playing the Recorded Demo**
 
@@ -529,9 +552,9 @@ Prerequisites when enabled: Meterless Nightshift running locally; the local Zeta
 
 Notes:
 
-- `.env` does not override variables already set in the shell, so `LLM_PROVIDER=bedrock python api_server.py` switches for one run without editing `.env`. The API builds the Analyze model at startup: **restart `api_server.py` after switching**. Each evidence run is a new process and reads the setting when it starts
+- `.env` does not override variables already set in the shell, so `LLM_PROVIDER=bedrock python api_server.py` switches for one run without editing `.env`. The API builds the Analyze model on the first Analyze request and keeps it: **restart `api_server.py` after switching**. The API starts even when the provider's settings are missing (the Recorded Demo and `/api/evidence` need no model); Analyze then answers `model_unavailable` before fetching any data. Each evidence run is a new process and reads the setting when it starts
 - A pinned provider model (Nemotron) may not appear in Nightshift's `GET /v1/models`; that alone does not mean it is unavailable. `check_meterless.py --chat` shows whether it answers. A `meterless_detail` of `nvidia_key_missing` means Nightshift has no NVIDIA API key loaded: set the key again in Nightshift. Do not switch `METERLESS_MODEL` to `meterless/auto`: on this machine it routes to an NVIDIA model that answers 404
-- When the model cannot be called, Analyze answers `model_unavailable` with the provider and a hint (for example, AWS credentials expired, or no NVIDIA key in Nightshift); other failures stay `analyze_failed`. The API log records only `provider`, a reason code, and the HTTP status (`Analyze model error ...`), never the response body or credentials
+- When the model cannot be called, Analyze answers `model_unavailable` with the provider and a hint (for example, AWS credentials expired, no NVIDIA key in Nightshift, or the provider's settings not loaded); other failures stay `analyze_failed`. The API log records only `provider`, a reason code, and the HTTP status (`Analyze model error ...`), never the response body or credentials
 - Recorded Demos are saved traces and do not depend on the current provider
 
 ### 4. Optional connection checks
@@ -618,7 +641,7 @@ cd web && npm test                 # Web unit tests (portfolio, sample text, Rec
 cd web && npm run lint && npm run build
 ```
 
-`verify_offline.py` runs each check in its own subprocess: Analyze cache, LLM provider selection, OpenAI-compatible and Meterless providers (local fake servers), structured output lists, evidence schema, SQL guard and SQLite store, evidence tables, Zetaris store (fake engine), evidence loop and Critic rules (stub models), `/api/evidence`, decision memory, H-MEM conformance suite + adapter (skipped without Node.js), interventions, `/api/interventions`, sample mode, and the memory → evidence-run integration.
+`verify_offline.py` runs each check in its own subprocess: Analyze cache, LLM provider selection, OpenAI-compatible and Meterless providers (local fake servers), structured output lists, evidence schema, SQL guard and SQLite store, evidence tables, Zetaris store (fake engine), evidence loop and Critic rules (stub models), `/api/evidence`, API startup and Recorded Demo reads without model settings, decision memory, H-MEM conformance suite + adapter (skipped without Node.js), interventions, `/api/interventions`, sample mode, and the memory → evidence-run integration.
 
 Not part of the offline suite (need live services): `verify_ga4.py`, `verify_admob.py`, `verify_zetaris_live.py`, `check_meterless.py`.
 
@@ -699,6 +722,8 @@ Also still out of scope for now:
 - **AdMob partial metric missing handling is not implemented** — response gaps are not strictly distinguished from true zeros
 - **Live Analyze output is grounded by prompt / data contract but not machine-validated after generation** — only the evidence loop re-runs SQL and has a Critic
 - **The Critic can be wrong and runs end with unresolved findings** — both Japanese Recorded Demos ended at the review limit (`max_rounds`) with unresolved findings, including known false `value_mismatch` judgments and a finding filed under the wrong kind. The English `base` converged, but review after the run found two v3 action reasons the Critic did not flag (known limitations). "Unresolved" means not verified, not proven wrong
+- **Recorded Demo check results predate the current check rules** — they were judged with 100x / 0.01x matching and without the Critic's `evidence_index`. Re-judging the stored values changes one check in `competitor-variant` (see [Recorded results vs the current check rules](#sample-data-live-sample-and-recorded-demo)); the traces are not rewritten and no run uses the current rules yet
+- **SQL checks cover evidence values only** — numbers written only in claim text or action reasons are not compared, so a converged run can still contain unchecked numbers
 - **Evidence runs are slow** — several minutes per step; about 9.5–24 minutes per run in the Recorded Demos
 - **One run per scenario** — the Recorded Demos cannot separate model variance from the scenario difference
 - **Evidence loop scope** — App Store Connect daily data, Known Events, and public listings only; competitor data is the public listing (no screenshots' content, no reviews)

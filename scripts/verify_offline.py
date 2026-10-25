@@ -30,6 +30,7 @@ OFFLINE_CHECKS = (
     "scripts/verify_zetaris_store.py",
     "scripts/verify_evidence_loop.py",
     "scripts/verify_evidence_api.py",
+    "scripts/verify_api_without_model.py",
     "scripts/verify_memory.py",
     "scripts/verify_hmem.py",
     "scripts/verify_interventions.py",

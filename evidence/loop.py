@@ -278,11 +278,12 @@ def run_evidence_loop(
         step.critic = result
         save()
         logger.info(
-            "Critic round %d: %d findings, %d/%d checks matched, %.1fs",
+            "Critic round %d: %d findings, %d/%d checks matched, %d unverifiable, %.1fs",
             round_no,
             len(result.findings),
             sum(o.matched for o in outcomes),
             len(outcomes),
+            sum(not o.matched and bool((o.error or "").strip()) for o in outcomes),
             result.duration_seconds,
         )
         return result

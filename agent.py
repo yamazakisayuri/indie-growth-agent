@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from datetime import date
 
 from strands import Agent
@@ -14,7 +15,7 @@ from asc.sales import AscSalesRevenueSnapshot, try_fetch_sales_revenue_snapshot
 from format_input import format_agent_input
 from ga4 import try_fetch_ga4_snapshot, try_fetch_ga4_web_snapshot
 from ga4.snapshot import Ga4GrowthSnapshot
-from llm import build_model
+from llm import ModelNotConfiguredError, build_model
 from report_builder import build_analyze_response
 from planner import attach_planner_safe
 
@@ -158,7 +159,25 @@ Do NOT invent UI headings such as "Next actions" / "次にやるべきこと",
 Those labels are owned by the client UI. Only fill analysis content fields.
 """
 
-agent = Agent(system_prompt=SYSTEM_PROMPT, model=build_model())
+_agent: Agent | None = None
+_agent_lock = threading.Lock()
+
+
+def _analysis_agent() -> Agent:
+    """The Analyze agent, built on first use so the API starts without model settings.
+
+    Recorded Demos and /api/evidence need no model; only Analyze does. A failed build is
+    not cached, so fixing the settings and calling again works without a restart.
+    """
+    global _agent
+    with _agent_lock:
+        if _agent is None:
+            try:
+                model = build_model()
+            except ValueError as exc:
+                raise ModelNotConfiguredError(str(exc)) from exc
+            _agent = Agent(system_prompt=SYSTEM_PROMPT, model=model)
+        return _agent
 
 
 def _asc_anchor_date(snapshot: AscGrowthSnapshot) -> date | None:
@@ -314,6 +333,8 @@ def run_analysis(
 
 def _run_analysis_bound(language: str | None = "en") -> AnalyzeResponse:
     lang = _normalize_language(language)
+    # Before fetching sources: missing model settings fail fast, without a data fetch.
+    analysis_agent = _analysis_agent()
     (
         asc,
         ga4,
@@ -346,7 +367,7 @@ def _run_analysis_bound(language: str | None = "en") -> AnalyzeResponse:
         sales.status if sales is not None else "none",
     )
 
-    result = agent(
+    result = analysis_agent(
         prompt,
         structured_output_model=StructuredAnalysis,
         structured_output_prompt=STRUCTURED_OUTPUT_PROMPT,

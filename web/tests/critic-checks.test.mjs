@@ -52,6 +52,20 @@ describe("checkVerdict", () => {
     );
   });
 
+  it("counts a check that returned another evidence item's value as unverifiable", () => {
+    const wrongItem = {
+      matched: false,
+      error: "The check names evidence item 0 but returns the value of item 1; not compared.",
+    };
+    assert.equal(checkVerdict(wrongItem), "unverifiable");
+    const run = {
+      status: "converged",
+      steps: [{ version: "v3", critic: { checks: [{ matched: true, error: null }, wrongItem], findings: [] } }],
+    };
+    assert.deepEqual(runOutcome(run).finalChecks, { matched: 1, mismatched: 0, unverifiable: 1, total: 2 });
+    assert.equal(formatOutcome(runOutcome(run), en), "Converged · 0 unresolved findings · 1 unverifiable SQL check");
+  });
+
   it("tallies an empty or missing list as zeros", () => {
     assert.deepEqual(tallyChecks(undefined), { matched: 0, mismatched: 0, unverifiable: 0, total: 0 });
   });
@@ -155,7 +169,7 @@ describe("known limitations on proposals (English base trace)", () => {
 describe("sampleText for an English-only Recorded Demo", () => {
   it("shows English notes in the Japanese UI when there is no Japanese", () => {
     const text = sampleText({ knownLimitations: [], en: EN_BASE_LIMITATIONS.en }, "ja");
-    assert.equal(text.knownLimitations.length, 2);
+    assert.equal(text.knownLimitations.length, 3);
     assert.match(text.knownLimitations[0], /v3 action #3/);
   });
 });

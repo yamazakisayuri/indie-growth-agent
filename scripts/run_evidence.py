@@ -133,10 +133,15 @@ def _print_summary(run: EvidenceRun, path: Path) -> None:
         )
         if step.critic:
             matched = sum(c.matched for c in step.critic.checks)
+            unverifiable = sum(not c.matched and bool((c.error or "").strip()) for c in step.critic.checks)
             print(
                 f"  critic: {len(step.critic.findings)} findings, "
-                f"{matched}/{len(step.critic.checks)} checks matched, {step.critic.duration_seconds}s"
+                f"{matched}/{len(step.critic.checks)} checks matched, "
+                f"{unverifiable} unverifiable, {step.critic.duration_seconds}s"
             )
+            for c in step.critic.checks:
+                if not c.matched and (c.error or "").strip():
+                    print(f"    [unverifiable check] {c.claim_id}[{c.evidence_index}]: {c.error}")
             for f in step.critic.findings:
                 print(f"    [{f.kind} / {f.origin} / {f.resolution}] {f.claim_id}: {f.message}")
     final = run.final

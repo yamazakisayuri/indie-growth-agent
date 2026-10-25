@@ -152,6 +152,10 @@ _MODEL_HINTS: dict[str, tuple[str, str]] = {
         "Nightshift に NVIDIA の API キーが読み込まれていません。Nightshift でキーを設定し直してください。",
         "Nightshift has no NVIDIA API key loaded. Set the key again in Nightshift.",
     ),
+    "model_not_configured": (
+        "LLM_PROVIDER に必要な設定（認証情報など）が API サーバーに読み込まれていません。.env を確認してください。",
+        "The API server has not loaded the settings LLM_PROVIDER needs (such as credentials). Check .env.",
+    ),
     "AccessDeniedException": (
         "Bedrock のモデルを使う権限がありません。モデルアクセスと IAM 権限を確認してください。",
         "No permission for the Bedrock model. Check model access and IAM permissions.",

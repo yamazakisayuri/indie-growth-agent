@@ -124,7 +124,7 @@ def main() -> None:
             "checks": '[{"claim_id": "c1", "sql": "SELECT 1"}]',
         }
     )
-    assert critic.issues[0].kind == "causal_leap" and critic.checks[0].evidence_index == 0
+    assert critic.issues[0].kind == "causal_leap" and critic.checks[0].evidence_index is None
     print("OK CriticReport decodes JSON-string issues and checks")
     _expect_invalid(
         CriticReport,

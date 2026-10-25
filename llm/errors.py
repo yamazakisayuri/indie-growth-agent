@@ -87,6 +87,10 @@ def describe_model_error(exc: BaseException) -> str:
     return _redact(" | ".join(parts))
 
 
+class ModelNotConfiguredError(RuntimeError):
+    """LLM_PROVIDER's settings are missing or invalid, so no model could be built."""
+
+
 @dataclass(frozen=True)
 class ModelErrorSummary:
     """A model provider failure reduced to fields safe to log and show: no body text, no keys."""
@@ -114,6 +118,8 @@ def summarize_model_error(exc: BaseException) -> ModelErrorSummary | None:
     The reason is the runtime's error code (e.g. Meterless' meterless_detail, Bedrock's
     error code) or the exception class name. None when exc is not a model provider error.
     """
+    if any(isinstance(current, ModelNotConfiguredError) for current in _chain(exc)):
+        return ModelErrorSummary("model_not_configured")
     api = find_api_error(exc)
     if api is not None:
         body = getattr(api, "body", None)

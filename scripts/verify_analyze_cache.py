@@ -182,6 +182,18 @@ def main() -> None:
         logged = " ".join(r.getMessage() for r in records)
         assert "reason=nvidia_key_missing" in logged and "body text" not in logged, logged
 
+        from llm import ModelNotConfiguredError
+
+        def no_model_settings(**_kwargs):
+            raise ModelNotConfiguredError("LLM_PROVIDER=meterless needs METERLESS_RUNTIME_TOKEN")
+
+        api_server.run_analysis = no_model_settings  # type: ignore[assignment]
+        unset = client.post("/api/analyze", json={"language": "en", "productId": "mahjong"})
+        assert unset.status_code == 502, unset.text
+        detail = unset.json()["detail"]
+        assert detail["code"] == "model_unavailable" and "Check .env" in detail["error"], detail
+        assert "METERLESS_RUNTIME_TOKEN" not in detail["error"], detail
+
         def data_down(**_kwargs):
             raise RuntimeError("ASC report download failed")
 

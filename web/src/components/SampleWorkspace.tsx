@@ -370,6 +370,8 @@ function VerifySection({ recorded }: { recorded: RecordedSummary }) {
         </span>
       </p>
       <p className="sample-section__note">{copy("checksAuthority")}</p>
+      <p className="sample-section__note">{copy("reviewTerms")}</p>
+      <p className="sample-section__note">{copy("recordedChecksNote")}</p>
       <Link href={DEMO_PATH} className="sample-cta">
         {copy("sampleVerifyCta")} →
       </Link>

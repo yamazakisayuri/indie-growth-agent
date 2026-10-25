@@ -546,8 +546,8 @@ export const uiCopy = {
     en: "Verify the evidence and revise",
   },
   evidenceHint: {
-    ja: "v1 — 自アプリのデータ → v2 — 競合の状況（競合の公開情報を追加）→ Critic が自分で書いた SQL で数字を照合 → v3 — Critic レビュー済みの提案。提案に出てくる数字は、すべて根拠ストアへの SQL で再現できるかを確かめます。",
-    en: "v1 — Own App Data → v2 — Competitor Context (adds public competitor listings) → the Critic re-checks every number with its own SQL → v3 — Critic-Reviewed Actions. Every number in a proposal must be reproducible by SQL on the evidence store.",
+    ja: "v1 — 自アプリのデータ → v2 — 競合の状況（競合の公開情報を追加）→ Critic が自分で書いた SQL で根拠の数値を照合 → v3 — Critic レビュー済みの提案。照合するのは各主張の根拠項目（evidence）の値で、コードが Analyst の SQL を再実行し、Critic の SQL の結果とも比べます。主張の本文や提案の理由にだけ書かれた数字は照合しません。",
+    en: "v1 — Own App Data → v2 — Competitor Context (adds public competitor listings) → the Critic checks the evidence values with its own SQL → v3 — Critic-Reviewed Actions. What is compared is each claim's evidence values: code re-runs the Analyst's SQL and compares the Critic's SQL results. Numbers written only in claim text or action reasons are not compared.",
   },
   evidenceRun: {
     ja: "実行",
@@ -722,16 +722,16 @@ export const uiCopy = {
     en: "Hypothesis",
   },
   evidenceBadgeVerified: {
-    ja: "✓ SQL 照合済み",
-    en: "✓ Verified by SQL",
+    ja: "✓ Critic の SQL と一致",
+    en: "✓ Matched Critic SQL",
   },
   evidenceBadgeFlagged: {
     ja: "指摘あり",
     en: "Flagged",
   },
   evidenceBadgeUnchecked: {
-    ja: "照合なし",
-    en: "Not checked",
+    ja: "Critic の照合なし",
+    en: "No Critic check",
   },
   evidenceBadgeNotReviewed: {
     ja: "未レビュー",
@@ -1257,8 +1257,8 @@ export const uiCopy = {
     en: "What the Critic questioned",
   },
   demoCriticHint: {
-    ja: "Critic は Analyst とは別に、提案に含まれる数値を自分の SQL で再計算し、根拠と食い違う主張や実行できない提案を指摘します。Analyst は次の版で回答します。",
-    en: "Separately from the Analyst, the Critic re-computes every number in a proposal with its own SQL, and flags claims the evidence does not support and actions that cannot be run. The Analyst answers in the next version.",
+    ja: "Critic は Analyst とは別に、主張の根拠項目（evidence）の数値を自分の SQL で再計算し、根拠と食い違う主張や実行できない提案を指摘します。主張の本文や提案の理由にだけ書かれた数字は照合されません。Analyst は次の版で回答します。",
+    en: "Separately from the Analyst, the Critic re-computes the evidence values of each claim with its own SQL, and flags claims the evidence does not support and actions that cannot be run. Numbers written only in claim text or action reasons are not compared. The Analyst answers in the next version.",
   },
   demoReviewed: {
     ja: "確認した版",
@@ -1314,8 +1314,16 @@ export const uiCopy = {
     en: "Unverifiable",
   },
   checksAuthority: {
-    ja: "数値が根拠と合っているかは、このコードによる照合結果が正です。照合不能は、SQL が1つの値を返さなかったなどで比べられなかったもので、不一致ではありません。",
-    en: "Whether a number matches the evidence is decided by this code check, not by the model. Unverifiable means the check could not compare (for example, the SQL did not return exactly one value); it is not a mismatch.",
+    ja: "数値が根拠と合っているかは、このコードによる照合結果が正です。比べるのは根拠項目（evidence）の値だけです。件数・評価・金額は単位を換算せず、率だけは % 表記か SQL の計算式で単位が分かる場合に限り比率と百分率を換算します。照合不能は、SQL が1つの値を返さなかった、指定した根拠項目とは別の項目の値を返したなどで比べられなかったもので、不一致ではありません。",
+    en: "Whether a number matches the evidence is decided by this code check, not by the model. Only evidence values are compared. Counts, ratings, and amounts are never unit-converted; a rate converts between ratio and percent only when a % sign or the SQL formula shows the unit. Unverifiable means the check could not compare (for example, the SQL did not return exactly one value, or it returned the value of a different evidence item than the one it named); it is not a mismatch.",
+  },
+  recordedChecksNote: {
+    ja: "Recorded Demo の照合件数と指摘は、記録時のコードが判定したものをそのまま表示しています。現在の規則で保存済みの値を比べ直した結果との違いは、既知の限界に書いています。",
+    en: "The check counts and findings of a Recorded Demo are shown as the code judged them at record time. Where comparing the stored values with the current rules differs, the known limitations say so.",
+  },
+  reviewTerms: {
+    ja: "収束: 最後の Critic レビューで指摘が0件だったこと。すべての数字が検証済みという意味ではありません（照合不能のチェックや、本文にだけ書かれた数字は残りえます）。解消: 次のレビューで同じ主張に同じ種類の指摘が出なかったこと。主張が書き換えられたり取り下げられたりした場合も含み、修正が正しいことの証明ではありません。",
+    en: "Converged: the last Critic review raised no findings. It does not mean every number is verified (unverifiable checks and numbers written only in text may remain). Resolved: the next review raised no finding of the same kind on the same claim. This includes claims that were rewritten or removed; it does not prove the fix is correct.",
   },
   criticComment: {
     ja: "Critic のコメント（モデル生成）",

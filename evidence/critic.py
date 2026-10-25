@@ -24,10 +24,11 @@ from .schema import (
 )
 from .store import EvidenceStore, EvidenceStoreError
 
-_SCALES = (1.0, 100.0, 0.01)
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 _NULL_WORDS = frozenset({"null", "none", "n/a", ""})
+_SQL_STRING = re.compile(r"'(?:[^']|'')*'")
+_TIMES_100 = re.compile(r"\*\s*100(?:\.0*)?(?![\d.])|(?<![\d.])100(?:\.0*)?\s*\*")
 
 
 def to_number(value: Any) -> float | None:
@@ -52,16 +53,43 @@ def _decimals(value: Any) -> int:
     return min(len(text.split(".", 1)[1].rstrip("0")), 6) if "." in text else 0
 
 
-def values_match(claimed: Any, actual: Any) -> bool:
+def sql_rate_unit(sql: str) -> str | None:
+    """'percent' when sql divides and multiplies by 100, 'ratio' when it only divides, else None."""
+    code = _SQL_STRING.sub("''", sql or "")
+    if "/" not in code:
+        return None
+    return "percent" if _TIMES_100.search(code) else "ratio"
+
+
+def _scales(claimed: Any, sql: str) -> tuple[float, ...]:
+    """Unit conversions allowed for this comparison: none unless both units are visible.
+
+    A count, rating, or amount is never compared at 100x or 0.01x. A rate converts only
+    when the claim is written with '%' and sql returns a ratio, or the claim is a plain
+    ratio and sql returns a percent (division multiplied by 100).
+    """
+    unit = sql_rate_unit(sql)
+    is_percent = str(claimed).strip().endswith("%")
+    if is_percent and unit == "ratio":
+        return (100.0,)
+    if not is_percent and unit == "percent":
+        return (1.0, 0.01)
+    return (1.0,)
+
+
+def values_match(claimed: Any, actual: Any, *, sql: str = "") -> bool:
     """True when actual, rounded to the precision the claim was written with, equals it.
 
-    A ratio written as a percent (0.3563 vs 35.63) also matches.
+    sql is the query that returned actual; it decides whether a percent / ratio
+    conversion is allowed (see _scales). Zero never matches a non-zero value.
     """
     c, a = to_number(claimed), to_number(actual)
     if c is None or a is None:
         return False
+    if (c == 0) != (a == 0):
+        return False
     tolerance = 0.5 * 10 ** -_decimals(claimed) + 1e-9
-    return any(abs(a * scale - c) <= tolerance for scale in _SCALES)
+    return any(abs(a * scale - c) <= tolerance for scale in _scales(claimed, sql))
 
 
 def is_composite(value: Any) -> bool:
@@ -112,10 +140,10 @@ def _text_key(value: Any) -> str:
     return "".join(str(value).split()).casefold()
 
 
-def values_equal(claimed: Any, actual: Any) -> bool:
+def values_equal(claimed: Any, actual: Any, *, sql: str = "") -> bool:
     """Numbers by values_match; texts by case-insensitive equality ignoring whitespace only."""
     if to_number(claimed) is not None:
-        return values_match(claimed, actual)
+        return values_match(claimed, actual, sql=sql)
     claimed_null = claimed is None or str(claimed).strip().casefold() in _NULL_WORDS
     if claimed_null or actual is None:
         return claimed_null and actual is None
@@ -260,7 +288,7 @@ def recheck_cited_sql(
                         claimed_value=evidence.value,
                     )
                 )
-            elif not values_equal(evidence.value, actual):
+            elif not values_equal(evidence.value, actual, sql=evidence.sql):
                 findings.append(
                     CriticFinding(
                         id=ids.next(),
@@ -294,20 +322,36 @@ def apply_critic_report(
         if claim is None or not claim.evidence:
             continue
         actual, error = _scalar(store, check.sql, "critic", log)
-        # Models often omit evidence_index, so a check counts as matched when its value
-        # equals any of the claim's evidence values; evidence_index only picks what a
-        # mismatch is reported against.
-        index = next(
-            (
-                i
-                for i, e in enumerate(claim.evidence)
-                if error is None and not packs_numbers(e, store) and values_equal(e.value, actual)
-            ),
-            None,
-        )
-        matched = index is not None
-        if index is None:
-            index = min(check.evidence_index, len(claim.evidence) - 1)
+
+        def reproduces(e: Evidence) -> bool:
+            return (
+                error is None
+                and not packs_numbers(e, store)
+                and values_equal(e.value, actual, sql=check.sql)
+            )
+
+        named = check.evidence_index
+        if named is not None and named >= len(claim.evidence):
+            named = None
+        if named is None and len(claim.evidence) == 1:
+            named = 0
+        if named is not None:
+            # The named item only: a value that happens to equal another item is no match.
+            index = named
+            matched = reproduces(claim.evidence[index])
+            other = None if matched else next(
+                (i for i, e in enumerate(claim.evidence) if i != index and reproduces(e)), None
+            )
+            if other is not None:
+                error = (
+                    f"The check names evidence item {index} but returns the value of item "
+                    f"{other}; not compared."
+                )
+        else:
+            # No evidence_index: matched when the value equals any of the claim's items.
+            found = next((i for i, e in enumerate(claim.evidence) if reproduces(e)), None)
+            matched = found is not None
+            index = found if found is not None else 0
         evidence = claim.evidence[index]
         if not matched and error is None and packs_numbers(evidence, store):
             error = "The claim's evidence value packs several numbers; not compared."
@@ -353,11 +397,23 @@ def apply_critic_report(
 
 
 def dedupe(findings: Sequence[CriticFinding]) -> list[CriticFinding]:
-    """Keep the first finding per (claim, kind, origin, message)."""
-    seen: set[tuple[str, str, str, str]] = set()
+    """Keep the first finding per claim, kind, origin, message, SQL, and values.
+
+    Two mismatches in one claim share a message but not their SQL or values, so both stay.
+    """
+    seen: set[tuple[str, ...]] = set()
     out: list[CriticFinding] = []
     for f in findings:
-        key = (f.claim_id, f.kind, f.origin, f.message)
+        key = (
+            f.claim_id,
+            f.kind,
+            f.origin,
+            f.message,
+            f.analyst_sql,
+            f.critic_sql,
+            repr(f.claimed_value),
+            repr(f.critic_value),
+        )
         if key not in seen:
             seen.add(key)
             out.append(f)

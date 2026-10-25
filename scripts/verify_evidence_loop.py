@@ -27,6 +27,7 @@ from evidence.critic import (  # noqa: E402
     FindingIds,
     apply_critic_report,
     critic_payload,
+    dedupe,
     is_composite,
     recheck_cited_sql,
     structural_findings,
@@ -127,18 +128,46 @@ V1 = AnalystOutput.model_validate(
 )
 
 
+RATIO_SQL = "SELECT SUM(product_page_views) * 1.0 / SUM(impressions) FROM asc_daily"
+PERCENT_SQL = "SELECT SUM(product_page_views) * 100.0 / SUM(impressions) FROM asc_daily"
+
+
 def check_values_match() -> None:
     assert values_match(2258, 2258) and not values_match(2258, 2259)
-    assert values_match(35.63, 0.356321) and values_match(0.3563, 0.356321)
-    assert values_match("35.63%", "0.356321") and values_match("2,258", "2258")
+    assert values_match("2,258", "2258")
     assert values_match(36, 35.63) and not values_match(35.6, 35.7)
     assert not values_match("n/a", 1) and not values_match(1, None)
-    print("OK values_match: exact counts, claim precision, percent/ratio forms, strings from stores")
+    print("OK values_match: exact counts, claim precision, strings from stores")
+
+    # Counts, ratings, and amounts never match at 100x / 0.01x.
+    assert not values_match("410", 4.1, sql="SELECT rating_avg FROM competitor_listing")
+    assert not values_match(4.1, 410, sql="SELECT rating_count FROM competitor_listing")
+    assert not values_match(1, 100, sql="SELECT COUNT(*) FROM competitor_listing")
+    assert not values_match(2258, 22.58) and not values_match(22.58, 2258)
+    assert not values_match("0.0", 5.0, sql="SELECT COUNT(*) FROM competitor_listing WHERE price = 0")
+    print("OK values_match: no 100x / 0.01x match for counts, ratings, or amounts")
+
+    # Zero never matches a non-zero value, even when it rounds to the claim's precision.
+    assert not values_match(0, 0.3) and not values_match("0.0", 0.04) and not values_match(0.3, 0)
+    assert not values_match("0%", 0.004, sql=RATIO_SQL)
+    assert values_match(0, 0) and values_match("0.0", 0.0) and values_match("0%", 0, sql=RATIO_SQL)
+    print("OK values_match: zero and non-zero never match")
+
+    # A rate converts only when both units are visible.
+    assert values_match("35.63%", 0.356321, sql=RATIO_SQL)
+    assert values_match(0.3563, 35.6321, sql=PERCENT_SQL) and values_match(35.63, 35.6321, sql=PERCENT_SQL)
+    assert values_match(0.3563, 0.356321, sql=RATIO_SQL)
+    assert not values_match(35.63, 0.356321, sql=RATIO_SQL), "plain 35.63 has no stated unit"
+    assert not values_match(35.63, 0.356321) and not values_match(0.3563, 35.6321)
+    assert not values_match("35.63%", 0.356321), "no SQL: the ratio's meaning is not visible"
+    assert not values_match("35.63%", 0.356321, sql=PERCENT_SQL), "SQL already returns a percent"
+    assert not values_match("35.63%", 0.356321, sql="SELECT '1/2' AS x, rate FROM t")
+    print("OK values_match: percent / ratio only with a % claim or a SQL that computes the rate")
 
     assert is_composite("impressions=2248, page_views=76") and is_composite("previous=15, current=11")
     assert not is_composite("Games") and not is_composite("2026-10-11") and not is_composite(2258)
     assert values_equal("Games", "games ") and not values_equal("Games", "Utilities")
-    assert values_equal("35.63%", 0.35632)
+    assert values_equal("35.63%", 0.35632, sql=RATIO_SQL) and not values_equal("35.63%", 0.35632)
     assert values_equal("NULL", None) and values_equal(None, None)
     assert not values_equal("NULL", 0) and not values_equal("Games", None)
     listing = "◉ 不要に!!!\n◉ 把握 できる\n\n機能一覧"
@@ -256,7 +285,86 @@ def check_code_rules(store: SQLiteEvidenceStore) -> None:
     found, outcomes = apply_critic_report(report, two_periods, store=store, ids=FindingIds("r1"), log=[])
     assert [(o.matched, o.evidence_index) for o in outcomes] == [(True, 1), (False, 1)], outcomes
     assert [(f.kind, f.claimed_value, f.critic_value) for f in found] == [("value_mismatch", 35, 99)]
-    print("OK a check matches whichever evidence item it reproduces, even without evidence_index")
+    print("OK without evidence_index a check matches whichever evidence item it reproduces")
+
+    ratings = AnalystOutput.model_validate(
+        {
+            "most_important_finding": "f",
+            "claims": [
+                {
+                    "id": "r1",
+                    "text": "fictional-104: 410 ratings, average 4.1",
+                    "kind": "observation",
+                    "evidence": [
+                        {"table": "competitor_listing", "sql": "SELECT 410", "value": "410", "as_of": "2026-10-22", "source": "s"},
+                        {"table": "competitor_listing", "sql": "SELECT 4.1", "value": "4.1", "as_of": "2026-10-22", "source": "s"},
+                    ],
+                },
+                _claim("r2", "observation", "0.0", "SELECT 0.0", table="competitor_listing"),
+            ],
+            "actions": [],
+        }
+    )
+    report = CriticReport.model_validate(
+        {
+            "summary": "s",
+            "checks": [
+                {"claim_id": "r1", "sql": "SELECT 4.1", "evidence_index": 1},
+                {"claim_id": "r1", "sql": "SELECT 4.1", "evidence_index": 0},
+                {"claim_id": "r1", "sql": "SELECT 4.1"},
+                {"claim_id": "r1", "sql": "SELECT 41", "evidence_index": 0},
+                {"claim_id": "r1", "sql": "SELECT 4.1", "evidence_index": 7},
+                {"claim_id": "r2", "sql": "SELECT COUNT(*) FROM competitor_listing WHERE is_self = 0"},
+            ],
+        }
+    )
+    found, outcomes = apply_critic_report(report, ratings, store=store, ids=FindingIds("r1"), log=[])
+    assert [(o.matched, o.evidence_index) for o in outcomes] == [
+        (True, 1), (False, 0), (True, 1), (False, 0), (True, 1), (False, 0),
+    ], outcomes
+    assert outcomes[1].error and "item 1" in outcomes[1].error, outcomes[1]
+    assert outcomes[3].error is None and outcomes[5].error is None
+    assert [(f.claim_id, f.claimed_value, f.critic_value) for f in found] == [
+        ("r1", "410", 41), ("r2", "0.0", 1),
+    ], found
+    print("OK evidence_index: a check is compared with the item it names; equal to another item "
+          "is not compared (no match, no finding); a count never matches a price of 0.0")
+
+    two_wrong = AnalystOutput.model_validate(
+        {
+            "most_important_finding": "f",
+            "claims": [
+                {
+                    "id": "w1",
+                    "text": "rates",
+                    "kind": "fact",
+                    "evidence": [
+                        {"table": "asc_daily", "sql": "SELECT 6.0", "value": 16.67, "as_of": "2026-10-15", "source": "s"},
+                        {"table": "asc_daily", "sql": "SELECT 20.0", "value": 5.0, "as_of": "2026-10-15", "source": "s"},
+                    ],
+                }
+            ],
+            "actions": [],
+        }
+    )
+    recheck = recheck_cited_sql(two_wrong, store=store, ids=FindingIds("r1"), log=[])
+    report = CriticReport.model_validate(
+        {
+            "summary": "s",
+            "checks": [
+                {"claim_id": "w1", "sql": "SELECT 6.0", "evidence_index": 0},
+                {"claim_id": "w1", "sql": "SELECT 20.0", "evidence_index": 1},
+            ],
+        }
+    )
+    checked, _ = apply_critic_report(report, two_wrong, store=store, ids=FindingIds("r1"), log=[])
+    kept = dedupe([*recheck, *checked, *recheck])
+    assert [(f.origin, f.claimed_value) for f in kept] == [
+        ("code", 16.67), ("code", 5.0), ("code", 16.67), ("code", 5.0),
+    ], kept
+    assert len({f.message for f in kept}) == 2 and len(kept) == len(recheck) + len(checked)
+    print("OK dedupe keeps each mismatch of one claim (same message, different SQL or value) "
+          "and drops exact repeats")
 
     payload = critic_payload(V2)
     assert "SELECT" not in payload and "初心者向け" in payload

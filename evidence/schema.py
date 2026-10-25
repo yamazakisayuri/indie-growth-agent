@@ -131,7 +131,12 @@ class CriticCheck(EvidenceModel):
 
     claim_id: str
     sql: str = Field(description="Your own SELECT returning exactly one value (1 row, 1 column).")
-    evidence_index: int = Field(default=0, ge=0, description="Which evidence item of the claim.")
+    evidence_index: int | None = Field(
+        default=None,
+        ge=0,
+        description="Which evidence item of the claim (0-based). Code compares the check with "
+        "that item only; set it whenever the claim has several items.",
+    )
 
 
 class CriticReport(EvidenceModel):

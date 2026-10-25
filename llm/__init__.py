@@ -2,6 +2,7 @@
 
 from .errors import (
     ModelErrorSummary,
+    ModelNotConfiguredError,
     describe_model_error,
     find_api_error,
     is_retryable,
@@ -18,6 +19,7 @@ from .factory import (
 
 __all__ = [
     "ModelErrorSummary",
+    "ModelNotConfiguredError",
     "SUPPORTED_PROVIDERS",
     "build_model",
     "describe_model_error",

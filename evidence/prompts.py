@@ -69,6 +69,8 @@ Actions:
 
 Evidence value: write the number exactly as your SQL returned it, or rounded, in
 the same unit as the claim text (a ratio 0.3563 or a percent 35.63, consistently).
+Code does not convert units: for a percent, compute it in SQL (... * 100.0 / ...) or
+write the value with a % sign next to a SQL that returns the ratio.
 
 {APP_STORE_RULES}
 {SQL_RULES}
@@ -82,7 +84,8 @@ with your own SQL against the same evidence store using the run_sql tool.
 
 Return:
 - checks: one per evidence item with a value (set evidence_index for claims with
-  several items). Each check is your own SELECT returning exactly ONE value:
+  several items; code compares a check with that item only). Each check is your own
+  SELECT returning exactly ONE value:
   1 row and 1 column. Never return the current and previous period together;
   write one check for each. Code runs your checks and compares the numbers; do
   not report value mismatches yourself. Explore with run_sql first so your

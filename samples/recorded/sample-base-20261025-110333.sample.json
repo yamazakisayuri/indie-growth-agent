@@ -22,7 +22,8 @@
   "reviewOutcome": "converged（収束）。v3 に未解決の指摘は0件。最終 Critic（v3 を確認）の SQL 照合は一致31・不一致0・照合不能1。照合不能の1件は Critic の SQL が1つの値を返さず比べられなかったもので、不一致ではない。",
   "knownLimitations": [
     "v3 の提案 #3 の理由にある「競合上位3社は8〜10枚」は、参照している claim の SQL evidence では裏付けられていない。",
-    "v3 の提案 #1 の約300 PV/日は既存の集計から導いた値だが、14日間で 2pp の差を検出できるという検出力の主張には根拠がない。"
+    "v3 の提案 #1 の約300 PV/日は既存の集計から導いた値だが、14日間で 2pp の差を検出できるという検出力の主張には根拠がない。",
+    "SQL 照合の範囲: 記録された照合結果は修正前のコード（件数・評価・金額にも100倍・0.01倍の換算を許し、Critic が指定した evidence_index を使わない判定）によるもの。保存済みの値を修正後の規則で比べ直しても、各ラウンドの一致・不一致・照合不能の件数は変わらない（モデルは再実行していない）。ただし Critic が指定した evidence_index はトレースに残っていないため、各チェックが指定どおりの根拠項目と一致したかは確認できない。照合されるのは根拠項目（evidence）の値だけで、主張の本文や提案の理由にだけ書かれた数字は照合されていない。"
   ],
   "en": {
     "note": "Fictional sample data. It is not a real app, not App Store Connect results, and not real competitor listings.",
@@ -31,7 +32,8 @@
     "reviewOutcome": "converged. No finding is unresolved in v3. The final Critic SQL checks (reviewing v3): 31 matched, 0 mismatched, 1 unverifiable. The unverifiable check could not be compared because the Critic's SQL did not return exactly one value; it is not a mismatch.",
     "knownLimitations": [
       "The reason for v3 action #3 says the top 3 competitors have 8-10 screenshots, but the SQL evidence of the claims it cites does not support that range.",
-      "In v3 action #1, about 300 page views/day is derived from existing totals, but the claim that 14 days give enough power to detect a 2pp difference has no basis in the evidence."
+      "In v3 action #1, about 300 page views/day is derived from existing totals, but the claim that 14 days give enough power to detect a 2pp difference has no basis in the evidence.",
+      "SQL check scope: the recorded check results come from the code before the fix (it allowed 100x / 0.01x conversion even for counts, ratings, and amounts, and did not use the evidence_index the Critic named). Comparing the stored values again with the fixed rules leaves the matched / mismatched / unverifiable counts of every round unchanged (no model was run again). The evidence_index the Critic named is not in the trace, so whether each check matched the evidence item it named cannot be confirmed. Only evidence values are compared; numbers written only in claim text or action reasons are not."
     ]
   }
 }

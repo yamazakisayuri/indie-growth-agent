@@ -135,10 +135,21 @@ describe("English base Recorded Demo (committed)", () => {
     const jaText = sampleText(run.sample, "ja");
     assert.match(enText.reviewOutcome, /^converged\. .*31 matched, 0 mismatched, 1 unverifiable/);
     assert.match(jaText.reviewOutcome, /^converged（収束）.*一致31・不一致0・照合不能1/);
-    assert.equal(enText.knownLimitations.length, 2);
-    assert.equal(jaText.knownLimitations.length, 2);
+    assert.equal(enText.knownLimitations.length, 3);
+    assert.equal(jaText.knownLimitations.length, 3);
     assert.match(enText.knownLimitations[0], /^The reason for v3 action #3/);
     assert.match(jaText.knownLimitations[1], /^v3 の提案 #1/);
+    assert.match(enText.knownLimitations[2], /^SQL check scope: .*counts of every round unchanged/);
+    assert.match(jaText.knownLimitations[2], /^SQL 照合の範囲: .*件数は変わらない/);
+  });
+
+  it("states the SQL check scope note on no proposal and no finding", () => {
+    const story = buildDemoStory(run);
+    const notes = [
+      ...story.versions.flatMap((v) => Object.values(v.notesByRank).flat()),
+      ...story.rounds.flatMap((r) => r.findings.flatMap((f) => f.reviewNotes)),
+    ];
+    assert.ok(notes.every((note) => !/^SQL check scope/.test(note.en ?? "")), notes);
   });
 });
 

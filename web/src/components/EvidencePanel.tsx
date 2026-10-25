@@ -423,6 +423,7 @@ function ReviewView({
       <h4 className="evidence__block-title">{copy("evidenceReview")}</h4>
       <CheckTallyLine tally={tallyChecks(review.checks)} />
       <p className="evidence__note">{copy("checksAuthority")}</p>
+      <p className="evidence__note">{copy("reviewTerms")}</p>
       <p className="evidence__counts">
         {(["resolved", "downgraded", "open", "unresolved"] as const).map((resolution) =>
           counts.get(resolution) ? (

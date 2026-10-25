@@ -277,6 +277,8 @@ function CriticSection({ run, story }: { run: EvidenceRun; story: DemoStory }) {
           </span>
         </p>
         <p className="evidence__note">{copy("checksAuthority")}</p>
+        <p className="evidence__note">{copy("reviewTerms")}</p>
+        <p className="evidence__note">{copy("recordedChecksNote")}</p>
         {text?.reviewOutcome ? <p className="evidence__note">{text.reviewOutcome}</p> : null}
         {text && text.knownLimitations.length > 0 ? (
           <details className="demo-version__changes">
