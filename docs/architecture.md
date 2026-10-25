@@ -131,7 +131,13 @@ flowchart TB
 
 All model calls go through Strands Agents with `LLM_PROVIDER=meterless`: Meterless Nightshift on the developer's machine, routed to NVIDIA Nemotron 3 Ultra. All SQL from the models passes a read-only guard.
 
-**Sample mode:** the Live Sample (`scripts/run_sample.py`) runs the same loop on fictional CSVs in a dedicated SQLite file (`tmp/sample/<scenario>.sqlite`), never Zetaris, with no memory recall. Recorded Demo traces in `samples/recorded/` are served read-only by `/api/evidence`. The Web UI shows them on a separate page, `/demo` (header link from the dashboard; `base` / `competitor-variant` switch; v1 / v2 / v3 proposals, Critic findings with the Analyst's answers, SQL evidence, and the full log), and also lists them, labeled, in the dashboard's Grounding Critic panel. `scripts/show_sample_demo.py` prints them without the API. Replaying never calls a model; the `/demo` page needs the local API server to read the traces.
+**Sample mode:** the Live Sample (`scripts/run_sample.py`) runs the same loop on fictional CSVs in a dedicated SQLite file (`tmp/sample/<scenario>.sqlite`), never Zetaris, with no memory recall. Recorded Demo traces in `samples/recorded/` are served read-only by `/api/evidence`.
+
+- **Dashboard (`/`)** shows real analysis results (Live Analyze, evidence runs, interventions). Its Grounding Critic panel also lists the Recorded Demos, labeled, in the run selector.
+- **Recorded Demo (`/demo`)**, opened from the dashboard header, is a separate page for the committed Recorded Demos only: `base` / `competitor-variant` switch, v1 / v2 / v3 proposals with change reasons, Critic findings per round with the Analyst's answers, findings marked as **Known misjudgment** when the Recorded Demo's known limitations name them, the outcome with the unresolved count, and collapsed SQL evidence and full log.
+- `scripts/show_sample_demo.py` prints them without the API.
+
+Viewing a Recorded Demo never calls a model and needs no API key; the `/demo` page needs the local API server (`python api_server.py`) to read the traces.
 
 ## Not in this architecture
 

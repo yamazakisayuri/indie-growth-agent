@@ -19,14 +19,17 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -r requirement
 python scripts/show_sample_demo.py     # Recorded Demo 2本: v1/v2/v3 の Top 3、Critic の件数、レビュー注記
 ```
 
-提案、Critic の指摘、その裏の SQL を見るには、Web UI の Recorded Demo 画面を開きます。モデルは呼びませんが、画面は保存済みの実行をローカルの API サーバーから読むため、両方を起動します。
+提案、Critic の指摘、その裏の SQL を見るには Web UI を使います。Recorded Demo 画面は **モデル呼び出しも API キーも不要** ですが、保存済みの実行をローカルの API サーバーから読むため、`api_server.py` を起動しておく必要があります。
 
 ```bash
 python api_server.py                       # ターミナル 1
-cd web && npm install && npm run dev       # ターミナル 2。http://localhost:3000/demo を開く
+cd web && npm install && npm run dev       # ターミナル 2
 ```
 
-ダッシュボードのヘッダーにある **Recorded Demo** からも開けます。`/demo` は `base` の実行を開くので、上の例を見るには **competitor-variant** に切り替えます。画面には、v1 / v2 / v3 の提案がどう変わったか、Critic が疑ったことと Analyst の回答（Critic 1回目の `r1-f3`、`r1-f7`、`r1-f13`）、未解決の件数を含む結果が表示されます。**SQL の根拠** と **詳細ログ**（版ごとの主張、Critic の SQL と値）はその下に折りたたまれています。
+1. `http://localhost:3000`（実際の分析結果を表示するダッシュボード）を開き、ヘッダーの **Recorded Demo** をクリックします。独立した Recorded Demo 画面 `/demo` が開きます。
+2. `/demo` は `base` の実行を開きます。上の例を見るには **competitor-variant** に切り替えます。
+3. 上から順に読みます: v1 / v2 / v3 の提案がどう変わったか → Critic が疑ったことと Analyst の回答（Critic 1回目の `r1-f3`、`r1-f7`、`r1-f13`）→ 未解決の件数を含む結果。あとで誤りと確認された指摘には **既知の誤判定** の印が付きます。
+4. **SQL の根拠** と **詳細ログ**（版ごとの主張、Critic の SQL と値）は一番下に折りたたまれています。
 
 **どこを見れば分かるか**
 
@@ -246,16 +249,22 @@ python scripts/show_sample_demo.py
 python scripts/show_sample_demo.py --run-id sample-base-20261024-214121
 ```
 
-Web UI では **`/demo`**（ダッシュボードのヘッダーの **Recorded Demo** リンク）を開きます。再生にモデル呼び出しやモデルの認証情報は不要ですが、画面は `/api/evidence` から実行を読むため、`python api_server.py` と `npm run dev` の両方を起動しておく必要があります。この画面は次のとおりです。
+Web UI の2つの画面は役割が違います。
 
-- `base` の実行を開き、`competitor-variant` に切り替えられる
+- **ダッシュボード（`/`）**: 選択中の Product の実際の分析結果（Live Analyze、Grounding Critic パネルの根拠ループの実行、施策管理）。ヘッダーに **Recorded Demo** リンクがある
+- **Recorded Demo（`/demo`）**: コミット済みの Recorded Demo だけを表示する独立画面
+
+`/demo` の閲覧にモデル呼び出しも API キーも不要ですが、画面は `/api/evidence` から実行を読むため、`python api_server.py`（と `npm run dev`）を起動しておく必要があります。この画面は次のとおりです。
+
+- `base` の実行を開き、`base` と `competitor-variant` を切り替えられる
 - 架空データの保存済み Recorded Demo で、実モデルで実行したものだと明示する
 - v1 / v2 / v3 の提案を、変更理由付きで比較する
-- 各回で Critic が疑ったことを、次の版での Analyst の回答、記録された解消状況とともに一覧にし、既知の誤判定には印を付ける
+- 各回で Critic が疑ったことを一覧にする: 指摘、記録された解消状況、Critic が SQL で再計算した数値の件数と一致した件数、次の版での Analyst の回答
+- Recorded Demo の既知の限界がその指摘の ID と種類を挙げている場合、指摘に **既知の誤判定（実行後のレビューで確認）** の印を付け、種類を「記録された分類」と表示する（`base`: `r2-f1`、`competitor-variant`: `r2-f1`・`r2-f2`）。トレース、Critic の本文、未解決の件数は変えずに表示する
 - 結果（レビューの状態、未解決の件数、既知の限界）を示す
 - **SQL の根拠**（最終版の各主張とその SQL）と **詳細ログ**（版ごとの主張、Critic の照合 SQL と値、比較上の注意）は折りたたんで表示する
 
-ダッシュボード（`/`）は実際の分析結果を表示する画面です。その Grounding Critic パネルの実行の選択肢にも、2本の Recorded Demo が `[Recorded Demo: <scenario>]` として表示され、Live Sample の実行は `[Live Sample: <scenario>]` と表示されます。
+ダッシュボードの Grounding Critic パネルの実行の選択肢にも、2本の Recorded Demo が `[Recorded Demo: <scenario>]` として表示され、Live Sample の実行は `[Live Sample: <scenario>]` と表示されます。
 
 ## ディレクトリ構成
 
@@ -426,7 +435,7 @@ Live Sample は同じループを Zetaris ではなく `tmp/sample/<scenario>.sq
 - **i18n / a11y**: 日本語 / English の UI クロム、focus-visible やラベルの i18n など
 - **言語切替**: UI クロムは即切替し、ページをまたいで保持する。**Analyze は再実行せず**、既存の Actions / Facts / Experiments 本文も書き換えない。本文の言語を変えるには、言語を選んだうえで再度 Analyze する
 - **ダッシュボード（`/`）**: 選択中の Product の実際の分析結果。ヘッダーから Portfolio と Recorded Demo へ移動できる
-- **Recorded Demo（`/demo`）**: コミット済みの Recorded Demo（`base` / `competitor-variant`）の独立画面。[架空サンプルデータ・Live Sample・Recorded Demo](#架空サンプルデータlive-samplerecorded-demo) 参照。モデル呼び出しなし、ローカルの API が必要
+- **Recorded Demo（`/demo`）**: コミット済みの Recorded Demo（`base` / `competitor-variant`）の独立画面。[架空サンプルデータ・Live Sample・Recorded Demo](#架空サンプルデータlive-samplerecorded-demo) 参照。モデル呼び出しも API キーも不要、ローカルの `api_server.py` が必要
 - **Grounding Critic パネル**（Top 3 の下）: 実行の選択、「新しく検証を実行」（確認あり。API から起動できる実行は同時に1つ）、v1 / v2 / v3 の各段階、根拠と SQL 付きの主張、解消状況付きの Critic の指摘、完了した実データの実行ではアクションごとの採用ボタン。架空データの実行には、レビュー結果、未解決の件数、シナリオの変更、既知の限界、比較上の注意をまとめたバナーを表示する
 - **施策パネル**: 一覧、手動登録、実施日の記録、評価の記録、再計測、取りやめ。AI の予測、変更前後の数字、スキップした期間、人の評価を表示する
 - **Portfolio Overview**（`/portfolio`、Header のリンク）: 保存済みの Live Analyze から、アプリごとに1枚のカード（Multi-Product 参照）

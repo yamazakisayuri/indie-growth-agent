@@ -57,11 +57,16 @@ Based on the commits from `1a9ae83` (2026-10-23) onward on `open-agent-2026` (se
 - **Interventions** (`a91bb7d`, `3d19cbb`, `22efb01`): adopt an AI action or register by hand, before/after measured by SQL, human verdict; `/api/interventions`; Interventions panel
 - **Evidence API and Web UI** (`e03fe9b`, `28c24e2`, `69e719b`, `f26e30d`): `/api/evidence` (list / read / start runs), revision-history panel under Top 3, Portfolio Overview (display of each app's saved Live Analyze; no cross-app analysis), UI language kept across pages
 - **Meterless Nightshift / NVIDIA Nemotron** (`3e0991f`): `LLM_PROVIDER=meterless`, pinned to `nvidia/nemotron-3-ultra-550b-a55b`, runtime status check (`scripts/check_meterless.py`), provider errors with details and one retry for retryable failures
-- **Sample mode and Recorded Demo** (`aea5f32`, `d0afcf0`, `0c4ff7b`, `faf589e`, `369ac58`, `74e3fe1`, `d23c927`, `6b9d315`): fictional mahjong sample with `base` and `competitor-variant` scenarios, Live Sample on a dedicated SQLite file, two committed Recorded Demo traces with review notes, labeled runs in the revision history, CLI viewer, Recorded Demo entry button on the dashboard
-- **Documentation** (`1a9ae83`, `4f9d832`, and the README / architecture update): pre-existing work, commit range, README (ja / en), architecture
+- **Sample mode and Recorded Demo** (`aea5f32`, `d0afcf0`, `0c4ff7b`, `faf589e`, `369ac58`, `74e3fe1`, `d23c927`): fictional mahjong sample with `base` and `competitor-variant` scenarios, Live Sample on a dedicated SQLite file, two committed Recorded Demo traces with review notes, labeled runs in the revision history, CLI viewer (`scripts/show_sample_demo.py`)
+- **Recorded Demo page `/demo`** (`6b9d315`, `561071b`, `af50f95`):
+  - `6b9d315` first added a Recorded Demo entry button at the top of the dashboard that opened the run inside the Grounding Critic panel
+  - `561071b` replaced it with a separate page, `/demo`, linked from the dashboard header next to Portfolio; the dashboard went back to showing real analysis results. `/demo` reads the committed run as a story: what the demo is, how the v1 / v2 / v3 proposals changed, what the Critic questioned and how the Analyst answered, and the outcome with the unresolved count and known limitations; SQL evidence and the full log are collapsed. A `base` / `competitor-variant` switch selects the run
+  - `af50f95` marks a finding as a known misjudgment (confirmed in review after the run) when the Recorded Demo's known limitations name that finding and its kind (`base`: `r2-f1`; `competitor-variant`: `r2-f1`, `r2-f2`), and labels the kind as the recorded classification. The trace, the Critic text, and the unresolved count are unchanged. `.gitignore` now ignores only the root `demo/`, so `web/src/app/demo/` is tracked normally
+  - Viewing needs no model call and no API key; the page reads the traces from the local `api_server.py`
+- **Evidence loop speed** (`f83beed`): Analyst prompts query before writing claims, the SQL tool reports the queries left, the Analyst / Critic models make no silent SDK retries (the app's one logged retry remains), and v2 / v3 receive the previous version as compact JSON. The effect on run time has not been measured yet
+- **Documentation** (`1a9ae83`, `4f9d832`, `7c0cf31`, `669be4a`, `515337b`, and this update): pre-existing work, commit range, README (ja / en) with Quick Demo and the Critic success example, the retired AWS deployment described as past, architecture
 
 ### Not finished at the time of writing
 
-- A standalone Recorded Demo screen (the Recorded Demo opens inside the dashboard's Grounding Critic panel)
-- Faster evidence runs (the Recorded Demos took about 15 and 24 minutes)
-- The Recorded Demos ended at the review limit (`max_rounds`) with unresolved Critic findings, some of them known false judgments (see each `samples/recorded/*.sample.json`)
+- Faster evidence runs: the Recorded Demos took about 15 and 24 minutes; `f83beed` cuts wasted model round trips, but no run has measured the effect yet
+- The Recorded Demos ended at the review limit (`max_rounds`) with unresolved Critic findings, some of them known false judgments (see each `samples/recorded/*.sample.json`, and the Known misjudgment marks on `/demo`)

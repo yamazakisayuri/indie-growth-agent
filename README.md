@@ -19,14 +19,17 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -r requirement
 python scripts/show_sample_demo.py     # both Recorded Demos: v1/v2/v3 Top 3, Critic counts, review notes
 ```
 
-To see the proposals, the Critic's findings, and the SQL behind them, open the Recorded Demo page in the Web UI. It makes no model call, but the page reads the saved runs from the local API server, so start both:
+To see the proposals, the Critic's findings, and the SQL behind them, use the Web UI. The Recorded Demo page needs **no model call and no API key**, but it reads the saved runs from the local API server, so `api_server.py` must be running:
 
 ```bash
 python api_server.py                       # terminal 1
-cd web && npm install && npm run dev       # terminal 2, then open http://localhost:3000/demo
+cd web && npm install && npm run dev       # terminal 2
 ```
 
-Or click **Recorded Demo** in the dashboard header. `/demo` opens the `base` run; for the example above, switch to **competitor-variant**. The page shows how the v1 / v2 / v3 proposals changed, what the Critic questioned and how the Analyst answered (`r1-f3`, `r1-f7`, `r1-f13` in Critic round 1), and the outcome with the unresolved count. **SQL evidence** and the **Full log** (each version's claims, the Critic's SQL and values) are collapsed below.
+1. Open `http://localhost:3000` (the dashboard, which shows real analysis results) and click **Recorded Demo** in the header. This opens the separate Recorded Demo page, `/demo`.
+2. `/demo` opens the `base` run. For the example above, switch to **competitor-variant**.
+3. Read top to bottom: how the v1 / v2 / v3 proposals changed → what the Critic questioned and how the Analyst answered (`r1-f3`, `r1-f7`, `r1-f13` in Critic round 1) → the outcome with the unresolved count. Findings later confirmed as wrong are marked **Known misjudgment**.
+4. **SQL evidence** and the **Full log** (each version's claims, the Critic's SQL and values) are collapsed at the bottom.
 
 **Where to look**
 
@@ -246,16 +249,22 @@ python scripts/show_sample_demo.py
 python scripts/show_sample_demo.py --run-id sample-base-20261024-214121
 ```
 
-In the Web UI, open **`/demo`** (the **Recorded Demo** link in the dashboard header). Replaying needs no model call or model credentials, but the page reads the runs from `/api/evidence`, so `python api_server.py` and `npm run dev` must both be running. The page:
+In the Web UI, the two screens have different jobs:
 
-- opens the `base` run, with a switch to `competitor-variant`
+- **Dashboard (`/`)**: real analysis results for the selected Product (Live Analyze, evidence runs in the Grounding Critic panel, interventions). Its header has the **Recorded Demo** link
+- **Recorded Demo (`/demo`)**: a separate page for the committed Recorded Demos only
+
+Viewing `/demo` needs no model call and no API key, but the page reads the runs from `/api/evidence`, so `python api_server.py` (and `npm run dev`) must be running. The page:
+
+- opens the `base` run, with a switch between `base` and `competitor-variant`
 - states that the run is a saved Recorded Demo on fictional data, executed by a real model
 - compares the v1 / v2 / v3 proposals, with the reason for each change
-- lists what the Critic questioned in each round, with the Analyst's answer in the next version, the recorded resolution, and known misjudgments marked
+- lists what the Critic questioned in each round: the finding, its recorded resolution, how many numbers the Critic re-computed with SQL and how many matched, and the Analyst's answer in the next version
+- marks a finding as **Known misjudgment (confirmed in review after the run)** when the Recorded Demo's known limitations name that finding and its kind, and labels the kind as "Recorded classification" (`base`: `r2-f1`; `competitor-variant`: `r2-f1`, `r2-f2`). The trace, the Critic's text, and the unresolved count are shown unchanged
 - shows the outcome (review status, unresolved count, known limitations)
 - keeps **SQL evidence** (each final claim with its SQL) and the **Full log** (each version's claims, the Critic's checks with SQL and values, the comparison note) collapsed
 
-The dashboard (`/`) shows real analysis results. Its Grounding Critic panel still lists both Recorded Demos in the run selector, labeled `[Recorded Demo: <scenario>]`; Live Sample runs are labeled `[Live Sample: <scenario>]`.
+The dashboard's Grounding Critic panel also lists both Recorded Demos in its run selector, labeled `[Recorded Demo: <scenario>]`; Live Sample runs are labeled `[Live Sample: <scenario>]`.
 
 ## Repository layout
 
@@ -426,7 +435,7 @@ The Live Sample uses the same loop on `tmp/sample/<scenario>.sqlite` instead of 
 - **i18n / a11y**: Japanese / English UI chrome; focus-visible and localized labels where applicable
 - **Language switch**: changes UI chrome immediately and is kept across pages. It does **not** re-run Analyze or rewrite existing analysis prose; Actions / Facts / Experiments stay in the language of the last successful Analyze until the user runs Analyze again
 - **Dashboard (`/`)**: real analysis results for the selected Product. The header links to Portfolio and Recorded Demo
-- **Recorded Demo (`/demo`)**: separate page for the committed Recorded Demos (`base` / `competitor-variant`); see [Sample data, Live Sample, and Recorded Demo](#sample-data-live-sample-and-recorded-demo). No model call; needs the local API
+- **Recorded Demo (`/demo`)**: separate page for the committed Recorded Demos (`base` / `competitor-variant`); see [Sample data, Live Sample, and Recorded Demo](#sample-data-live-sample-and-recorded-demo). No model call or API key; needs the local `api_server.py`
 - **Grounding Critic panel** (under Top 3): run selector, "Run a new verification" (confirmation; one run started from the API at a time), v1 / v2 / v3 steps, claims with evidence and SQL, Critic findings with resolution, and an adopt button per action on finished real-data runs. Fictional-data runs show a banner with the review outcome, unresolved count, scenario changes, known limitations, and comparison note
 - **Interventions panel**: list, add by hand, mark implemented, record verdict, re-measure, drop; shows the AI prediction, before / after numbers, skipped windows, and your verdict
 - **Portfolio Overview** (`/portfolio`, header link): one card per app from saved Live Analyze results (see Multi-Product)
