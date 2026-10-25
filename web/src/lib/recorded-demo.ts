@@ -6,6 +6,7 @@ import type {
   FindingResponse,
   ProposedAction,
   RevisionStep,
+  SampleInfo,
 } from "./evidence-client";
 
 export interface RecordedDemoTarget {
@@ -46,6 +47,58 @@ export interface DemoFinding {
   resolution: CriticFinding["resolution"];
   /** The Analyst's answer in the next version, if there is one. */
   answer: FindingResponse | null;
+  /** Known limitations that a reviewer wrote about this finding (see reviewNotesFor). */
+  reviewNotes: ReviewNote[];
+}
+
+/** One known limitation, as written in the Recorded Demo metadata (Japanese original, English if given). */
+export interface ReviewNote {
+  ja: string | null;
+  en: string | null;
+}
+
+function noteTexts(value: unknown): (string | null)[] {
+  return Array.isArray(value)
+    ? value.map((item) => (typeof item === "string" && item.trim() ? item.trim() : null))
+    : [];
+}
+
+function mentions(text: string | null, token: string): boolean {
+  if (!text) {
+    return false;
+  }
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\w-])${escaped}(?![\\w-])`).test(text);
+}
+
+/**
+ * Known limitations about one finding: those that name both its id (e.g. r2-f1) and its
+ * recorded kind (e.g. infeasible_action). Anything vaguer is left off the finding.
+ */
+export function reviewNotesFor(
+  finding: Pick<CriticFinding, "id" | "kind">,
+  sample: Pick<SampleInfo, "knownLimitations" | "en"> | null | undefined,
+): ReviewNote[] {
+  if (!sample) {
+    return [];
+  }
+  const ja = noteTexts(sample.knownLimitations);
+  const en = noteTexts(sample.en?.knownLimitations);
+  const notes: ReviewNote[] = [];
+  for (let i = 0; i < Math.max(ja.length, en.length); i += 1) {
+    const about = [ja[i] ?? null, en[i] ?? null].some(
+      (text) => mentions(text, finding.id) && mentions(text, finding.kind),
+    );
+    if (about) {
+      notes.push({ ja: ja[i] ?? null, en: en[i] ?? null });
+    }
+  }
+  return notes;
+}
+
+/** The note in the UI language, falling back to the other one. */
+export function reviewNoteText(note: ReviewNote, language: string): string {
+  return (language === "en" ? (note.en ?? note.ja) : (note.ja ?? note.en)) ?? "";
 }
 
 export interface DemoCriticRound {
@@ -98,6 +151,7 @@ export function buildDemoStory(run: EvidenceRun): DemoStory {
         message: finding.message,
         resolution: finding.resolution,
         answer: answers.get(finding.id) ?? null,
+        reviewNotes: reviewNotesFor(finding, run.sample),
       })),
     });
   });

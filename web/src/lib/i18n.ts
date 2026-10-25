@@ -1212,6 +1212,14 @@ export const uiCopy = {
     ja: "再チェックの上限に達したため、この指摘への回答版はありません。",
     en: "The run hit its review limit, so no version answers this finding.",
   },
+  demoRecordedClassification: {
+    ja: "記録された分類",
+    en: "Recorded classification",
+  },
+  demoKnownMisjudgment: {
+    ja: "既知の誤判定（実行後のレビューで確認）",
+    en: "Known misjudgment (confirmed in review after the run)",
+  },
   demoOutcomeTitle: {
     ja: "結果",
     en: "Outcome",

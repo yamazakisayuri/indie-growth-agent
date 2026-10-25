@@ -16,6 +16,7 @@ import {
   buildDemoStory,
   pickRecordedDemo,
   recordedDemos,
+  reviewNoteText,
   type DemoCriticRound,
   type DemoStory,
 } from "@/lib/recorded-demo";
@@ -154,9 +155,20 @@ function CriticSection({ run, story }: { run: EvidenceRun; story: DemoStory }) {
                     <Badge tone={resolutionTone(finding.resolution)}>
                       {copy(RESOLUTION_COPY[finding.resolution])}
                     </Badge>
-                    <span className="demo-finding__kind">{copy(FINDING_COPY[finding.kind])}</span>
+                    <span className="demo-finding__kind">
+                      {finding.reviewNotes.length > 0
+                        ? `${copy("demoRecordedClassification")}: `
+                        : null}
+                      {copy(FINDING_COPY[finding.kind])}
+                    </span>
                   </p>
                   <p className="demo-finding__message">{finding.message}</p>
+                  {finding.reviewNotes.map((note, i) => (
+                    <p key={i} className="demo-finding__known" role="note">
+                      <strong>{copy("demoKnownMisjudgment")}:</strong>{" "}
+                      {reviewNoteText(note, language)}
+                    </p>
+                  ))}
                   <p className="demo-finding__answer">
                     {finding.answer ? (
                       <>

@@ -19,4 +19,4 @@ web/out/
 tmp/
 
 # Local demo recordings / run outputs
-demo/
+/demo/

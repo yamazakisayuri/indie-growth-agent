@@ -2183,6 +2183,17 @@ body {
   overflow-wrap: anywhere;
 }
 
+.demo-finding__known {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--down);
+  background: var(--down-bg);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .demo-finding__answer {
   margin: 0;
   font-size: 0.8125rem;

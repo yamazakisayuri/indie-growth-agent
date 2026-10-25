@@ -2,7 +2,26 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { buildDemoStory, pickRecordedDemo, recordedDemos } from "../src/lib/recorded-demo.ts";
+import {
+  buildDemoStory,
+  pickRecordedDemo,
+  recordedDemos,
+  reviewNotesFor,
+  reviewNoteText,
+} from "../src/lib/recorded-demo.ts";
+
+function loadRecorded(name) {
+  const base = new URL(`../../samples/recorded/${name}`, import.meta.url);
+  const run = JSON.parse(readFileSync(new URL(`${base}.json`), "utf8"));
+  const sample = JSON.parse(readFileSync(new URL(`${base}.sample.json`), "utf8"));
+  return { ...run, sample, recorded: true };
+}
+
+function notedFindings(story) {
+  return story.rounds.flatMap((round) =>
+    round.findings.filter((f) => f.reviewNotes.length > 0).map((f) => `${f.id}:${f.kind}`),
+  );
+}
 
 function summary(runId, overrides = {}) {
   return {
@@ -91,5 +110,45 @@ describe("buildDemoStory (committed base Recorded Demo)", () => {
 
   it("counts what is still unresolved, without hiding it", () => {
     assert.equal(story.unresolved, 1);
+  });
+});
+
+describe("reviewNotesFor (known misjudgments)", () => {
+  it("attaches the base run's note to r2-f1 only, keeping the recorded kind", () => {
+    const run = loadRecorded("sample-base-20261024-214121");
+    const story = buildDemoStory(run);
+    assert.deepEqual(notedFindings(story), ["r2-f1:infeasible_action"]);
+    const note = story.rounds[1].findings[0].reviewNotes[0];
+    assert.match(reviewNoteText(note, "en"), /test-design/);
+    assert.match(reviewNoteText(note, "ja"), /比較設計/);
+    assert.equal(story.unresolved, 1);
+  });
+
+  it("marks only the two false value mismatches in competitor-variant", () => {
+    const story = buildDemoStory(loadRecorded("sample-competitor-variant-20261024-220111"));
+    assert.deepEqual(notedFindings(story), ["r2-f1:value_mismatch", "r2-f2:value_mismatch"]);
+    assert.equal(story.unresolved, 8);
+  });
+
+  it("needs both the finding id and its recorded kind", () => {
+    const sample = {
+      knownLimitations: [
+        "r2-f10 is filed as infeasible_action but is fine.",
+        "r2-f1 is a valid causal_leap.",
+        "C5 has a scope_mismatch.",
+      ],
+    };
+    assert.deepEqual(reviewNotesFor({ id: "r2-f1", kind: "infeasible_action" }, sample), []);
+    assert.equal(reviewNotesFor({ id: "r2-f1", kind: "causal_leap" }, sample).length, 1);
+    assert.deepEqual(reviewNotesFor({ id: "r2-f1", kind: "causal_leap" }, null), []);
+  });
+
+  it("matches an English-only note and falls back across languages", () => {
+    const sample = {
+      knownLimitations: [],
+      en: { knownLimitations: ["Finding r1-f2 (value_mismatch) is false."] },
+    };
+    const [note] = reviewNotesFor({ id: "r1-f2", kind: "value_mismatch" }, sample);
+    assert.equal(reviewNoteText(note, "ja"), "Finding r1-f2 (value_mismatch) is false.");
   });
 });
