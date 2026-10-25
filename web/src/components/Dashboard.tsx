@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import type { ProductSummary } from "@/lib/analyze-client";
-import type { RecordedDemoTarget } from "@/lib/demo-entry";
 import type { GrowthReport } from "@/lib/types";
 import { AnalysisDetails } from "./AnalysisDetails";
 import { DataScope } from "./DataScope";
-import { DemoEntry } from "./DemoEntry";
 import { EvidencePanel } from "./EvidencePanel";
 import { GrowthExperiments } from "./GrowthExperiments";
 import { Header } from "./Header";
@@ -36,21 +33,6 @@ export function Dashboard({
   onAnalyze,
 }: DashboardProps) {
   const experimentsKey = `${productId}:${report.analysisRunId}:${report.dataSource}`;
-  const [demoFocus, setDemoFocus] = useState<
-    (RecordedDemoTarget & { nonce: number }) | null
-  >(null);
-  const focusRunId =
-    demoFocus && demoFocus.productId === productId ? demoFocus.runId : undefined;
-
-  function openRecordedDemo(target: RecordedDemoTarget) {
-    setDemoFocus((current) => ({ ...target, nonce: (current?.nonce ?? 0) + 1 }));
-    onProductChange(target.productId);
-  }
-
-  function changeProduct(nextProductId: string) {
-    setDemoFocus(null);
-    onProductChange(nextProductId);
-  }
 
   return (
     <div
@@ -64,17 +46,12 @@ export function Dashboard({
         error={error}
         products={products}
         productId={productId}
-        onProductChange={changeProduct}
+        onProductChange={onProductChange}
         onAnalyze={onAnalyze}
       />
-      <DemoEntry disabled={analyzing} onOpen={openRecordedDemo} />
       <MetricsSummary report={report} />
       <TopActions report={report} />
-      <EvidencePanel
-        key={focusRunId ? `${productId}:demo:${demoFocus?.nonce}` : productId}
-        productId={productId}
-        initialRunId={focusRunId}
-      />
+      <EvidencePanel key={productId} productId={productId} />
       <InterventionsPanel key={`interventions:${productId}`} productId={productId} />
       <GrowthExperiments key={experimentsKey} report={report} />
       <AnalysisDetails report={report} />

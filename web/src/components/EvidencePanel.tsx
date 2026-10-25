@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { CopyKey } from "@/lib/i18n";
 import {
   EvidenceRequestError,
@@ -24,14 +24,14 @@ import { AdoptActionButton } from "./AdoptActionButton";
 const POLL_MS = 4000;
 const VALUE_PREVIEW_CHARS = 160;
 
-const STATUS_COPY: Record<EvidenceRunStatus, CopyKey> = {
+export const STATUS_COPY: Record<EvidenceRunStatus, CopyKey> = {
   running: "evidenceStatusRunning",
   converged: "evidenceStatusConverged",
   max_rounds: "evidenceStatusMaxRounds",
   error: "evidenceStatusError",
 };
 
-const STAGE_COPY: Record<RevisionStep["stage"], CopyKey> = {
+export const STAGE_COPY: Record<RevisionStep["stage"], CopyKey> = {
   internal: "evidenceStageInternal",
   competitive: "evidenceStageCompetitive",
   critic_revision: "evidenceStageRevision",
@@ -43,7 +43,7 @@ const KIND_COPY: Record<Claim["kind"], CopyKey> = {
   hypothesis: "evidenceKindHypothesis",
 };
 
-const FINDING_COPY: Record<CriticFinding["kind"], CopyKey> = {
+export const FINDING_COPY: Record<CriticFinding["kind"], CopyKey> = {
   value_mismatch: "evidenceFindingValueMismatch",
   unverifiable: "evidenceFindingUnverifiable",
   kind_mislabel: "evidenceFindingKindMislabel",
@@ -52,27 +52,27 @@ const FINDING_COPY: Record<CriticFinding["kind"], CopyKey> = {
   infeasible_action: "evidenceFindingInfeasibleAction",
 };
 
-const RESOLUTION_COPY: Record<CriticFinding["resolution"], CopyKey> = {
+export const RESOLUTION_COPY: Record<CriticFinding["resolution"], CopyKey> = {
   resolved: "evidenceResolutionResolved",
   downgraded: "evidenceResolutionDowngraded",
   unresolved: "evidenceResolutionUnresolved",
   open: "evidenceResolutionOpen",
 };
 
-const RESPONSE_COPY: Record<FindingResponse["response"], CopyKey> = {
+export const RESPONSE_COPY: Record<FindingResponse["response"], CopyKey> = {
   fixed: "evidenceResponseFixed",
   downgraded: "evidenceResponseDowngraded",
   removed: "evidenceResponseRemoved",
   disputed: "evidenceResponseDisputed",
 };
 
-const DECISION_COPY = {
+export const DECISION_COPY = {
   kept: "evidenceDecisionKept",
   modified: "evidenceDecisionModified",
   removed: "evidenceDecisionRemoved",
 } as const satisfies Record<string, CopyKey>;
 
-type Tone = "up" | "down" | "muted";
+export type Tone = "up" | "down" | "muted";
 
 function errorCopy(err: unknown): CopyKey {
   return err instanceof EvidenceRequestError && err.code === "api_unreachable"
@@ -134,7 +134,7 @@ function runOptionLabel(
  * Fictional sample data: say so, with the review outcome and unresolved count up front.
  * The scenario, changed values, known limitations, and comparison note sit in details.
  */
-function SampleBanner({ run }: { run: EvidenceRun }) {
+export function SampleBanner({ run }: { run: EvidenceRun }) {
   const { copy, language } = useLanguage();
   if (!run.sample) {
     return null;
@@ -211,7 +211,7 @@ function SampleBanner({ run }: { run: EvidenceRun }) {
   );
 }
 
-function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
+export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
   return <span className={`evidence__badge evidence__badge--${tone}`}>{children}</span>;
 }
 
@@ -251,7 +251,7 @@ function claimBadge(
   return { tone: "muted", label: copy("evidenceBadgeUnchecked") };
 }
 
-function Stepper({
+export function Stepper({
   run,
   selected,
   onSelect,
@@ -335,7 +335,7 @@ function SqlBlock({ sql }: { sql: string }) {
   return <pre className="evidence__sql">{sql}</pre>;
 }
 
-function ClaimList({
+export function ClaimList({
   step,
   showSql,
 }: {
@@ -470,7 +470,7 @@ function ReviewView({
   );
 }
 
-function StepView({
+export function StepView({
   step,
   previous,
   next,
@@ -583,24 +583,13 @@ function StepView({
 }
 
 /** Revision history of the evidence loop (v1 → v2 → Critic → v3) for one product. */
-export function EvidencePanel({
-  productId,
-  initialRunId,
-}: {
-  productId: string;
-  /** Run to select first and scroll to once loaded (the Recorded Demo entry). */
-  initialRunId?: string;
-}) {
+export function EvidencePanel({ productId }: { productId: string }) {
   const { copy, language } = useLanguage();
-  const sectionRef = useRef<HTMLElement>(null);
-  const scrolledRef = useRef(false);
   const [runs, setRuns] = useState<EvidenceRunSummary[] | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [listNonce, setListNonce] = useState(0);
   const [listError, setListError] = useState<CopyKey | null>(null);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(
-    initialRunId ?? null,
-  );
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [run, setRun] = useState<EvidenceRun | null>(null);
   const [runError, setRunError] = useState<CopyKey | null>(null);
   const [pinnedVersion, setPinnedVersion] = useState<string | null>(null);
@@ -695,14 +684,6 @@ export function EvidencePanel({
   }
 
   const shownRun = run && run.runId === selectedRunId ? run : null;
-
-  useEffect(() => {
-    if (initialRunId && shownRun?.runId === initialRunId && !scrolledRef.current) {
-      scrolledRef.current = true;
-      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [initialRunId, shownRun?.runId]);
-
   const steps = shownRun?.steps ?? [];
   const selectedIndex = (() => {
     const pinned = steps.findIndex((s) => s.version === pinnedVersion);
@@ -726,7 +707,7 @@ export function EvidencePanel({
   const duration = shownRun ? minutesBetween(shownRun.startedAt, shownRun.finishedAt) : null;
 
   return (
-    <section ref={sectionRef} className="evidence" aria-labelledby="evidence-heading">
+    <section className="evidence" aria-labelledby="evidence-heading">
       <header className="evidence__header">
         <p className="evidence__eyebrow">{copy("evidenceEyebrow")}</p>
         <h2 id="evidence-heading" className="evidence__heading">

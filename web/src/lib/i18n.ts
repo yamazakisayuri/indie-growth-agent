@@ -1131,42 +1131,106 @@ export const uiCopy = {
     ja: "比較上の注意",
     en: "Comparison note",
   },
-  // --- Recorded Demo entry ---
-  demoEntryTitle: {
-    ja: "根拠で裏づけた、成長の意思決定。",
-    en: "Growth decisions, backed by evidence.",
-  },
-  demoEntryLead: {
-    ja: "AI がアプリの成長を分析し、その主張を SQL で独立に検証し、根拠と食い違えば推奨を改訂します。",
-    en: "AI analyzes app growth, independently checks its claims with SQL, and revises recommendations when the evidence disagrees.",
-  },
-  demoEntryTagRecorded: {
+  // --- Recorded Demo (/demo) ---
+  demoNavLink: {
     ja: "Recorded Demo",
     en: "Recorded Demo",
   },
-  demoEntryTagSynthetic: {
+  demoTitle: {
+    ja: "根拠で裏づけた、成長の意思決定。",
+    en: "Growth decisions, backed by evidence.",
+  },
+  demoLead: {
+    ja: "AI がアプリの成長を分析し、その主張を SQL で独立に検証し、根拠と食い違えば推奨を改訂します。",
+    en: "AI analyzes app growth, independently checks its claims with SQL, and revises recommendations when the evidence disagrees.",
+  },
+  demoTagRecorded: {
+    ja: "Recorded Demo",
+    en: "Recorded Demo",
+  },
+  demoTagSynthetic: {
     ja: "架空データ",
     en: "Synthetic Data",
   },
-  demoEntryTagRealModel: {
+  demoTagRealModel: {
     ja: "実モデルで実行",
     en: "Real Model Execution",
   },
-  demoEntryCta: {
-    ja: "検証の流れを見る",
-    en: "Explore the verification process",
-  },
-  demoEntryFlow: {
+  demoFlow: {
     ja: "Analyst → 独立した Critic → 改訂後のアクション",
     en: "Analyst → Independent Critic → Revised Actions",
   },
-  demoEntryNote: {
-    ja: "API キーもモデル呼び出しも使わずに、保存済みの実行を開きます。",
-    en: "Open the saved run without API keys or model calls.",
+  demoNote: {
+    ja: "保存済みの実行を表示しています。API キーもモデル呼び出しも使いません。",
+    en: "This page shows a saved run. It uses no API keys and makes no model calls.",
   },
-  demoEntryNotFound: {
+  demoNotFound: {
     ja: "保存済みの Recorded Demo が見つかりませんでした。",
     en: "No saved Recorded Demo was found.",
+  },
+  demoModelLanguageNote: {
+    ja: "提案と指摘の本文は、実行時の言語（{lang}）のままです。",
+    en: "Proposal and finding text stays in the run's language ({lang}).",
+  },
+  demoProposalsTitle: {
+    ja: "AI の提案はこう変わった",
+    en: "How the AI's proposals changed",
+  },
+  demoProposalsHint: {
+    ja: "v1 は自アプリのデータだけ、v2 は競合の公開情報を加えた版、v3 は Critic の指摘を受けて改訂した最終版です。",
+    en: "v1 uses only our own app data, v2 adds public competitor data, and v3 is the final version, revised for the Critic's findings.",
+  },
+  demoFinal: {
+    ja: "最終版",
+    en: "Final",
+  },
+  demoChangeReasons: {
+    ja: "前の版からの変更理由",
+    en: "Why it changed from the previous version",
+  },
+  demoCriticTitle: {
+    ja: "Critic が疑ったこと",
+    en: "What the Critic questioned",
+  },
+  demoCriticHint: {
+    ja: "Critic は Analyst とは別に、提案に含まれる数値を自分の SQL で再計算し、根拠と食い違う主張や実行できない提案を指摘します。Analyst は次の版で回答します。",
+    en: "Separately from the Analyst, the Critic re-computes every number in a proposal with its own SQL, and flags claims the evidence does not support and actions that cannot be run. The Analyst answers in the next version.",
+  },
+  demoReviewed: {
+    ja: "確認した版",
+    en: "reviewed",
+  },
+  demoRecomputed: {
+    ja: "Critic が SQL で再計算した数値",
+    en: "Numbers the Critic re-computed with SQL",
+  },
+  demoMatched: {
+    ja: "一致",
+    en: "matched",
+  },
+  demoNoAnswer: {
+    ja: "再チェックの上限に達したため、この指摘への回答版はありません。",
+    en: "The run hit its review limit, so no version answers this finding.",
+  },
+  demoOutcomeTitle: {
+    ja: "結果",
+    en: "Outcome",
+  },
+  demoSqlTitle: {
+    ja: "SQL の根拠",
+    en: "SQL evidence",
+  },
+  demoSqlHint: {
+    ja: "最終版の各主張と、その数値を返す SQL",
+    en: "Each claim in the final version, with the SQL that returns its numbers",
+  },
+  demoLogTitle: {
+    ja: "詳細ログ",
+    en: "Full log",
+  },
+  demoLogHint: {
+    ja: "版ごとの主張・Critic の検証結果・既知の限界",
+    en: "Claims and Critic results per version, and known limitations",
   },
 } as const;
 
