@@ -80,10 +80,14 @@ def review_notes(meta: dict) -> list[str]:
 
 
 def compare(runs: list[tuple[EvidenceRun, dict]]) -> list[str]:
-    latest: dict[str, EvidenceRun] = {}
+    """Latest base vs latest competitor-variant, both in the same run language."""
+    by_language: dict[str, dict[str, EvidenceRun]] = {}
     for run, meta in runs:
-        latest[meta["scenario"]] = run
-    if "base" not in latest or "competitor-variant" not in latest:
+        by_language.setdefault(run.language, {})[meta["scenario"]] = run
+    latest = next(
+        (s for s in by_language.values() if "base" in s and "competitor-variant" in s), None
+    )
+    if latest is None:
         return []
     lines = ["== base vs competitor-variant (final version)"]
     for name in ("base", "competitor-variant"):

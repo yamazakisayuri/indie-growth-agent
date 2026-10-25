@@ -1,6 +1,7 @@
 "use client";
 
 import type { ProductSummary } from "@/lib/analyze-client";
+import { hasSuccessfulReport } from "@/lib/map-report";
 import type { GrowthReport } from "@/lib/types";
 import { AnalysisDetails } from "./AnalysisDetails";
 import { DataScope } from "./DataScope";
@@ -9,6 +10,7 @@ import { GrowthExperiments } from "./GrowthExperiments";
 import { Header } from "./Header";
 import { InterventionsPanel } from "./InterventionsPanel";
 import { MetricsSummary } from "./MetricsSummary";
+import { MyWorkspaceGuide } from "./MyWorkspaceGuide";
 import { TopActions } from "./TopActions";
 
 interface DashboardProps {
@@ -49,6 +51,7 @@ export function Dashboard({
         onProductChange={onProductChange}
         onAnalyze={onAnalyze}
       />
+      {!analyzing && !hasSuccessfulReport(report) ? <MyWorkspaceGuide /> : null}
       <MetricsSummary report={report} />
       <TopActions report={report} />
       <EvidencePanel key={productId} productId={productId} />

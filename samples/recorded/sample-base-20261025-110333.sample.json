@@ -1,0 +1,37 @@
+{
+  "dataKind": "fictional_sample",
+  "note": "架空のサンプルデータです。実在のアプリ、App Store Connect の実績、競合の掲載情報のいずれでもありません。",
+  "app": {
+    "productId": "mahjong",
+    "name": "麻雀スコア帳（架空のサンプルアプリ）",
+    "appId": "fictional-001"
+  },
+  "scenario": "base",
+  "scenarioDescription": "基本のサンプル（2026-10-09〜2026-10-22 の14日間）。直近7日は前7日より表示回数が40%増えたが、ページビュー率と初回ダウンロードは下がった。経路別では browse の表示回数が大きく増えている。上位の競合は評価数・スクリーンショット数・更新の新しさで自アプリを上回る。",
+  "changes": [],
+  "sampleDir": "samples/mahjong",
+  "csvSha256": {
+    "asc_daily.csv": "460a3b93f9e04a4c8b6998fc76378f6743d9406e7a61ede480b931ac19af6554",
+    "asc_daily_by_source.csv": "0797154f0dae86b8bc4c3401b3f71f8fd7ead67ea3d77cb1c50cf656bfb56a19",
+    "competitor_listing.csv": "f737182e442783247884a718092b7f932dfcab1fa5a575180b15d55ee6189a5f",
+    "known_events.csv": "fe17eef87602a2003521e23d9e9a21256d17535361281ab6f165d6f967d024fc",
+    "scenarios.json": "6894c7d6da918c8f12c19199ef058e9c8c1bedf4c704a7c585cd16ed239ae0c5"
+  },
+  "recordedAt": "2026-10-25T11:43:26+09:00",
+  "representative": true,
+  "reviewOutcome": "converged（収束）。v3 に未解決の指摘は0件。最終 Critic（v3 を確認）の SQL 照合は一致31・不一致0・照合不能1。照合不能の1件は Critic の SQL が1つの値を返さず比べられなかったもので、不一致ではない。",
+  "knownLimitations": [
+    "v3 の提案 #3 の理由にある「競合上位3社は8〜10枚」は、参照している claim の SQL evidence では裏付けられていない。",
+    "v3 の提案 #1 の約300 PV/日は既存の集計から導いた値だが、14日間で 2pp の差を検出できるという検出力の主張には根拠がない。"
+  ],
+  "en": {
+    "note": "Fictional sample data. It is not a real app, not App Store Connect results, and not real competitor listings.",
+    "scenarioDescription": "Base sample (14 days, 2026-10-09 to 2026-10-22). In the latest 7 days impressions rose 40% over the previous 7 days, while the page view rate and first-time downloads fell. By source, browse impressions grew the most. The top competitors lead our app in rating count, screenshot count, and update recency.",
+    "changeReasons": [],
+    "reviewOutcome": "converged. No finding is unresolved in v3. The final Critic SQL checks (reviewing v3): 31 matched, 0 mismatched, 1 unverifiable. The unverifiable check could not be compared because the Critic's SQL did not return exactly one value; it is not a mismatch.",
+    "knownLimitations": [
+      "The reason for v3 action #3 says the top 3 competitors have 8-10 screenshots, but the SQL evidence of the claims it cites does not support that range.",
+      "In v3 action #1, about 300 page views/day is derived from existing totals, but the claim that 14 days give enough power to detect a 2pp difference has no basis in the evidence."
+    ]
+  }
+}

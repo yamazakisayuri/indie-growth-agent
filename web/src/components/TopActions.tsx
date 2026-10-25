@@ -1,13 +1,24 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useLanguage } from "@/lib/language-context";
-import type { GrowthReport } from "@/lib/types";
+import type { DisplayAction } from "@/lib/types";
 
 /**
  * Top 3 Actions body text comes from the Agent.
  * The section heading is UI-fixed i18n — never from Agent output.
+ * `renderText` may decorate that text (e.g. glosses) but must keep it as is;
+ * `renderDetails` adds content under an action (e.g. cited claims, known limitations).
  */
-export function TopActions({ report }: { report: GrowthReport }) {
+export function TopActions<A extends DisplayAction>({
+  report,
+  renderText = (text) => text,
+  renderDetails,
+}: {
+  report: { actions: A[] };
+  renderText?: (text: string) => ReactNode;
+  renderDetails?: (action: A) => ReactNode;
+}) {
   const { copy } = useLanguage();
 
   return (
@@ -32,8 +43,9 @@ export function TopActions({ report }: { report: GrowthReport }) {
                 <span className="actions__rank-num">{action.rank}</span>
               </div>
               <div className="actions__body">
-                <h3 className="actions__item-title">{action.title}</h3>
-                <p className="actions__item-reason">{action.reason}</p>
+                <h3 className="actions__item-title">{renderText(action.title)}</h3>
+                <p className="actions__item-reason">{renderText(action.reason)}</p>
+                {renderDetails ? renderDetails(action) : null}
               </div>
             </li>
           ))}

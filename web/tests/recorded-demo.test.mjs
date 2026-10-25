@@ -105,7 +105,12 @@ describe("buildDemoStory (committed base Recorded Demo)", () => {
     assert.equal(first.id, "r1-f1");
     assert.equal(first.answer?.response, "fixed");
     assert.equal(story.rounds[1].findings[0].answer, null);
-    assert.equal(story.rounds[0].checksMatched, story.rounds[0].checksTotal);
+    assert.deepEqual(story.rounds[0].checks, {
+      matched: 14,
+      mismatched: 0,
+      unverifiable: 0,
+      total: 14,
+    });
   });
 
   it("counts what is still unresolved, without hiding it", () => {

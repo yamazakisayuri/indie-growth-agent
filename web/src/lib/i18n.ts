@@ -546,8 +546,8 @@ export const uiCopy = {
     en: "Verify the evidence and revise",
   },
   evidenceHint: {
-    ja: "v1（自アプリの実績）→ v2（＋競合の公開情報）→ Critic が自分で書いた SQL で数字を照合 → 指摘を受けて v3。提案に出てくる数字は、すべて根拠ストアへの SQL で再現できるかを確かめます。",
-    en: "v1 (own app data) → v2 (+ public competitor data) → the Critic re-checks every number with its own SQL → v3 answers the findings. Every number in a proposal must be reproducible by SQL on the evidence store.",
+    ja: "v1 — 自アプリのデータ → v2 — 競合の状況（競合の公開情報を追加）→ Critic が自分で書いた SQL で数字を照合 → v3 — Critic レビュー済みの提案。提案に出てくる数字は、すべて根拠ストアへの SQL で再現できるかを確かめます。",
+    en: "v1 — Own App Data → v2 — Competitor Context (adds public competitor listings) → the Critic re-checks every number with its own SQL → v3 — Critic-Reviewed Actions. Every number in a proposal must be reproducible by SQL on the evidence store.",
   },
   evidenceRun: {
     ja: "実行",
@@ -598,7 +598,7 @@ export const uiCopy = {
     en: "Running",
   },
   evidenceStatusConverged: {
-    ja: "指摘なしで完了",
+    ja: "収束",
     en: "Converged",
   },
   evidenceStatusMaxRounds: {
@@ -638,16 +638,16 @@ export const uiCopy = {
     en: "(no proposals)",
   },
   evidenceStageInternal: {
-    ja: "自アプリの実績",
-    en: "Own app data",
+    ja: "自アプリのデータ",
+    en: "Own App Data",
   },
   evidenceStageCompetitive: {
-    ja: "＋競合の公開情報",
-    en: "+ competitor data",
+    ja: "競合の状況",
+    en: "Competitor Context",
   },
   evidenceStageRevision: {
-    ja: "指摘を受けて改訂",
-    en: "Revised for findings",
+    ja: "Critic レビュー済みの提案",
+    en: "Critic-Reviewed Actions",
   },
   evidenceCritic: {
     ja: "Critic",
@@ -752,10 +752,6 @@ export const uiCopy = {
   evidenceReview: {
     ja: "Critic のレビュー",
     en: "Critic review",
-  },
-  evidenceChecksMatched: {
-    ja: "Critic の SQL と一致",
-    en: "Critic SQL matched",
   },
   evidenceResolutionResolved: {
     ja: "解消",
@@ -1157,8 +1153,8 @@ export const uiCopy = {
     en: "Real Model Execution",
   },
   demoFlow: {
-    ja: "Analyst → 独立した Critic → 改訂後のアクション",
-    en: "Analyst → Independent Critic → Revised Actions",
+    ja: "Analyst → 独立した Critic → Critic レビュー済みの提案",
+    en: "Analyst → Independent Critic → Critic-Reviewed Actions",
   },
   demoNote: {
     ja: "保存済みの実行を表示しています。API キーもモデル呼び出しも使いません。",
@@ -1169,16 +1165,84 @@ export const uiCopy = {
     en: "No saved Recorded Demo was found.",
   },
   demoModelLanguageNote: {
-    ja: "提案と指摘の本文は、実行時の言語（{lang}）のままです。",
-    en: "Proposal and finding text stays in the run's language ({lang}).",
+    ja: "この実行のモデル出力（提案、Critic の指摘とコメント、Analyst の回答）は{lang}で記録されており、翻訳していません。UI のラベルとレビュー注記は表示言語で表示します。",
+    en: "The model output of this run (proposals, Critic findings and comments, Analyst answers) was recorded in {lang} and is not translated. UI labels and review notes follow the UI language.",
+  },
+  demoOutputLanguage: {
+    ja: "{lang}の出力",
+    en: "{lang} output",
+  },
+  snapshotTitle: {
+    ja: "アプリで何が起きたか",
+    en: "What happened in the app",
+  },
+  snapshotLead: {
+    ja: "この実行が分析した架空のサンプルデータを、前の7日と直近7日で比べたものです。提案を読む前の前提として示します。",
+    en: "The fictional sample data this run analyzed, the previous 7 days against the last 7 days. Shown as context before the proposals.",
+  },
+  snapshotDownloads: {
+    ja: "初回ダウンロード（全経路）",
+    en: "First-time downloads (all sources)",
+  },
+  snapshotBrowseImpressions: {
+    ja: "Browse 経由の表示回数",
+    en: "Browse impressions",
+  },
+  snapshotBrowseDownloads: {
+    ja: "Browse 経由の初回ダウンロード",
+    en: "Browse first-time downloads",
+  },
+  snapshotNote: {
+    ja: "samples/mahjong の架空データ（asc_daily、asc_daily_by_source）を集計。グラフごとに0から始まる独自の目盛りで、表示回数とダウンロード数は同じ軸に載せていません。Browse はサンプルにある3つの流入経路の1つで、経路の合計は全体と一致しません。",
+    en: "Totals of the fictional data in samples/mahjong (asc_daily, asc_daily_by_source). Each chart has its own scale starting at zero; impressions and downloads never share an axis. Browse is one of the sample's three traffic sources, and the sources do not add up to the overall total.",
+  },
+  citedClaims: {
+    ja: "参照している主張",
+    en: "Cited claims",
+  },
+  citedClaimMissing: {
+    ja: "（この版に該当する主張がありません）",
+    en: "(no claim with this id in this version)",
+  },
+  demoFinalActionsTitle: {
+    ja: "最終 Top 3 アクション",
+    en: "Final Top 3 Actions",
+  },
+  demoFinalActionsHint: {
+    ja: "Critic のレビューを経た最終版の提案です。理由・参照している主張・既知の限界を、記録されたとおりに示します。",
+    en: "The final proposals after the Critic's review: each reason, the claims it cites, and its known limitations, as recorded.",
+  },
+  demoHasKnownLimitation: {
+    ja: "既知の限界あり ↓",
+    en: "Known limitation ↓",
+  },
+  glossLabel: {
+    ja: "訳",
+    en: "translation",
+  },
+  glossLegend: {
+    ja: "［訳: …］はこのページが追加した訳です。それ以外は記録されたモデル出力の原文です。",
+    en: "Text in [translation: …] is added by this page; everything else is the recorded model output, unchanged.",
+  },
+  glossTitle: {
+    ja: "読みやすさのためにこのページが追加した訳です。記録されたモデル出力には含まれません。",
+    en: "Added by this page for readability; not part of the recorded model output.",
+  },
+  languageNameJa: {
+    ja: "日本語",
+    en: "Japanese",
+  },
+  languageNameEn: {
+    ja: "英語",
+    en: "English",
   },
   demoProposalsTitle: {
     ja: "AI の提案はこう変わった",
     en: "How the AI's proposals changed",
   },
   demoProposalsHint: {
-    ja: "v1 は自アプリのデータだけ、v2 は競合の公開情報を加えた版、v3 は Critic の指摘を受けて改訂した最終版です。",
-    en: "v1 uses only our own app data, v2 adds public competitor data, and v3 is the final version, revised for the Critic's findings.",
+    ja: "v1 — 自アプリのデータ: 自アプリのデータだけを使った版。v2 — 競合の状況: 競合の公開情報を加えた版。v3 — Critic レビュー済みの提案: Critic の指摘を受けて改訂した最終版。",
+    en: "v1 — Own App Data uses only our app's data. v2 — Competitor Context adds public competitor listings. v3 — Critic-Reviewed Actions is the final version, revised after the Critic's review.",
   },
   demoFinal: {
     ja: "最終版",
@@ -1199,14 +1263,6 @@ export const uiCopy = {
   demoReviewed: {
     ja: "確認した版",
     en: "reviewed",
-  },
-  demoRecomputed: {
-    ja: "Critic が SQL で再計算した数値",
-    en: "Numbers the Critic re-computed with SQL",
-  },
-  demoMatched: {
-    ja: "一致",
-    en: "matched",
   },
   demoNoAnswer: {
     ja: "再チェックの上限に達したため、この指摘への回答版はありません。",
@@ -1239,6 +1295,288 @@ export const uiCopy = {
   demoLogHint: {
     ja: "版ごとの主張・Critic の検証結果・既知の限界",
     en: "Claims and Critic results per version, and known limitations",
+  },
+  // --- Critic SQL checks (judged by code) and run outcome ---
+  checksTitle: {
+    ja: "SQL 照合（コードで判定）",
+    en: "SQL checks (judged by code)",
+  },
+  checksMatched: {
+    ja: "一致",
+    en: "Matched",
+  },
+  checksMismatched: {
+    ja: "不一致",
+    en: "Mismatched",
+  },
+  checksUnverifiable: {
+    ja: "照合不能",
+    en: "Unverifiable",
+  },
+  checksAuthority: {
+    ja: "数値が根拠と合っているかは、このコードによる照合結果が正です。照合不能は、SQL が1つの値を返さなかったなどで比べられなかったもので、不一致ではありません。",
+    en: "Whether a number matches the evidence is decided by this code check, not by the model. Unverifiable means the check could not compare (for example, the SQL did not return exactly one value); it is not a mismatch.",
+  },
+  criticComment: {
+    ja: "Critic のコメント（モデル生成）",
+    en: "Critic's comment (model-generated)",
+  },
+  outcomeUnresolvedOne: {
+    ja: "未解決の指摘 {n}件",
+    en: "{n} unresolved finding",
+  },
+  outcomeUnresolvedOther: {
+    ja: "未解決の指摘 {n}件",
+    en: "{n} unresolved findings",
+  },
+  outcomeUnverifiableOne: {
+    ja: "照合不能の SQL チェック {n}件",
+    en: "{n} unverifiable SQL check",
+  },
+  outcomeUnverifiableOther: {
+    ja: "照合不能の SQL チェック {n}件",
+    en: "{n} unverifiable SQL checks",
+  },
+  proposalKnownLimitation: {
+    ja: "既知の限界（実行後のレビューで確認）",
+    en: "Known limitation (confirmed in review after the run)",
+  },
+  // --- Workspaces (Sample / My) ---
+  workspaceLabel: {
+    ja: "ワークスペース",
+    en: "Workspace",
+  },
+  workspaceSample: {
+    ja: "Sample Workspace",
+    en: "Sample Workspace",
+  },
+  workspaceSampleHint: {
+    ja: "架空のサンプルデータ",
+    en: "Fictional sample data",
+  },
+  workspaceMy: {
+    ja: "My Workspace",
+    en: "My Workspace",
+  },
+  workspaceMyHint: {
+    ja: "自分のアプリの実データ",
+    en: "Your own app data",
+  },
+  sampleDataKind: {
+    ja: "データ種別",
+    en: "Data",
+  },
+  sampleDataKindValue: {
+    ja: "架空のサンプルデータ（CSV）",
+    en: "Fictional sample data (CSV)",
+  },
+  sampleBadge: {
+    ja: "架空データ",
+    en: "Fictional data",
+  },
+  sampleNotice: {
+    ja: "このワークスペースの数値・アプリ・競合はすべて架空です。実在のアプリ、App Store Connect の実績、競合の掲載情報ではありません。表示のために AI は実行していません。",
+    en: "Every number, app, and competitor in this workspace is made up. It is not a real app, not App Store Connect results, and not real competitor listings. No AI runs to show this page.",
+  },
+  sampleCurrentPeriod: {
+    ja: "直近7日",
+    en: "Last 7 days",
+  },
+  samplePreviousPeriod: {
+    ja: "前の7日",
+    en: "Previous 7 days",
+  },
+  sampleKpiTitle: {
+    ja: "主要KPI",
+    en: "Key metrics",
+  },
+  sampleKpiNote: {
+    ja: "比較期間: 直近7日（{current}）と前の7日（{previous}）の合計。率はこのサンプルの合計値から計算した値で、App Store Connect 公式の「コンバージョン率」（ユニークデバイス数に基づく）とは定義が異なります。",
+    en: "Compared: totals of the last 7 days ({current}) and the previous 7 days ({previous}). Rates are computed from this sample's totals; they are not App Store Connect's official Conversion Rate, which is based on unique devices.",
+  },
+  sampleKpiImpressions: {
+    ja: "表示回数",
+    en: "Impressions",
+  },
+  sampleKpiImpressionsDef: {
+    ja: "App Store での表示回数の合計",
+    en: "Total App Store impressions",
+  },
+  sampleKpiPageViews: {
+    ja: "ページビュー",
+    en: "Product page views",
+  },
+  sampleKpiPageViewsDef: {
+    ja: "製品ページの閲覧数の合計",
+    en: "Total product page views",
+  },
+  sampleKpiDownloads: {
+    ja: "初回ダウンロード",
+    en: "First-time downloads",
+  },
+  sampleKpiDownloadsDef: {
+    ja: "初回ダウンロード数の合計",
+    en: "Total first-time downloads",
+  },
+  sampleKpiPageViewRate: {
+    ja: "ページビュー率",
+    en: "Page view rate",
+  },
+  sampleKpiDownloadRate: {
+    ja: "ダウンロード率",
+    en: "Download rate",
+  },
+  sampleKpiImpressionDownloadRate: {
+    ja: "表示→ダウンロード率",
+    en: "Impression-to-download rate",
+  },
+  samplePrevious: {
+    ja: "前の7日",
+    en: "Prev. 7 days",
+  },
+  sampleTrendTitle: {
+    ja: "14日間の推移",
+    en: "14-day trend",
+  },
+  sampleTrendLegend: {
+    ja: "網掛けは直近7日。点線は Known Events（下の一覧の番号）。",
+    en: "Shaded: last 7 days. Dashed lines: Known Events (numbers in the list below).",
+  },
+  sampleEventsTitle: {
+    ja: "Known Events（既知のイベント）",
+    en: "Known Events",
+  },
+  sampleEventsLanguageNote: {
+    ja: "",
+    en: "Event text is in the sample's original language (Japanese).",
+  },
+  sampleSourcesTitle: {
+    ja: "流入経路別",
+    en: "By traffic source",
+  },
+  sampleSourcesNote: {
+    ja: "サンプルにある {buckets} の3経路だけです。合計は全体と一致しません（直近7日の表示回数: 3経路計 {bucketImpressions} / 全体 {totalImpressions}、初回ダウンロード: 3経路計 {bucketDownloads} / 全体 {totalDownloads}）。",
+    en: "Only the three sources in the sample ({buckets}). They do not add up to the overall total (last 7 days, impressions: {bucketImpressions} for the three vs {totalImpressions} overall; first-time downloads: {bucketDownloads} vs {totalDownloads}).",
+  },
+  sampleSource: {
+    ja: "経路",
+    en: "Source",
+  },
+  sampleActionsSource: {
+    ja: "出典: Recorded Demo（{scenario} シナリオ）の最終版 {version} · run {runId} · モデル {model}",
+    en: "Source: Recorded Demo ({scenario} scenario), final version {version} · run {runId} · model {model}",
+  },
+  sampleActionsLanguageNote: {
+    ja: "提案の本文は実行時の言語（{lang}）のままです。",
+    en: "Proposal text stays in the run's language ({lang}).",
+  },
+  sampleNoRecorded: {
+    ja: "base シナリオの Recorded Demo が見つかりませんでした。",
+    en: "No base-scenario Recorded Demo was found.",
+  },
+  sampleVerifyTitle: {
+    ja: "Critic による検証",
+    en: "Critic verification",
+  },
+  sampleVerifyRound: {
+    ja: "Critic {round}（{version} を確認）: SQL 照合 一致 {matched} · 不一致 {mismatched} · 照合不能 {unverifiable} · 指摘 {findings}件",
+    en: "Critic {round} (reviewed {version}): SQL checks {matched} matched · {mismatched} mismatched · {unverifiable} unverifiable · findings: {findings}",
+  },
+  sampleVerifyKnown: {
+    ja: "実行後のレビューで確認された既知の誤判定",
+    en: "Known misjudgments confirmed in review after the run",
+  },
+  sampleVerifyCta: {
+    ja: "検証の過程を詳しく見る（Recorded Demo）",
+    en: "See the full verification (Recorded Demo)",
+  },
+  sampleDataSourcesTitle: {
+    ja: "データソース",
+    en: "Data sources",
+  },
+  sampleDataSourcesNote: {
+    ja: "どれもリポジトリ内の架空の CSV で、外部サービスには接続していません。",
+    en: "All are fictional CSVs in the repository; no external service is connected.",
+  },
+  sampleSourceAscDaily: {
+    ja: "App Store 日次指標（asc_daily）",
+    en: "App Store daily metrics (asc_daily)",
+  },
+  sampleSourceAscBySource: {
+    ja: "流入経路別（asc_daily_by_source）",
+    en: "By traffic source (asc_daily_by_source)",
+  },
+  sampleSourceCompetitors: {
+    ja: "競合の掲載情報（competitor_listing）",
+    en: "Competitor listings (competitor_listing)",
+  },
+  sampleSourceEvents: {
+    ja: "Known Events（known_events）",
+    en: "Known Events (known_events)",
+  },
+  sampleSourceCsv: {
+    ja: "サンプル CSV",
+    en: "Sample CSV",
+  },
+  sampleSourceNotIncluded: {
+    ja: "サンプルに含まれない",
+    en: "Not in the sample",
+  },
+  sampleDays: {
+    ja: "{n}日分",
+    en: "{n} days",
+  },
+  sampleBuckets: {
+    ja: "{n}経路",
+    en: "{n} sources",
+  },
+  sampleCompetitors: {
+    ja: "競合 {n}件",
+    en: "{n} competitors",
+  },
+  sampleEventsCount: {
+    ja: "{n}件",
+    en: "{n} events",
+  },
+  sampleMyOnlyTitle: {
+    ja: "実データの分析は My Workspace で",
+    en: "Analyze real data in My Workspace",
+  },
+  sampleMyOnlyBody: {
+    ja: "Analyze（最新データの分析）、Portfolio、施策管理、改訂履歴は、自分のアプリの実データだけを扱います。サンプルデータはそこに混ざりません。",
+    en: "Analyze, Portfolio, interventions, and the revision history work only on your own app data. Sample data never mixes in.",
+  },
+  sampleOpenMy: {
+    ja: "My Workspace を開く",
+    en: "Open My Workspace",
+  },
+  sampleMissing: {
+    ja: "サンプルデータ（samples/mahjong/）を読み込めませんでした。",
+    en: "Could not load the sample data (samples/mahjong/).",
+  },
+  myGuideTitle: {
+    ja: "自分のアプリを分析する",
+    en: "Analyze your own app",
+  },
+  myGuideBody: {
+    ja: "このブラウザにはまだ、このアプリの分析結果がありません。次の手順で実データを取り込みます。",
+    en: "This browser has no analysis for this app yet. Bring in your real data in three steps.",
+  },
+  myGuideStep1: {
+    ja: "products/ のアプリ設定と .env に、App Store Connect・GA4・AdMob の接続情報を設定する（使うものだけ）",
+    en: "Set the App Store Connect, GA4, and AdMob connections you use in the app config under products/ and in .env",
+  },
+  myGuideStep2: {
+    ja: "Agent API（python api_server.py）を起動する",
+    en: "Start the Agent API (python api_server.py)",
+  },
+  myGuideStep3: {
+    ja: "右上の「最新データを分析」を押す。結果はこのブラウザに保存され、Portfolio にも表示されます",
+    en: "Press Analyze latest data. The result is saved in this browser and shows up in Portfolio",
+  },
+  myGuideSample: {
+    ja: "先に Sample Workspace で画面の見え方を確認できます。",
+    en: "You can see what the dashboard looks like in Sample Workspace first.",
   },
 } as const;
 

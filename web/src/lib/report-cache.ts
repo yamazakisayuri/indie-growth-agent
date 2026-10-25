@@ -3,6 +3,9 @@ import type { GrowthReport, Language } from "@/lib/types";
 const REPORTS_KEY = "indie-growth-agent:lastReports";
 const PRODUCT_KEY = "indie-growth-agent:selectedProductId";
 const LANGUAGE_KEY = "indie-growth-agent:language";
+const WORKSPACE_KEY = "indie-growth-agent:workspace";
+
+export type WorkspaceMode = "sample" | "my";
 
 type ReportStore = Record<string, GrowthReport>;
 
@@ -92,6 +95,29 @@ export function loadSelectedLanguage(): Language | null {
     return saved === "ja" || saved === "en" ? saved : null;
   } catch {
     return null;
+  }
+}
+
+/** Sample Workspace until the user picks My Workspace. */
+export function loadWorkspaceMode(): WorkspaceMode {
+  if (typeof window === "undefined") {
+    return "sample";
+  }
+  try {
+    return window.localStorage.getItem(WORKSPACE_KEY) === "my" ? "my" : "sample";
+  } catch {
+    return "sample";
+  }
+}
+
+export function saveWorkspaceMode(mode: WorkspaceMode) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(WORKSPACE_KEY, mode);
+  } catch {
+    // ignore
   }
 }
 

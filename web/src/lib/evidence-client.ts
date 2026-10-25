@@ -132,7 +132,11 @@ export interface SampleInfo {
   scenario: string;
   scenarioDescription: string;
   changes: SampleChange[];
+  /** SHA-256 of each sample file the run loaded (sample_mode.csv_digests). */
+  csvSha256?: Record<string, string>;
   recordedAt?: string;
+  /** The Recorded Demo shown for this scenario in every UI language. */
+  representative?: boolean;
   /** Recorded Demo notes written by a person after reviewing the run. */
   reviewOutcome?: string;
   knownLimitations?: string[];

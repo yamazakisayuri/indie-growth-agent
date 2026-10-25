@@ -14,32 +14,47 @@ import type { CopyKey } from "@/lib/i18n";
 import { useLanguage } from "@/lib/language-context";
 import {
   buildDemoStory,
+  languageName,
   pickRecordedDemo,
-  recordedDemos,
+  outcomeCounts,
+  recordedDemosByScenario,
   reviewNoteText,
+  stageSuffix,
+  versionLabel,
   type DemoCriticRound,
   type DemoStory,
 } from "@/lib/recorded-demo";
 import { DASHBOARD_PATH } from "@/lib/routes";
+import { hasGloss, sampleAppName } from "@/lib/sample-glossary";
 import { sampleText } from "@/lib/sample-text";
+import { snapshotMatchesRun, type SampleSnapshot } from "@/lib/sample-workspace";
 import {
   Badge,
+  CheckTallyLine,
   ClaimList,
   DECISION_COPY,
   FINDING_COPY,
   RESOLUTION_COPY,
   RESPONSE_COPY,
-  STAGE_COPY,
   STATUS_COPY,
   SampleBanner,
   StepView,
   Stepper,
   type Tone,
 } from "./EvidencePanel";
+import { ActionDetails } from "./ActionDetails";
+import { GlossedText } from "./GlossedText";
 import { LanguageSelector } from "./LanguageSelector";
+import { SampleSnapshotSection } from "./SampleSnapshot";
 
 /** API's max list size, so committed Recorded Demos are not pushed out by newer runs. */
 const RUN_LIST_LIMIT = 100;
+
+/** The fictional sample's two-week snapshot and the digests of the CSVs it was computed from. */
+export interface SnapshotData {
+  snapshot: SampleSnapshot;
+  csvSha256: Record<string, string>;
+}
 
 function loadErrorCopy(err: unknown): CopyKey {
   return err instanceof EvidenceRequestError && err.code === "api_unreachable"
@@ -59,8 +74,22 @@ function resolutionTone(resolution: DemoCriticRound["findings"][number]["resolut
 }
 
 function ProposalsSection({ story }: { story: DemoStory }) {
-  const { copy } = useLanguage();
+  const { copy, language } = useLanguage();
   const finalIndex = story.versions.length - 1;
+  const finalVersion = story.versions[finalIndex];
+  const glossed = hasGloss(
+    [
+      ...story.versions.flatMap((version) => [
+        ...version.actions.map((action) => action.title),
+        ...version.changes.map((change) => change.reason),
+      ]),
+      ...(finalVersion?.actions ?? []).flatMap((action) => [
+        action.reason,
+        ...(finalVersion.citedByRank[action.rank] ?? []).map((claim) => claim.text),
+      ]),
+    ],
+    language,
+  );
 
   return (
     <section className="demo-section" aria-labelledby="demo-proposals">
@@ -68,6 +97,7 @@ function ProposalsSection({ story }: { story: DemoStory }) {
         {copy("demoProposalsTitle")}
       </h2>
       <p className="demo-section__hint">{copy("demoProposalsHint")}</p>
+      {glossed ? <p className="demo-section__hint">{copy("glossLegend")}</p> : null}
       <ol className="demo-versions">
         {story.versions.map((version, index) => {
           const final = index === finalIndex;
@@ -78,7 +108,7 @@ function ProposalsSection({ story }: { story: DemoStory }) {
             >
               <p className="demo-version__label">
                 <span className="demo-version__id">{version.version}</span>
-                {copy(STAGE_COPY[version.stage])}
+                {stageSuffix(version.stage, copy)}
                 {final ? <Badge tone="up">{copy("demoFinal")}</Badge> : null}
               </p>
               <ol className="demo-version__actions">
@@ -86,9 +116,13 @@ function ProposalsSection({ story }: { story: DemoStory }) {
                   <li key={action.rank}>
                     <span className="demo-rank">{action.rank}</span>
                     <div>
-                      <p className="demo-version__action-title">{action.title}</p>
-                      {final ? (
-                        <p className="demo-version__action-reason">{action.reason}</p>
+                      <p className="demo-version__action-title">
+                        <GlossedText text={action.title} />
+                      </p>
+                      {final && (version.notesByRank[action.rank] ?? []).length > 0 ? (
+                        <a href={`#final-action-${action.rank}`} className="demo-version__note-link">
+                          {copy("demoHasKnownLimitation")}
+                        </a>
                       ) : null}
                     </div>
                   </li>
@@ -103,7 +137,7 @@ function ProposalsSection({ story }: { story: DemoStory }) {
                         <Badge tone={change.decision === "removed" ? "down" : "muted"}>
                           #{change.previousRank} {copy(DECISION_COPY[change.decision])}
                         </Badge>{" "}
-                        {change.reason}
+                        <GlossedText text={change.reason} />
                       </li>
                     ))}
                   </ul>
@@ -112,6 +146,44 @@ function ProposalsSection({ story }: { story: DemoStory }) {
             </li>
           );
         })}
+      </ol>
+    </section>
+  );
+}
+
+/** The final version's Top 3 at full width: reason, cited claims, then known limitations. */
+function FinalActionsSection({ story }: { story: DemoStory }) {
+  const { copy } = useLanguage();
+  const final = story.versions.at(-1);
+  if (!final || final.actions.length === 0) {
+    return null;
+  }
+  return (
+    <section className="demo-section" aria-labelledby="demo-final">
+      <h2 id="demo-final" className="demo-section__title">
+        {copy("demoFinalActionsTitle")} — {final.version}
+      </h2>
+      <p className="demo-section__hint">
+        {versionLabel(final.version, final.stage, copy)} · {copy("demoFinalActionsHint")}
+      </p>
+      <ol className="demo-final">
+        {final.actions.slice(0, 3).map((action) => (
+          <li key={action.rank} id={`final-action-${action.rank}`} className="demo-final__item">
+            <span className="demo-rank">{action.rank}</span>
+            <div className="demo-final__body">
+              <h3 className="demo-final__title">
+                <GlossedText text={action.title} />
+              </h3>
+              <p className="demo-final__reason">
+                <GlossedText text={action.reason} />
+              </p>
+              <ActionDetails
+                claims={final.citedByRank[action.rank] ?? []}
+                notes={final.notesByRank[action.rank] ?? []}
+              />
+            </div>
+          </li>
+        ))}
       </ol>
     </section>
   );
@@ -135,16 +207,10 @@ function CriticSection({ run, story }: { run: EvidenceRun; story: DemoStory }) {
               {copy("evidenceCritic")} {round.round}
             </h3>
             <span className="demo-round__meta">
-              {copy("demoReviewed")}: {round.reviewedVersion}
-            </span>
-            <span className="demo-round__meta">
-              {copy("demoRecomputed")}:{" "}
-              <strong>
-                {round.checksMatched}/{round.checksTotal}
-              </strong>{" "}
-              {copy("demoMatched")}
+              {copy("demoReviewed")}: {versionLabel(round.reviewedVersion, round.reviewedStage, copy)}
             </span>
           </header>
+          <CheckTallyLine tally={round.checks} />
           {round.findings.length === 0 ? (
             <p className="evidence__note">{copy("evidenceNoFindings")}</p>
           ) : (
@@ -162,7 +228,9 @@ function CriticSection({ run, story }: { run: EvidenceRun; story: DemoStory }) {
                       {copy(FINDING_COPY[finding.kind])}
                     </span>
                   </p>
-                  <p className="demo-finding__message">{finding.message}</p>
+                  <p className="demo-finding__message">
+                    <GlossedText text={finding.message} />
+                  </p>
                   {finding.reviewNotes.map((note, i) => (
                     <p key={i} className="demo-finding__known" role="note">
                       <strong>{copy("demoKnownMisjudgment")}:</strong>{" "}
@@ -176,7 +244,14 @@ function CriticSection({ run, story }: { run: EvidenceRun; story: DemoStory }) {
                           {copy("evidenceAnalystAnswer")} ({round.answeredIn}):{" "}
                           {copy(RESPONSE_COPY[finding.answer.response])}
                         </strong>
-                        {finding.answer.note ? ` — ${finding.answer.note}` : ""}
+                        {finding.answer.note ? (
+                          <>
+                            {" — "}
+                            <GlossedText text={finding.answer.note} />
+                          </>
+                        ) : (
+                          ""
+                        )}
                       </>
                     ) : round.answeredIn ? null : (
                       copy("demoNoAnswer")
@@ -194,11 +269,14 @@ function CriticSection({ run, story }: { run: EvidenceRun; story: DemoStory }) {
         <p className="demo-finding__head">
           <Badge tone={run.status === "converged" ? "up" : "muted"}>
             {copy(STATUS_COPY[run.status])}
-          </Badge>
+          </Badge>{" "}
           <span>
-            {copy("evidenceUnresolvedFindings")}: <strong>{story.unresolved}</strong>
+            {outcomeCounts(story.outcome, copy)
+              .map((part) => `· ${part}`)
+              .join(" ")}
           </span>
         </p>
+        <p className="evidence__note">{copy("checksAuthority")}</p>
         {text?.reviewOutcome ? <p className="evidence__note">{text.reviewOutcome}</p> : null}
         {text && text.knownLimitations.length > 0 ? (
           <details className="demo-version__changes">
@@ -217,9 +295,13 @@ function CriticSection({ run, story }: { run: EvidenceRun; story: DemoStory }) {
   );
 }
 
-function DemoRunView({ run }: { run: EvidenceRun }) {
+function DemoRunView({ run, snapshotData }: { run: EvidenceRun; snapshotData: SnapshotData | null }) {
   const { copy, language } = useLanguage();
   const story = useMemo(() => buildDemoStory(run), [run]);
+  const snapshot =
+    snapshotData && snapshotMatchesRun(snapshotData.snapshot, snapshotData.csvSha256, run)
+      ? snapshotData.snapshot
+      : null;
   const [pinnedVersion, setPinnedVersion] = useState<string | null>(null);
   const steps = run.steps;
   const pinned = steps.findIndex((step) => step.version === pinnedVersion);
@@ -227,6 +309,7 @@ function DemoRunView({ run }: { run: EvidenceRun }) {
   const selectedStep = steps[selectedIndex] ?? null;
   const finalStep = steps.at(-1) ?? null;
   const text = run.sample ? sampleText(run.sample, language) : null;
+  const appName = run.sample ? sampleAppName(run.sample.app, language) : null;
 
   return (
     <>
@@ -235,7 +318,9 @@ function DemoRunView({ run }: { run: EvidenceRun }) {
           {run.sample ? (
             <div>
               <dt>{copy("targetApp")}</dt>
-              <dd>{run.sample.app.name}</dd>
+              <dd title={appName !== run.sample.app.name ? run.sample.app.name : undefined}>
+                {appName}
+              </dd>
             </div>
           ) : null}
           {run.sample ? (
@@ -262,13 +347,15 @@ function DemoRunView({ run }: { run: EvidenceRun }) {
         ) : null}
         {text?.note ? <p className="evidence__note">{text.note}</p> : null}
         {run.language !== language ? (
-          <p className="evidence__note">
-            {copy("demoModelLanguageNote").replace("{lang}", run.language)}
+          <p className="sample-notice" role="note">
+            {copy("demoModelLanguageNote").replace("{lang}", languageName(run.language, copy))}
           </p>
         ) : null}
       </section>
 
+      {snapshot ? <SampleSnapshotSection snapshot={snapshot} /> : null}
       <ProposalsSection story={story} />
+      <FinalActionsSection story={story} />
       <CriticSection run={run} story={story} />
 
       {finalStep ? (
@@ -305,21 +392,24 @@ function DemoRunView({ run }: { run: EvidenceRun }) {
 }
 
 /** Standalone Recorded Demo: a committed run, read from /api/evidence. Nothing runs here. */
-export function RecordedDemo() {
-  const { copy } = useLanguage();
-  const [demos, setDemos] = useState<EvidenceRunSummary[] | null>(null);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+export function RecordedDemo({ snapshotData }: { snapshotData: SnapshotData | null }) {
+  const { copy, language } = useLanguage();
+  const [runs, setRuns] = useState<EvidenceRunSummary[] | null>(null);
+  const [pickedScenario, setPickedScenario] = useState<string | null>(null);
   const [run, setRun] = useState<EvidenceRun | null>(null);
   const [error, setError] = useState<CopyKey | null>(null);
+  const demos = useMemo(() => (runs ? recordedDemosByScenario(runs) : null), [runs]);
+  const selectedRunId =
+    demos?.find((demo) => (demo.sample?.scenario ?? demo.runId) === pickedScenario)?.runId ??
+    pickRecordedDemo(runs ?? undefined)?.runId ??
+    null;
 
   useEffect(() => {
     const controller = new AbortController();
     listEvidenceRuns(null, controller.signal, RUN_LIST_LIMIT)
       .then((list) => {
-        const target = pickRecordedDemo(list.runs);
-        setDemos(recordedDemos(list.runs));
-        setSelectedRunId(target?.runId ?? null);
-        setError(target ? null : "demoNotFound");
+        setRuns(list.runs);
+        setError(pickRecordedDemo(list.runs) ? null : "demoNotFound");
       })
       .catch((err: unknown) => {
         if (!isAbort(err)) {
@@ -400,9 +490,12 @@ export function RecordedDemo() {
                     : "lang-selector__btn"
                 }
                 aria-pressed={demo.runId === selectedRunId}
-                onClick={() => setSelectedRunId(demo.runId)}
+                onClick={() => setPickedScenario(demo.sample?.scenario ?? demo.runId)}
               >
                 {demo.sample?.scenario ?? demo.runId}
+                {demo.language !== language
+                  ? ` · ${copy("demoOutputLanguage").replace("{lang}", languageName(demo.language, copy))}`
+                  : null}
               </button>
             ))}
           </div>
@@ -415,7 +508,9 @@ export function RecordedDemo() {
         </p>
       ) : null}
       {!error && !shownRun ? <p className="panel-empty">{copy("evidenceLoading")}</p> : null}
-      {shownRun ? <DemoRunView key={shownRun.runId} run={shownRun} /> : null}
+      {shownRun ? (
+        <DemoRunView key={shownRun.runId} run={shownRun} snapshotData={snapshotData} />
+      ) : null}
     </div>
   );
 }

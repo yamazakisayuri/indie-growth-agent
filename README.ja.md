@@ -16,7 +16,7 @@ Indie app 向けの成長分析 Agent（ハッカソン MVP を **Open Agent Hac
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-python scripts/show_sample_demo.py     # Recorded Demo 2本: v1/v2/v3 の Top 3、Critic の件数、レビュー注記
+python scripts/show_sample_demo.py     # 全 Recorded Demo: v1/v2/v3 の Top 3、Critic の件数、レビュー注記
 ```
 
 提案、Critic の指摘、その裏の SQL を見るには Web UI を使います。Recorded Demo 画面は **モデル呼び出しも API キーも不要** ですが、保存済みの実行をローカルの API サーバーから読むため、`api_server.py` を起動しておく必要があります。
@@ -26,9 +26,9 @@ python api_server.py                       # ターミナル 1
 cd web && npm install && npm run dev       # ターミナル 2
 ```
 
-1. `http://localhost:3000`（実際の分析結果を表示するダッシュボード）を開き、ヘッダーの **Recorded Demo** をクリックします。独立した Recorded Demo 画面 `/demo` が開きます。
-2. `/demo` は `base` の実行を開きます。上の例を見るには **competitor-variant** に切り替えます。
-3. 上から順に読みます: v1 / v2 / v3 の提案がどう変わったか → Critic が疑ったことと Analyst の回答（Critic 1回目の `r1-f3`、`r1-f7`、`r1-f13`）→ 未解決の件数を含む結果。あとで誤りと確認された指摘には **既知の誤判定** の印が付きます。
+1. `http://localhost:3000` を開くと **Sample Workspace**（架空データ。AI は実行しない）が開きます。ヘッダーの **Recorded Demo** をクリックすると、独立した Recorded Demo 画面 `/demo` が開きます。
+2. `/demo` は表示言語にかかわらず英語版の `base` の実行を開きます。上の例を見るには **competitor-variant** に切り替えます（モデル出力は日本語で、画面にその旨が表示されます）。
+3. 上から順に読みます: アプリで何が起きたか（架空データの小さなグラフ3つ）→ v1 / v2 / v3 の提案がどう変わったか → 参照している主張と既知の限界付きの最終 Top 3 → Critic が疑ったことと Analyst の回答（Critic 1回目の `r1-f3`、`r1-f7`、`r1-f13`）→ 未解決の件数を含む結果。あとで誤りと確認された指摘には **既知の誤判定** の印が付きます。
 4. **SQL の根拠** と **詳細ログ**（版ごとの主張、Critic の SQL と値）は一番下に折りたたまれています。
 
 **どこを見れば分かるか**
@@ -68,8 +68,8 @@ cd web && npm install && npm run dev       # ターミナル 2
 | 施策管理 | AI の提案を採用、または手動で登録。実施 → 評価のライフサイクル、変更前後の SQL 計測、人の評価（`interventions/`、`scripts/interventions.py`） |
 | 判断メモリ | `none` / `local`（JSONL）/ `hmem`（Meterless H-MEM の参照実装を Node の別プロセスで実行）。根拠ループの実行前に過去の判断と結果を思い出す（`memory/`、`integrations/hmem/`） |
 | API | `/api/evidence`（実行の一覧・取得・開始）、`/api/interventions`（採用・登録・実施・評価・再計測・取りやめ） |
-| Web UI | Grounding Critic の改訂履歴パネル、施策パネル、Portfolio Overview（`/portfolio`）、Recorded Demo 画面（`/demo`） |
-| サンプルモード | 架空の麻雀サンプル CSV と2つのシナリオ、専用 SQLite での Live Sample、レビュー注記付きの Recorded Demo トレース2本 |
+| Web UI | `/` の Sample Workspace / My Workspace、Grounding Critic の改訂履歴パネル、施策パネル、Portfolio Overview（`/portfolio`）、Recorded Demo 画面（`/demo`） |
+| サンプルモード | 架空の麻雀サンプル CSV と2つのシナリオ、専用 SQLite での Live Sample、レビュー注記付きの Recorded Demo トレース3本（英語版 `base`、日本語版 `base` と `competitor-variant`） |
 | テスト | `scripts/verify_offline.py` で 18 のオフラインチェックを実行（認証情報・ネットワーク・モデル不要） |
 
 ハッカソン以前に作ったもの（Analyze、Data Grounding、Multi-Product、ASC / GA4 / AdMob 取得、Planner、Draft、AWS デプロイ）は [`docs/pre-existing-work.md`](docs/pre-existing-work.md) にまとめています。
@@ -232,14 +232,15 @@ Revenue UI では AdMob 推定収益と App Store Developer Proceeds を **別�
 
 同じ回で、v3 は PPO に search 経由だけのコンバージョン率を求めていた検証計画も直しました（PPO はトラフィックソース別に結果を分けないため。`resolved`）。すべてが直ったわけではありません。C5・C6・C12 の因果の飛躍の指摘は、応答はあったものの2回目でも再び指摘され、未解決のままです（下の表）。
 
-**コミット済みの Recorded Demo**（どちらもレビュー上限で終了。すべての指摘が解消済みではありません）:
+**コミット済みの Recorded Demo**（結果は実行ごとに異なります。日本語版の2本は、すべての指摘が解消済みではありません）:
 
-| 実行 | トレース上のモデル名 | 結果 | 所要時間 |
-|------|----------------------|------|----------|
-| `sample-base-20261024-214121` | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`、v3 に未解決の指摘1件 | 約15分 |
-| `sample-competitor-variant-20261024-220111` | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`、v3 に未解決の指摘8件（うち2件は既知の誤判定） | 約24分 |
+| 実行 | モデル出力 | トレース上のモデル名 | 結果 | 所要時間 |
+|------|-----------|----------------------|------|----------|
+| `sample-base-20261025-110333`（代表の `base`） | 英語 | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `converged`、未解決の指摘0件。最終 Critic の SQL 照合は一致31・不一致0・照合不能1。v3 の提案 #1・#3 に既知の限界2件 | 約9.5分 |
+| `sample-base-20261024-214121` | 日本語 | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`、v3 に未解決の指摘1件 | 約15分 |
+| `sample-competitor-variant-20261024-220111` | 日本語 | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`、v3 に未解決の指摘8件（うち2件は既知の誤判定） | 約24分 |
 
-2本とも、専用の `LLM_PROVIDER=meterless` を追加する前に Nightshift の OpenAI 互換エンドポイント経由で実行したため、トレースには `openai_compatible` と記録されています。各 `.sample.json` には、レビュー結果、既知の限界、比較上の注意（日本語と英語）が入っています。2つのシナリオの違いを、競合データの変更による因果効果として **読まないでください**。各シナリオ1回ずつの実行ではモデルのばらつきとデータの違いを切り分けられず、実行条件も同一ではありません。
+3本とも Nightshift の OpenAI 互換エンドポイント経由で実行したため、トレースには `openai_compatible` と記録されています。各 `.sample.json` には、レビュー結果と既知の限界（日本語と英語）が入っており、日本語版の2本には比較上の注意もあります。英語版の `base` には `"representative": true` が付いており、`/demo` と Sample Workspace は表示言語にかかわらずこれを表示します。日本語版の `base` もコミットしたまま残しており、CLI ビューアと API から見られます。収束した実行が1本あることは、実行が一般に収束することを示しません。2つのシナリオの違いを、競合データの変更による因果効果として **読まないでください**。各シナリオ1回ずつの実行ではモデルのばらつきとデータの違いを切り分けられず、実行条件も同一ではありません。
 
 **Recorded Demo の再生方法**
 
@@ -249,22 +250,24 @@ python scripts/show_sample_demo.py
 python scripts/show_sample_demo.py --run-id sample-base-20261024-214121
 ```
 
-Web UI の2つの画面は役割が違います。
+Web UI では、架空データと実データを同じ画面に混ぜません。
 
-- **ダッシュボード（`/`）**: 選択中の Product の実際の分析結果（Live Analyze、Grounding Critic パネルの根拠ループの実行、施策管理）。ヘッダーに **Recorded Demo** リンクがある
+- **Sample Workspace（`/`、最初に開く）**: 架空のサンプルだけ。ビルド時に `samples/` から作り、API もモデルも呼ばない。直近7日と前の7日の KPI、Known Events 付きの14日間の推移、流入経路別の表、代表の Recorded Demo の最終 Top 3（各アクションの下に参照している主張と既知の限界）、その Critic の照合件数
+- **My Workspace（`/`、上部で切り替え）**: 選択中の Product の実際の分析結果（Live Analyze、Grounding Critic パネルの根拠ループの実行、施策管理）。選択は `localStorage` に保存する
 - **Recorded Demo（`/demo`）**: コミット済みの Recorded Demo だけを表示する独立画面
 
 `/demo` の閲覧にモデル呼び出しも API キーも不要ですが、画面は `/api/evidence` から実行を読むため、`python api_server.py`（と `npm run dev`）を起動しておく必要があります。この画面は次のとおりです。
 
-- `base` の実行を開き、`base` と `competitor-variant` を切り替えられる
+- 表示言語にかかわらず代表の英語版 `base` を開き、`base` と `competitor-variant` を切り替えられる。モデル出力の言語が表示言語と違う場合は、切り替えボタンと画面にその旨を表示する。モデル出力は翻訳せず、UI のラベルとレビュー注記は表示言語に従う。英語 UI では、サンプル由来の日本語の用語の直後に、区別できる形で訳（`[translation: …]`）を補う
 - 架空データの保存済み Recorded Demo で、実モデルで実行したものだと明示する
-- v1 / v2 / v3 の提案を、変更理由付きで比較する
-- 各回で Critic が疑ったことを一覧にする: 指摘、記録された解消状況、Critic が SQL で再計算した数値の件数と一致した件数、次の版での Analyst の回答
-- Recorded Demo の既知の限界がその指摘の ID と種類を挙げている場合、指摘に **既知の誤判定（実行後のレビューで確認）** の印を付け、種類を「記録された分類」と表示する（`base`: `r2-f1`、`competitor-variant`: `r2-f1`・`r2-f2`）。トレース、Critic の本文、未解決の件数は変えずに表示する
-- 結果（レビューの状態、未解決の件数、既知の限界）を示す
+- 冒頭の **アプリで何が起きたか** で、架空データのグラフを3つ示す（初回ダウンロード、Browse 経由の表示回数、Browse 経由の初回ダウンロード。前の7日と直近7日、グラフごとに0から始まる目盛り）。実行の `.sample.json` のハッシュと期間が、画面のビルドに使った CSV と一致する場合だけ表示する
+- v1 / v2 / v3 の Top 3 のタイトルを並べて比較し（v1 — 自アプリのデータ、v2 — 競合の状況、v3 — Critic レビュー済みの提案）、変更理由も示す。その下に **最終 Top 3 アクション — v3** を全幅で表示し、各アクションの理由、参照している主張、既知の限界を並べる
+- 各回で Critic が疑ったことを一覧にする: 指摘、記録された解消状況、コードが判定した SQL 照合（一致・不一致・照合不能）、次の版での Analyst の回答
+- Recorded Demo の既知の限界がその指摘の ID と種類を挙げている場合、指摘に **既知の誤判定（実行後のレビューで確認）** の印を付け、種類を「記録された分類」と表示する（`competitor-variant`: `r2-f1`・`r2-f2`）。トレース、Critic の本文、未解決の件数は変えずに表示する
+- 結果（レビューの状態、未解決の件数、照合不能の件数、既知の限界）を示す
 - **SQL の根拠**（最終版の各主張とその SQL）と **詳細ログ**（版ごとの主張、Critic の照合 SQL と値、比較上の注意）は折りたたんで表示する
 
-ダッシュボードの Grounding Critic パネルの実行の選択肢にも、2本の Recorded Demo が `[Recorded Demo: <scenario>]` として表示され、Live Sample の実行は `[Live Sample: <scenario>]` と表示されます。
+My Workspace の Grounding Critic パネルには実データの実行だけを表示します。Recorded Demo と Live Sample の実行（同じ product id）は含めません。
 
 ## ディレクトリ構成
 
@@ -390,7 +393,7 @@ flowchart TB
   dev([Indie developer])
 
   subgraph local ["Local machine"]
-    ui["Next.js Web UI<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo page /demo · Portfolio Overview"]
+    ui["Next.js Web UI<br/>Sample Workspace · My Workspace<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo page /demo · Portfolio Overview"]
     api["FastAPI<br/>/api/evidence · /api/interventions"]
     loop["Evidence loop<br/>scripts/run_evidence.py"]
     analyst["Analyst<br/>Strands Agent + SQL tool"]
@@ -434,9 +437,9 @@ Live Sample は同じループを Zetaris ではなく `tmp/sample/<scenario>.sq
 - **Loading / empty / error**: Analyze 中の経過秒、初回成功前の空状態、失敗時の再試行
 - **i18n / a11y**: 日本語 / English の UI クロム、focus-visible やラベルの i18n など
 - **言語切替**: UI クロムは即切替し、ページをまたいで保持する。**Analyze は再実行せず**、既存の Actions / Facts / Experiments 本文も書き換えない。本文の言語を変えるには、言語を選んだうえで再度 Analyze する
-- **ダッシュボード（`/`）**: 選択中の Product の実際の分析結果。ヘッダーから Portfolio と Recorded Demo へ移動できる
-- **Recorded Demo（`/demo`）**: コミット済みの Recorded Demo（`base` / `competitor-variant`）の独立画面。[架空サンプルデータ・Live Sample・Recorded Demo](#架空サンプルデータlive-samplerecorded-demo) 参照。モデル呼び出しも API キーも不要、ローカルの `api_server.py` が必要
-- **Grounding Critic パネル**（Top 3 の下）: 実行の選択、「新しく検証を実行」（確認あり。API から起動できる実行は同時に1つ）、v1 / v2 / v3 の各段階、根拠と SQL 付きの主張、解消状況付きの Critic の指摘、完了した実データの実行ではアクションごとの採用ボタン。架空データの実行には、レビュー結果、未解決の件数、シナリオの変更、既知の限界、比較上の注意をまとめたバナーを表示する
+- **`/`: Sample Workspace / My Workspace**: 最初は Sample Workspace（架空データ、読み取り専用、AI は実行しない）を開く。My Workspace は選択中の Product の実際の分析結果。2つは混ぜず、選択は次回も保持する。ヘッダーから Portfolio と Recorded Demo へ移動できる
+- **Recorded Demo（`/demo`）**: コミット済みの Recorded Demo（代表の英語版 `base` / `competitor-variant`）の独立画面。[架空サンプルデータ・Live Sample・Recorded Demo](#架空サンプルデータlive-samplerecorded-demo) 参照。モデル呼び出しも API キーも不要、ローカルの `api_server.py` が必要
+- **Grounding Critic パネル**（My Workspace の Top 3 の下）: 実行の選択（実データの実行のみ）、「新しく検証を実行」（確認あり。API から起動できる実行は同時に1つ）、v1 / v2 / v3 の各段階、根拠と SQL 付きの主張、コードが判定した SQL 照合（一致・不一致・照合不能）、モデル生成と明示した Critic のコメント、解消状況付きの Critic の指摘、完了した実データの実行ではアクションごとの採用ボタン
 - **施策パネル**: 一覧、手動登録、実施日の記録、評価の記録、再計測、取りやめ。AI の予測、変更前後の数字、スキップした期間、人の評価を表示する
 - **Portfolio Overview**（`/portfolio`、Header のリンク）: 保存済みの Live Analyze から、アプリごとに1枚のカード（Multi-Product 参照）
 
@@ -543,7 +546,7 @@ python scripts/run_evidence.py --product-id mahjong         # v1 → v2 → Crit
 python scripts/run_evidence.py --product-id mahjong --language en --max-rounds 3
 ```
 
-最初の数行に、実際に使ったモデルプロバイダー、根拠ストア（`asc_daily` の行数付き）、メモリのバックエンドが出ます。1回の実行は1段階あたり数分かかります（Recorded Demo は約15分と約24分）。
+最初の数行に、実際に使ったモデルプロバイダー、根拠ストア（`asc_daily` の行数付き）、メモリのバックエンドが出ます。1回の実行は1段階あたり数分かかります（Recorded Demo は約9.5分、約15分、約24分）。
 
 施策管理:
 
@@ -593,7 +596,7 @@ npm install && npm run dev
 
 ```bash
 python scripts/verify_offline.py   # 18 チェック: import スモーク + 下記の verify_* スクリプト
-cd web && npm test                 # Web の単体テスト（portfolio、サンプル文言、Recorded Demo の画面構成）
+cd web && npm test                 # Web の単体テスト（portfolio、サンプル文言、Recorded Demo の画面構成と選択、Critic の照合、Sample Workspace、訳の補足、グラフ）
 cd web && npm run lint && npm run build
 ```
 
@@ -634,7 +637,7 @@ cd web && npm run lint && npm run build
 - 判断メモリ（`local`、Meterless H-MEM）と、過去の判断・結果を Analyst の文脈として想起
 - `/api/evidence`、`/api/interventions`、Web UI の Grounding Critic パネルと施策パネル
 - Portfolio Overview（各アプリの保存済み Live Analyze の表示）
-- 架空サンプルデータ、Live Sample、Recorded Demo（CLI ビューア、`/demo` 画面、改訂履歴でのラベル表示）
+- 架空サンプルデータ、Live Sample、Recorded Demo（CLI ビューア、`/demo` 画面）、My Workspace と分けた Sample Workspace
 - オフライン検証の一括実行
 
 ### まだ完了していないもの
@@ -677,8 +680,8 @@ Acquisition → Usage → Feedback → Revenue → Prioritized action → Measur
 - **Source populations may differ** — カレンダーが揃っていても ASC Analytics / ASC Sales / GA4 App / GA4 Web / AdMob は同一母集団ではない
 - **AdMob partial metric missing handling is not implemented** — レスポンス欠落時に「未取得」と「ゼロ」を厳密には区別しない
 - **Live Analyze の出力は prompt / data contract で制約しているが、生成後の機械検証はない** — SQL の再実行と Critic があるのは根拠ループだけ
-- **Critic は誤ることがあり、未解決の指摘を残して終わる** — Recorded Demo は2本ともレビュー上限（`max_rounds`）で終わり、未解決の指摘が残っている。既知の `value_mismatch` の誤判定や、種類の合わない指摘も含む。「未解決」は検証できていないという意味で、誤りが証明されたという意味ではない
-- **根拠ループの実行が遅い** — 1段階あたり数分、Recorded Demo では1回約15〜24分
+- **Critic は誤ることがあり、未解決の指摘を残して終わる** — 日本語版の Recorded Demo は2本ともレビュー上限（`max_rounds`）で終わり、未解決の指摘が残っている。既知の `value_mismatch` の誤判定や、種類の合わない指摘も含む。英語版の `base` は収束したが、実行後のレビューで、Critic が指摘しなかった v3 の提案理由の問題が2件見つかった（既知の限界）。「未解決」は検証できていないという意味で、誤りが証明されたという意味ではない
+- **根拠ループの実行が遅い** — 1段階あたり数分、Recorded Demo では1回約9.5〜24分
 - **シナリオごとに1回の実行** — Recorded Demo ではモデルのばらつきとシナリオの違いを切り分けられない
 - **根拠ループの範囲** — App Store Connect の日次データ、Known Events、公開掲載情報のみ。競合データは公開掲載情報だけで、スクリーンショットの中身やレビューは含まない
 - **変更前後の計測** は territory が `ALL` の `asc_daily` の行を読む（製品 JSON は `ALL`）。1日でも欠けた期間はスキップする。判定は人によるもので、統計的検定ではない

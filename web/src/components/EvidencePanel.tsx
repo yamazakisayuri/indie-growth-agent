@@ -18,18 +18,21 @@ import {
   type RevisionStep,
 } from "@/lib/evidence-client";
 import { useLanguage } from "@/lib/language-context";
+import {
+  RUN_STATUS_COPY,
+  isFictionalRun,
+  outcomeCounts,
+  runOutcome,
+  tallyChecks,
+  type CheckTally,
+} from "@/lib/recorded-demo";
 import { sampleText } from "@/lib/sample-text";
 import { AdoptActionButton } from "./AdoptActionButton";
 
 const POLL_MS = 4000;
 const VALUE_PREVIEW_CHARS = 160;
 
-export const STATUS_COPY: Record<EvidenceRunStatus, CopyKey> = {
-  running: "evidenceStatusRunning",
-  converged: "evidenceStatusConverged",
-  max_rounds: "evidenceStatusMaxRounds",
-  error: "evidenceStatusError",
-};
+export const STATUS_COPY: Record<EvidenceRunStatus, CopyKey> = RUN_STATUS_COPY;
 
 export const STAGE_COPY: Record<RevisionStep["stage"], CopyKey> = {
   internal: "evidenceStageInternal",
@@ -215,6 +218,26 @@ export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
   return <span className={`evidence__badge evidence__badge--${tone}`}>{children}</span>;
 }
 
+/** Code-judged SQL checks: matched / mismatched / unverifiable (never folded into mismatched). */
+export function CheckTallyLine({ tally }: { tally: CheckTally }) {
+  const { copy } = useLanguage();
+  return (
+    <p className="evidence__counts evidence__check-tally">
+      <strong>{copy("checksTitle")}</strong>
+      <span>
+        <Badge tone="up">{copy("checksMatched")}</Badge> {tally.matched}
+      </span>
+      <span>
+        <Badge tone={tally.mismatched > 0 ? "down" : "muted"}>{copy("checksMismatched")}</Badge>{" "}
+        {tally.mismatched}
+      </span>
+      <span>
+        <Badge tone="muted">{copy("checksUnverifiable")}</Badge> {tally.unverifiable}
+      </span>
+    </p>
+  );
+}
+
 function claimBadge(
   claim: Claim,
   review: CriticReview | null,
@@ -390,7 +413,6 @@ function ReviewView({
   showSql: boolean;
 }) {
   const { copy } = useLanguage();
-  const matched = review.checks.filter((c) => c.matched).length;
   const counts = new Map<CriticFinding["resolution"], number>();
   for (const finding of review.findings) {
     counts.set(finding.resolution, (counts.get(finding.resolution) ?? 0) + 1);
@@ -399,11 +421,9 @@ function ReviewView({
   return (
     <div className="evidence__block">
       <h4 className="evidence__block-title">{copy("evidenceReview")}</h4>
-      <p className="evidence__note">{review.summary}</p>
+      <CheckTallyLine tally={tallyChecks(review.checks)} />
+      <p className="evidence__note">{copy("checksAuthority")}</p>
       <p className="evidence__counts">
-        <span>
-          {copy("evidenceChecksMatched")}: {matched}/{review.checks.length}
-        </span>
         {(["resolved", "downgraded", "open", "unresolved"] as const).map((resolution) =>
           counts.get(resolution) ? (
             <span key={resolution}>
@@ -412,6 +432,10 @@ function ReviewView({
           ) : null,
         )}
       </p>
+      <div className="evidence__comment">
+        <p className="evidence__comment-label">{copy("criticComment")}</p>
+        <p className="evidence__note">{review.summary}</p>
+      </div>
       {review.findings.length > 0 ? (
         <ul className="evidence__findings">
           {review.findings.map((finding) => {
@@ -601,10 +625,12 @@ export function EvidencePanel({ productId }: { productId: string }) {
     const controller = new AbortController();
     listEvidenceRuns(productId, controller.signal)
       .then((list) => {
-        setRuns(list.runs);
+        // Real-app history only: fictional runs share the product id but live in Sample Workspace and /demo.
+        const real = list.runs.filter((summary) => !isFictionalRun(summary));
+        setRuns(real);
         setActiveRunId(list.activeRunId);
         setListError(null);
-        setSelectedRunId((current) => current ?? list.runs[0]?.runId ?? null);
+        setSelectedRunId((current) => current ?? real[0]?.runId ?? null);
       })
       .catch((err: unknown) => {
         if (!isAbort(err)) {
@@ -785,6 +811,9 @@ export function EvidencePanel({ productId }: { productId: string }) {
                   {copy(STATUS_COPY[shownRun.status])}
                 </Badge>
                 {duration ? ` ${duration}` : ""}
+                {outcomeCounts(runOutcome(shownRun), copy)
+                  .map((part) => ` · ${part}`)
+                  .join("")}
               </dd>
             </div>
             {shownRun.model ? (

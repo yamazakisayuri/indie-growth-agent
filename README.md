@@ -16,7 +16,7 @@ Growth-analysis agent for indie apps (Hackathon MVP, extended for **Open Agent H
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-python scripts/show_sample_demo.py     # both Recorded Demos: v1/v2/v3 Top 3, Critic counts, review notes
+python scripts/show_sample_demo.py     # every Recorded Demo: v1/v2/v3 Top 3, Critic counts, review notes
 ```
 
 To see the proposals, the Critic's findings, and the SQL behind them, use the Web UI. The Recorded Demo page needs **no model call and no API key**, but it reads the saved runs from the local API server, so `api_server.py` must be running:
@@ -26,9 +26,9 @@ python api_server.py                       # terminal 1
 cd web && npm install && npm run dev       # terminal 2
 ```
 
-1. Open `http://localhost:3000` (the dashboard, which shows real analysis results) and click **Recorded Demo** in the header. This opens the separate Recorded Demo page, `/demo`.
-2. `/demo` opens the `base` run. For the example above, switch to **competitor-variant**.
-3. Read top to bottom: how the v1 / v2 / v3 proposals changed → what the Critic questioned and how the Analyst answered (`r1-f3`, `r1-f7`, `r1-f13` in Critic round 1) → the outcome with the unresolved count. Findings later confirmed as wrong are marked **Known misjudgment**.
+1. Open `http://localhost:3000`. It opens the **Sample Workspace** (fictional data, no AI run); click **Recorded Demo** in the header to open the separate Recorded Demo page, `/demo`.
+2. `/demo` opens the English `base` run in either UI language. For the example above, switch to **competitor-variant** (its model output is Japanese, and the page says so).
+3. Read top to bottom: what happened in the app (three small charts of the fictional data) → how the v1 / v2 / v3 proposals changed → the final Top 3 with cited claims and known limitations → what the Critic questioned and how the Analyst answered (`r1-f3`, `r1-f7`, `r1-f13` in Critic round 1) → the outcome with the unresolved count. Findings later confirmed as wrong are marked **Known misjudgment**.
 4. **SQL evidence** and the **Full log** (each version's claims, the Critic's SQL and values) are collapsed at the bottom.
 
 **Where to look**
@@ -68,8 +68,8 @@ The track asks for an agent that can show **why** it recommends something, not j
 | Interventions | Adopt an AI action or register one by hand; implement → evaluate lifecycle; before/after measured by SQL; human verdict (`interventions/`, `scripts/interventions.py`) |
 | Decision memory | `none` / `local` (JSONL) / `hmem` (Meterless H-MEM reference, Node sidecar). Past decisions and outcomes are recalled before each evidence run (`memory/`, `integrations/hmem/`) |
 | API | `/api/evidence` (list / read / start runs), `/api/interventions` (adopt, add, implement, evaluate, measure, drop) |
-| Web UI | Grounding Critic revision-history panel, Interventions panel, Portfolio Overview (`/portfolio`), Recorded Demo page (`/demo`) |
-| Sample mode | Fictional mahjong sample CSVs with two scenarios, Live Sample runs on a dedicated SQLite file, two committed Recorded Demo traces with review notes |
+| Web UI | Sample Workspace / My Workspace on `/`, Grounding Critic revision-history panel, Interventions panel, Portfolio Overview (`/portfolio`), Recorded Demo page (`/demo`) |
+| Sample mode | Fictional mahjong sample CSVs with two scenarios, Live Sample runs on a dedicated SQLite file, three committed Recorded Demo traces with review notes (English `base`; Japanese `base` and `competitor-variant`) |
 | Tests | `scripts/verify_offline.py` runs 18 offline checks (no credentials, network, or model) |
 
 Everything before the hackathon (Analyze, Data Grounding, Multi-Product, ASC / GA4 / AdMob fetchers, Planner, Draft, AWS deployment) is listed in [`docs/pre-existing-work.md`](docs/pre-existing-work.md).
@@ -232,14 +232,15 @@ Why this needed an independent check: v2's SQL was `SUM(impressions) * 1.0 / SUM
 
 In the same round, v3 also fixed a test plan that asked PPO for a search-only conversion rate (PPO does not split results by traffic source; `resolved`). Not everything was fixed: the causal-leap findings on C5, C6, and C12 were answered but raised again in round 2 and remain unresolved (see the table below).
 
-**Committed Recorded Demos** (both ended at the review limit; not every finding is resolved):
+**Committed Recorded Demos** (results differ by run; not every finding is resolved in the Japanese runs):
 
-| Run | Model label in the trace | Result | Run time |
-|-----|--------------------------|--------|----------|
-| `sample-base-20261024-214121` | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`, 1 unresolved finding in v3 | about 15 min |
-| `sample-competitor-variant-20261024-220111` | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`, 8 unresolved findings in v3 (2 are known false judgments) | about 24 min |
+| Run | Model output | Model label in the trace | Result | Run time |
+|-----|--------------|--------------------------|--------|----------|
+| `sample-base-20261025-110333` (representative `base`) | English | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `converged`, 0 unresolved findings; final Critic SQL checks 31 matched / 0 mismatched / 1 unverifiable; 2 known limitations in v3 actions #1 and #3 | about 9.5 min |
+| `sample-base-20261024-214121` | Japanese | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`, 1 unresolved finding in v3 | about 15 min |
+| `sample-competitor-variant-20261024-220111` | Japanese | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`, 8 unresolved findings in v3 (2 are known false judgments) | about 24 min |
 
-Both were run through Nightshift's OpenAI-compatible endpoint before the dedicated `LLM_PROVIDER=meterless` provider was added, so the trace says `openai_compatible`. Each `.sample.json` carries a review outcome, known limitations, and a comparison note (in Japanese and English). The difference between the two scenarios must **not** be read as a causal effect of the competitor data change: one run per scenario cannot separate model variance from the data difference, and the run conditions differed.
+All three were run through Nightshift's OpenAI-compatible endpoint, so the trace says `openai_compatible`. Each `.sample.json` carries a review outcome and known limitations (in Japanese and English); the Japanese runs also carry a comparison note. The English `base` is marked `"representative": true`, so `/demo` and the Sample Workspace show it in either UI language; the Japanese `base` stays committed and is shown by the CLI viewer and the API. One converged run does not show that runs converge in general. The difference between the two scenarios must **not** be read as a causal effect of the competitor data change: one run per scenario cannot separate model variance from the data difference, and the run conditions differed.
 
 **Playing the Recorded Demo**
 
@@ -249,22 +250,24 @@ python scripts/show_sample_demo.py
 python scripts/show_sample_demo.py --run-id sample-base-20261024-214121
 ```
 
-In the Web UI, the two screens have different jobs:
+In the Web UI, fictional and real data never share a screen:
 
-- **Dashboard (`/`)**: real analysis results for the selected Product (Live Analyze, evidence runs in the Grounding Critic panel, interventions). Its header has the **Recorded Demo** link
+- **Sample Workspace (`/`, opened first)**: fictional sample only, built from `samples/` at build time with no API or model call. KPIs for the last 7 days against the previous 7, 14-day trends with Known Events, the traffic-source table, the representative Recorded Demo's final Top 3 (cited claims and known limitations under each action), and its Critic verification counts
+- **My Workspace (`/`, switch at the top)**: real analysis results for the selected Product (Live Analyze, evidence runs in the Grounding Critic panel, interventions). The choice is kept in `localStorage`
 - **Recorded Demo (`/demo`)**: a separate page for the committed Recorded Demos only
 
 Viewing `/demo` needs no model call and no API key, but the page reads the runs from `/api/evidence`, so `python api_server.py` (and `npm run dev`) must be running. The page:
 
-- opens the `base` run, with a switch between `base` and `competitor-variant`
+- opens the representative English `base` run in either UI language, with a switch between `base` and `competitor-variant`. When the model output language differs from the UI language, the switch and the page say so; model output is never translated, while UI labels and review notes follow the UI language. In the English UI, a few Japanese terms from the sample get a marked gloss (`[translation: …]`) next to the original
 - states that the run is a saved Recorded Demo on fictional data, executed by a real model
-- compares the v1 / v2 / v3 proposals, with the reason for each change
-- lists what the Critic questioned in each round: the finding, its recorded resolution, how many numbers the Critic re-computed with SQL and how many matched, and the Analyst's answer in the next version
-- marks a finding as **Known misjudgment (confirmed in review after the run)** when the Recorded Demo's known limitations name that finding and its kind, and labels the kind as "Recorded classification" (`base`: `r2-f1`; `competitor-variant`: `r2-f1`, `r2-f2`). The trace, the Critic's text, and the unresolved count are shown unchanged
-- shows the outcome (review status, unresolved count, known limitations)
+- starts with **What happened in the app**: three charts of the fictional data (first-time downloads, Browse impressions, Browse first-time downloads; previous vs last 7 days, each on its own zero-based scale). They are shown only when the run's `.sample.json` digests and periods match the CSVs the page was built from
+- compares the v1 / v2 / v3 Top 3 titles side by side (v1 — Own App Data, v2 — Competitor Context, v3 — Critic-Reviewed Actions), with the reason for each change, then shows the **Final Top 3 Actions — v3** at full width: reason, cited claims, and known limitations under each action
+- lists what the Critic questioned in each round: the finding, its recorded resolution, the SQL checks judged by code (matched / mismatched / unverifiable), and the Analyst's answer in the next version
+- marks a finding as **Known misjudgment (confirmed in review after the run)** when the Recorded Demo's known limitations name that finding and its kind, and labels the kind as "Recorded classification" (`competitor-variant`: `r2-f1`, `r2-f2`). The trace, the Critic's text, and the unresolved count are shown unchanged
+- shows the outcome (review status, unresolved count, unverifiable checks, known limitations)
 - keeps **SQL evidence** (each final claim with its SQL) and the **Full log** (each version's claims, the Critic's checks with SQL and values, the comparison note) collapsed
 
-The dashboard's Grounding Critic panel also lists both Recorded Demos in its run selector, labeled `[Recorded Demo: <scenario>]`; Live Sample runs are labeled `[Live Sample: <scenario>]`.
+The Grounding Critic panel in My Workspace lists real-data runs only; Recorded Demo and Live Sample runs (same product id) are left out of it.
 
 ## Repository layout
 
@@ -390,7 +393,7 @@ flowchart TB
   dev([Indie developer])
 
   subgraph local ["Local machine"]
-    ui["Next.js Web UI<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo page /demo · Portfolio Overview"]
+    ui["Next.js Web UI<br/>Sample Workspace · My Workspace<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo page /demo · Portfolio Overview"]
     api["FastAPI<br/>/api/evidence · /api/interventions"]
     loop["Evidence loop<br/>scripts/run_evidence.py"]
     analyst["Analyst<br/>Strands Agent + SQL tool"]
@@ -434,9 +437,9 @@ The Live Sample uses the same loop on `tmp/sample/<scenario>.sqlite` instead of 
 - **Loading / empty / error**: Analyze progress (elapsed seconds), empty states before first success, retry on Analyze failure
 - **i18n / a11y**: Japanese / English UI chrome; focus-visible and localized labels where applicable
 - **Language switch**: changes UI chrome immediately and is kept across pages. It does **not** re-run Analyze or rewrite existing analysis prose; Actions / Facts / Experiments stay in the language of the last successful Analyze until the user runs Analyze again
-- **Dashboard (`/`)**: real analysis results for the selected Product. The header links to Portfolio and Recorded Demo
-- **Recorded Demo (`/demo`)**: separate page for the committed Recorded Demos (`base` / `competitor-variant`); see [Sample data, Live Sample, and Recorded Demo](#sample-data-live-sample-and-recorded-demo). No model call or API key; needs the local `api_server.py`
-- **Grounding Critic panel** (under Top 3): run selector, "Run a new verification" (confirmation; one run started from the API at a time), v1 / v2 / v3 steps, claims with evidence and SQL, Critic findings with resolution, and an adopt button per action on finished real-data runs. Fictional-data runs show a banner with the review outcome, unresolved count, scenario changes, known limitations, and comparison note
+- **`/`: Sample Workspace / My Workspace**: opens the Sample Workspace (fictional data, read-only, no AI run); My Workspace shows real analysis results for the selected Product. The two are never mixed, and the choice is kept across visits. The header links to Portfolio and Recorded Demo
+- **Recorded Demo (`/demo`)**: separate page for the committed Recorded Demos (representative English `base` / `competitor-variant`); see [Sample data, Live Sample, and Recorded Demo](#sample-data-live-sample-and-recorded-demo). No model call or API key; needs the local `api_server.py`
+- **Grounding Critic panel** (My Workspace, under Top 3): run selector (real-data runs only), "Run a new verification" (confirmation; one run started from the API at a time), v1 / v2 / v3 steps, claims with evidence and SQL, SQL checks judged by code (matched / mismatched / unverifiable), the Critic's comment labeled as model-generated, Critic findings with resolution, and an adopt button per action on finished real-data runs
 - **Interventions panel**: list, add by hand, mark implemented, record verdict, re-measure, drop; shows the AI prediction, before / after numbers, skipped windows, and your verdict
 - **Portfolio Overview** (`/portfolio`, header link): one card per app from saved Live Analyze results (see Multi-Product)
 
@@ -543,7 +546,7 @@ python scripts/run_evidence.py --product-id mahjong         # v1 → v2 → Crit
 python scripts/run_evidence.py --product-id mahjong --language en --max-rounds 3
 ```
 
-The first lines name the model provider, the evidence store (with its `asc_daily` rows), and the memory backend actually used. One run takes several minutes per step (the Recorded Demos took about 15 and 24 minutes).
+The first lines name the model provider, the evidence store (with its `asc_daily` rows), and the memory backend actually used. One run takes several minutes per step (the Recorded Demos took about 9.5, 15, and 24 minutes).
 
 Interventions:
 
@@ -593,7 +596,7 @@ All offline (no credentials, network, or model calls):
 
 ```bash
 python scripts/verify_offline.py   # 18 checks: import smoke + every verify_* script below
-cd web && npm test                 # Web unit tests (portfolio, sample text, Recorded Demo story)
+cd web && npm test                 # Web unit tests (portfolio, sample text, Recorded Demo story and choice, Critic checks, Sample Workspace, glosses, snapshot)
 cd web && npm run lint && npm run build
 ```
 
@@ -634,7 +637,7 @@ Already in this repository:
 - Decision memory (`local`, Meterless H-MEM) and recall of past decisions and outcomes as Analyst context
 - `/api/evidence`, `/api/interventions`, Grounding Critic and Interventions panels in the Web UI
 - Portfolio Overview (display of each app's saved Live Analyze)
-- Fictional sample data, Live Sample, Recorded Demo (CLI viewer, `/demo` page, labeled runs in the revision history)
+- Fictional sample data, Live Sample, Recorded Demo (CLI viewer, `/demo` page), Sample Workspace kept apart from My Workspace
 - Offline verification runner
 
 ### Not finished yet
@@ -677,8 +680,8 @@ Also still out of scope for now:
 - **Source populations may differ** — matching calendars do not make ASC Analytics / ASC Sales / GA4 App / GA4 Web / AdMob the same population
 - **AdMob partial metric missing handling is not implemented** — response gaps are not strictly distinguished from true zeros
 - **Live Analyze output is grounded by prompt / data contract but not machine-validated after generation** — only the evidence loop re-runs SQL and has a Critic
-- **The Critic can be wrong and runs end with unresolved findings** — both Recorded Demos ended at the review limit (`max_rounds`) with unresolved findings, including known false `value_mismatch` judgments and a finding filed under the wrong kind. "Unresolved" means not verified, not proven wrong
-- **Evidence runs are slow** — several minutes per step; about 15–24 minutes per run in the Recorded Demos
+- **The Critic can be wrong and runs end with unresolved findings** — both Japanese Recorded Demos ended at the review limit (`max_rounds`) with unresolved findings, including known false `value_mismatch` judgments and a finding filed under the wrong kind. The English `base` converged, but review after the run found two v3 action reasons the Critic did not flag (known limitations). "Unresolved" means not verified, not proven wrong
+- **Evidence runs are slow** — several minutes per step; about 9.5–24 minutes per run in the Recorded Demos
 - **One run per scenario** — the Recorded Demos cannot separate model variance from the scenario difference
 - **Evidence loop scope** — App Store Connect daily data, Known Events, and public listings only; competitor data is the public listing (no screenshots' content, no reviews)
 - **Before / after measurement** reads `asc_daily` rows with territory `ALL` (the Product JSONs use `ALL`); a window with any missing day is skipped. The verdict is the person's, not a statistical test
