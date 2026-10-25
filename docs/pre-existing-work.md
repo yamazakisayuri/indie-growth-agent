@@ -45,13 +45,23 @@ The first version of this project was submitted to **Agents for Humans Hackathon
 
 - Zetaris: local JDBC connection check (`SELECT 1`) on 2026-10-20. Environment setup only; no code from this check is committed.
 
-## Planned hackathon additions
+## Built during the hackathon
 
-**Not implemented yet.** This section lists the planned scope. Before submission it will be replaced by a "Built during the hackathon" section based on the actual commits (see the `git log` command above).
+Based on the commits from `1a9ae83` (2026-10-23) onward on `open-agent-2026` (see the `git log` command above). Track: **Track 2 — The Agent That Can Explain Why**.
 
-- Long-term product spine remains Top 3 → measure (adopt AI or register manually) → baseline → effect measurement
-- Hackathon focus: Competitive Evidence for the mahjong app — SQL-verified claims via Zetaris + Grounding Critic (v1→v2→Critic→v3)
-- Competitive analysis is a means to make proposals concrete, not a must-have for every app
-- Zetaris: CSV ingest and real aggregations
-- Meterless / Nemotron wiring
-- `SAMPLE_MODE` with sample CSV for the mahjong demo scenario (not three products)
+- **Offline verification and provider plumbing** (`a15d740`, `0b7ec12`, `5a9a7f5`, `48252d9`): `scripts/verify_offline.py`; every Strands Agent goes through `llm.build_model()`; generic OpenAI-compatible provider; list fields sent as JSON strings accepted
+- **Evidence foundation** (`ac40a47`, `331fc9f`, `aa18c88`): evidence schema (claims, Critic findings, runs, decisions), evidence store interface with SQLite and a read-only SQL guard, evidence tables from ASC daily data / Known Events / iTunes Lookup competitor listings (`scripts/export_evidence.py`)
+- **Zetaris** (`1125c12`): evidence store backend over JDBC, CSV staging into the Zetaris container, Lightning filestore tables
+- **Grounding Critic and the revision loop** (`c74f637`, `728a95e`, `c822ceb`, `f855f75`, `b35aa36`, `055062f`, `e4382d3`, `9f7d574`, `e47b6ad`): v1 → v2 → Critic → v3 → Critic; code re-runs cited SQL and compares every value; Analyst answers with numeric facts but no SQL, or revisions that drop every action without a reason, are rejected
+- **Decision memory** (`8f23144`, `9ae9ba4`, `db05b16`, `9f9de82`, `1de325b`): `none` / `local` backends, Meterless H-MEM backend (vendored reference, Node sidecar), past decisions and evaluated outcomes recalled as Analyst context only
+- **Interventions** (`a91bb7d`, `3d19cbb`, `22efb01`): adopt an AI action or register by hand, before/after measured by SQL, human verdict; `/api/interventions`; Interventions panel
+- **Evidence API and Web UI** (`e03fe9b`, `28c24e2`, `69e719b`, `f26e30d`): `/api/evidence` (list / read / start runs), revision-history panel under Top 3, Portfolio Overview (display of each app's saved Live Analyze; no cross-app analysis), UI language kept across pages
+- **Meterless Nightshift / NVIDIA Nemotron** (`3e0991f`): `LLM_PROVIDER=meterless`, pinned to `nvidia/nemotron-3-ultra-550b-a55b`, runtime status check (`scripts/check_meterless.py`), provider errors with details and one retry for retryable failures
+- **Sample mode and Recorded Demo** (`aea5f32`, `d0afcf0`, `0c4ff7b`, `faf589e`, `369ac58`, `74e3fe1`, `d23c927`, `6b9d315`): fictional mahjong sample with `base` and `competitor-variant` scenarios, Live Sample on a dedicated SQLite file, two committed Recorded Demo traces with review notes, labeled runs in the revision history, CLI viewer, Recorded Demo entry button on the dashboard
+- **Documentation** (`1a9ae83`, `4f9d832`, and the README / architecture update): pre-existing work, commit range, README (ja / en), architecture
+
+### Not finished at the time of writing
+
+- A standalone Recorded Demo screen (the Recorded Demo opens inside the dashboard's Grounding Critic panel)
+- Faster evidence runs (the Recorded Demos took about 15 and 24 minutes)
+- The Recorded Demos ended at the review limit (`max_rounds`) with unresolved Critic findings, some of them known false judgments (see each `samples/recorded/*.sample.json`)

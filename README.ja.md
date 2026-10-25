@@ -2,9 +2,36 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-Indie app 向けの成長分析 Agent（ハッカソン MVP）。
+Indie app 向けの成長分析 Agent（ハッカソン MVP を **Open Agent Hackathon 2026 — Track 2「The Agent That Can Explain Why」** 向けに拡張）。
 
-**接続できた Product チャネル**（App Store Connect Analytics、任意の ASC Sales、GA4 App、GA4 Web、AdMob）の観測データを集め、数字の要約ではなく **優先すべき Top 3 Actions** を返します。実行ランタイムは **Strands Agents SDK + Amazon Bedrock** で、**Next.js の静的 Web UI**（日本語 / English）と **Multi-Product** カタログ（`products/`）を含みます。
+**接続できた Product チャネル**（App Store Connect Analytics、任意の ASC Sales、GA4 App、GA4 Web、AdMob）の観測データを集め、数字の要約ではなく **優先すべき Top 3 Actions** を返します。実行ランタイムは **Strands Agents SDK** で、モデルプロバイダーは切り替え可能です（既定は **Amazon Bedrock**、ハッカソンの実行は **Meterless Nightshift → NVIDIA Nemotron**）。**Next.js の静的 Web UI**（日本語 / English）と **Multi-Product** カタログ（`products/`）を含みます。
+
+ハッカソンでは **根拠の検証・改訂ループ** を追加しました。Analyst が主張（claim）付きでアクションを提案し、主張に出てくる数字にはすべて、根拠ストア（実データは **Zetaris**）でその値を再現する SQL を付けます。独立した **Grounding Critic** が自分で書いた SQL で主張を照合し、Analyst が改訂します（v1 → v2 → Critic → v3 → Critic）。採用したアクションは **施策（intervention）** として管理し、変更前後の数字を SQL で計測して人が評価します。その結果は **Meterless H-MEM** の判断メモリを通じて次回の Analyst に渡ります。
+
+## Open Agent Hackathon 2026 — Track 2: The Agent That Can Explain Why
+
+このトラックが求めるのは、何を勧めるかだけでなく **なぜそれを勧めるのか** を示せるエージェントです。本プロジェクトでの「なぜ」は次のとおりです。
+
+- 提案した各アクションは **主張（claim）** を指し、各主張は **fact**（自アプリのデータ）、**observation**（他アプリの公開情報）、**hypothesis**（検証計画が必要）のいずれかに分類される
+- fact と observation の数字には、根拠ストアでその値を **再現する SQL** が付く
+- 別の **Critic** が、自分で書いた SQL でその数字を照合する。数字が一致するかは **コード** が判定し、モデルには判定させない
+- 改訂の履歴（v1、v2、Critic の指摘、v3、2回目のレビュー、未解決の指摘）はトレースとして保存され、Web UI に表示される
+- 人が提案を実行したあと、計測した結果と人の評価が次回の分析の文脈になる
+
+### ハッカソン期間中に作ったもの（このリポジトリの `open-agent-2026` ブランチ）
+
+| 領域 | 追加したもの |
+|------|--------------|
+| 根拠ループ | 根拠スキーマ、読み取り専用 SQL ガード、SQLite / Zetaris の根拠ストア、ASC 日次データ・Known Events・競合の掲載情報からの根拠テーブル、Analyst + Grounding Critic のループ（`evidence/`） |
+| モデルプロバイダー | すべての Strands Agent を `llm.build_model()` 経由に統一: `bedrock`（既定）、`openai_compatible`、`meterless`（Meterless Nightshift。NVIDIA Nemotron 3 Ultra に固定） |
+| 施策管理 | AI の提案を採用、または手動で登録。実施 → 評価のライフサイクル、変更前後の SQL 計測、人の評価（`interventions/`、`scripts/interventions.py`） |
+| 判断メモリ | `none` / `local`（JSONL）/ `hmem`（Meterless H-MEM の参照実装を Node の別プロセスで実行）。根拠ループの実行前に過去の判断と結果を思い出す（`memory/`、`integrations/hmem/`） |
+| API | `/api/evidence`（実行の一覧・取得・開始）、`/api/interventions`（採用・登録・実施・評価・再計測・取りやめ） |
+| Web UI | Grounding Critic の改訂履歴パネル、施策パネル、Portfolio Overview（`/portfolio`）、ダッシュボードの Recorded Demo 入口ボタン |
+| サンプルモード | 架空の麻雀サンプル CSV と2つのシナリオ、専用 SQLite での Live Sample、レビュー注記付きの Recorded Demo トレース2本 |
+| テスト | `scripts/verify_offline.py` で 18 のオフラインチェックを実行（認証情報・ネットワーク・モデル不要） |
+
+ハッカソン以前に作ったもの（Analyze、Data Grounding、Multi-Product、ASC / GA4 / AdMob 取得、Planner、Draft、AWS デプロイ）は [`docs/pre-existing-work.md`](docs/pre-existing-work.md) にまとめています。
 
 ## 解決する課題
 
@@ -15,8 +42,70 @@ Indie app 向けの成長分析 Agent（ハッカソン MVP）。
 1. 選択した Product の接続ソースから直近 N 日 vs 前 N 日の事実を取得する
 2. Data Grounding 用の契約（期間・母集団・欠損・推測禁止・Revenue の安易な合算禁止）を入力に埋め込む
 3. 観測に基づく **Top 3 Actions** を返す（未確認の分析機能は提案しない）
+4. （根拠ループ）提案の裏にある数字をすべて SQL で再現できる形にし、独立した Critic に照合させ、改訂の履歴を残す
 
 複数ダッシュボードを一つの要約にまとめることが目的ではありません。接続できた事実から、**次にどこから手を付けるべきか**を優先順位付きで提示することが価値です（対象は選択中の Product）。
+
+## 根拠の検証・改訂ループ（v1 → v2 → Critic → v3 → Critic）
+
+実装は `evidence/loop.py`、`evidence/critic.py`、`evidence/agents.py`。CLI（`scripts/run_evidence.py`）または Web UI（同じスクリプトを起動）から実行します。
+
+| 段階 | 担当 | 内容 |
+|------|------|------|
+| v1 | Analyst | 自アプリの表（`asc_daily`、`asc_daily_by_source`、`known_events`）だけを使う。`asc_daily` の最新日を基準に、直近7日と前7日を比べる |
+| v2 | Analyst | 競合の公開情報の表（`competitor_listing`）を加える。この表を根拠にした主張は fact ではなく observation |
+| Critic 1回目 | コード + Critic | 下記のレビュー。指摘がなければ `converged` |
+| v3 | Analyst | 各指摘に応答し（`fixed` / `downgraded` / `removed` / `disputed`）、各アクションをどう変えたか（`kept` / `modified` / `removed`）を記録する |
+| Critic 2回目 | コード + Critic | v3 に同じレビュー。最終回（既定 2回、CLI の `--max-rounds` で 1〜3）でも残った指摘は `unresolved` になり、実行は `max_rounds` で終わる |
+
+**Critic の各回でやること**
+
+1. **構造のルール（コード）**: 根拠があるか、引用した表が存在するか、根拠1項目に数字1つか、fact に SQL があるか、他アプリの公開情報を fact にしていないか、hypothesis に検証計画があるか、競合の observation だけを根拠にしたアクションでないか
+2. **Analyst が引用した SQL の再実行（コード）**: 結果が、書かれた精度で記載値と一致すること（比率をパーセントで書いた場合も一致とみなす）
+3. **独立した Critic（モデル）**: 会話を共有しない新しい Strands Agent。主張とアクションは見るが、**Analyst の SQL と推論は見ない**。過去の判断も受け取らない。自分で SQL を書いて照合し、`causal_leap`、`scope_mismatch`、`kind_mislabel`、`unverifiable`、`infeasible_action`（アクションや検証計画が App Store の機能制約に反する）を指摘できる
+4. **値の照合（コード）**: Critic の SQL の結果と主張の根拠の値をコードで比べ、食い違えば `value_mismatch` の指摘になる
+
+**レビュー前のガード**
+
+- 両モデルの SQL はすべて読み取り専用ガードを通る（単一の `SELECT` / `WITH` のみ、書き込み系キーワード禁止）。SQLite では読み取り専用の authorizer も使う
+- v1 / v2 の回答が、その回答の中で成功した SQL なしに数値の fact を述べた場合は却下して1回だけやり直す。2回目も却下されたら実行を止めるので、作られた数字が Critic に届くことはない
+- 理由を書かずにすべてのアクションを消した改訂も同じ扱いで却下する
+
+トレース（`tmp/evidence_runs/<run_id>.json`）は各段階のあとに書き直され、各版、すべての SQL 呼び出し（Analyst / Critic / コード）、Critic の指摘とその解消状況（`resolved` / `downgraded` / `unresolved`）、却下された回答、所要時間、モデル名を含みます。
+
+**範囲:** 根拠ループが使うのは現在、App Store Connect の日次データ、Known Events、競合の公開掲載情報（iTunes Lookup）です。GA4 と AdMob は Live Analyze の経路だけで使います。根拠ループと Live Analyze は別の実行で、ループは Live Analyze の Top 3 を読みません。
+
+## 施策管理・変更前後の計測・人の評価・次回へのフィードバック
+
+実装は `interventions/`、`interventions_api.py`、`scripts/interventions.py`、Web UI の施策パネル。
+
+```
+AI の提案を採用 / 手動で登録 → planned
+  → 実施日を記録（implement）→ 変更前の期間を SQL で計測
+  → 評価を記録（evaluate）  → 変更後の期間を SQL で計測 + 人の判定
+  → 判断と結果を判断メモリへコピー
+  → 次回の根拠ループ: Analyst に「過去の判断」として渡す
+```
+
+- **採用または登録**: 完了した実データの実行から1つのアクション（1〜3位）を採用するか、人が考えた変更を登録する。採用したアクションは AI の提案（主張、検証計画、モデル、版）をそのまま保存し、書き換えない。架空サンプルデータの実行は採用できない
+- **計画**: 評価指標、判定方法、成功基準、評価までの日数、計測期間の長さ。指標は `impressions`、`product_page_views`、`first_time_downloads`、`impression_to_page_view_pct`、`page_view_to_download_pct`
+- **変更前 / 変更後**: 根拠ストアの `asc_daily` に対する SQL でコードが計算する（実施日の前の期間 / 後の期間）。期間内のすべての日に行がある場合だけ計測し、欠けた日がある期間は少ない日数で合計せず「スキップ」と記録する。数字を手入力することはない
+- **人の評価**: `improved` / `no_change` / `worse` / `inconclusive` とメモ。評価日より前に評価するには「早期評価」の指定が必要
+- **次回の Analyst へのフィードバック**: 判断は人が採用・登録したときに、結果は評価したときにメモリへ書く。分析の実行がメモリに書くことはない。実データの根拠ループの前に、この Product のメモリを検索し、見つかった判断を台帳から読み直し（取りやめたものは除く）、Analyst に **根拠ではなく文脈として** 渡す。数字が必要なら Analyst はストアに問い合わせ直す必要がある。Critic には渡さない
+- **保存先**: 台帳（`INTERVENTIONS_PATH`、既定 `tmp/interventions/ledger.jsonl`）が記録の本体で、`MEMORY_BACKEND` に関係なく残る。メモリは読みやすい写しを持つ（あとから `sync-memory` で結び直せる）
+
+## スポンサー技術とその役割
+
+| 技術 | このプロジェクトでの役割 | 場所 |
+|------|--------------------------|------|
+| **Zetaris** | 実データの根拠ストア（`EVIDENCE_STORE=zetaris`）。根拠テーブルを CSV としてローカルの Zetaris platform に置き、Lightning filestore テーブルとして登録する。Analyst の SQL、Critic の SQL、コードによる再実行、施策の変更前後の計測は、すべて JDBC（Spark SQL）経由でここで実行する | `integrations/zetaris/` |
+| **Meterless Nightshift** | ローカルの OpenAI 互換モデルランタイム（`LLM_PROVIDER=meterless`）。すべての Strands Agent（Analyst、Critic、Analyzer、Planner、Draft）がここへリクエストを送る。`meterless-app` ヘッダーを付けるので、実行記録がアプリ別に分かれる。Analyst / Critic のリクエストが再試行で直る理由で失敗した場合は1回だけやり直し、プロバイダーのエラーは詳細付きでログに残す | `integrations/meterless/`、`llm/` |
+| **NVIDIA Nemotron** | ハッカソンの実行で Analyst と Critic を動かすモデル: `nvidia/nemotron-3-ultra-550b-a55b`。Nightshift の NVIDIA プロバイダー経由で呼ぶ（このマシンでは `meterless/auto` が 404 を返すモデルに振り分けられたため固定） | `METERLESS_MODEL` |
+| **Meterless H-MEM** | 判断メモリのバックエンド（`MEMORY_BACKEND=hmem`）。公式の参照実装を同梱し、Node.js の別プロセスで動かす。判断と結果を Product ごとに保存し、根拠ループの前に思い出す | `integrations/hmem/` |
+| Strands Agents SDK | 構造化出力と SQL ツールを含む、すべてのモデル呼び出しの Agent ランタイム | `agent.py`、`evidence/agents.py` |
+| Amazon Bedrock | 既定のモデルプロバイダー（`LLM_PROVIDER` 未設定または `bedrock`）で、AWS デプロイのプロバイダー | `llm/factory.py` |
+
+Live Sample と Recorded Demo は Zetaris ではなく専用の SQLite ファイルを使うので、架空データが実データの根拠ストアに入ることはありません。
 
 ## Multi-Product
 
@@ -26,7 +115,10 @@ Indie app 向けの成長分析 Agent（ハッカソン MVP）。
 - **API**: `GET /api/products` が一覧を返し、`POST /api/analyze` は `{ language, productId }` を受け取る
 - **Web UI**: Header の Product セレクタ。切替時はその Product の **前回成功した Analyze** を localStorage から復元（なければ空シェル）
 
-**Product セレクタ ≠ ポートフォリオ分析。** 1 Product を選んで分析することは実装済みです。複数 Product を横断して比較・優先付けするポートフォリオ分析は **未実装** です（Future Roadmap 参照）。
+### Portfolio Overview（表示）とポートフォリオ分析（未実装）の違い
+
+- **Portfolio Overview（`/portfolio`、実装済み）**: 設定済みのアプリごとに1枚のカードを表示する。中身は、そのアプリについて **このブラウザに保存された最後の成功した Live Analyze**（期間、最優先の推奨、ソースごとの主要指標2つ、実行 ID）、または「未分析」。localStorage を読むだけで、分析のための API 呼び出し、値の生成、推奨の作成は **しない**
+- **アプリ横断のポートフォリオ分析（未実装）**: アプリ同士を比べて、開発者の時間を次にどのアプリへ使うべきかを決めること。各カードは別々の 1 Product の結果のままで、カード間の数字を比較・順位付けはしない
 
 ## Data Grounding
 
@@ -41,7 +133,7 @@ Indie app 向けの成長分析 Agent（ハッカソン MVP）。
 | No ungrounded cross-source ratios | 母集団一致の記述がない限り、ソース間の割り算・ファネル化をしない（例: GA4 `ad_impression` ≠ AdMob `IMPRESSIONS`） |
 | Revenue sources stay separate | AdMob **ESTIMATED_EARNINGS** と App Store Sales **Developer Proceeds** は意味・確度・通貨/スコープが異なる別ソース。並列表示し、**合算しない** |
 
-LLM 出力はプロンプト / Data Contract で制約していますが、生成後の機械検証はしていません（Known limitations 参照）。
+Live Analyze の経路では、LLM 出力はプロンプト / Data Contract で制約していますが、生成後の機械検証はしていません（Known limitations 参照）。根拠ループは、自身の提案に対して機械的な検証（SQL の再実行、構造のルール、Critic）を加えています。根拠テーブルは母集団の列（`territory`、`country`、`source`）を持ち、欠損値は 0 で埋めず NULL のまま保持します。
 
 ## 対応ソース（現在）
 
@@ -57,12 +149,61 @@ LLM 出力はプロンプト / Data Contract で制約していますが、生�
 
 Revenue UI では AdMob 推定収益と App Store Developer Proceeds を **別行** で表示します（意味・確度が異なるため合算しません）。
 
+### 根拠テーブル（根拠ループ）
+
+`scripts/export_evidence.py` が `EVIDENCE_STORE` に読み込みます。
+
+| テーブル | 取得元 | 種類 |
+|----------|--------|------|
+| `asc_daily` | App Store Connect Analytics の日次合計（ASC の認証情報が必要） | 自アプリのデータ → fact |
+| `asc_daily_by_source` | ASC の日次インプレッション / 初回ダウンロードの search / browse / referrer 別 | 自アプリのデータ → fact |
+| `known_events` | 開発者が書いた文脈（`known_events.json`） | 文脈のみ。時期が近くても原因の証明にはならない |
+| `competitor_listing` | 自アプリと、製品 JSON の固定の競合リスト（`competitors`）の App Store 公開掲載情報（iTunes Lookup、キー不要） | 外部 → observation |
+
+## 架空サンプルデータ・Live Sample・Recorded Demo
+
+デモ用に、**架空の** 麻雀サンプルを `samples/mahjong/` に置いています（`sample_mode.py`）。中の数字・アプリ・掲載情報はすべて作り物です（`source = fictional_sample`、アプリ ID `fictional-001`）。設定済みの実在アプリの ID を含むデータは読み込みを拒否します。
+
+| シナリオ | 内容 |
+|----------|------|
+| `base` | 14日間（2026-10-09〜2026-10-22）。直近7日は表示回数が40%増えたが、ページビュー率と初回ダウンロードは下がった。経路別では browse の表示回数が最も増えた。上位の競合は評価数・スクリーンショット数・更新の新しさで上回る |
+| `competitor-variant` | `base` と同じだが、競合1件（`fictional-101`）だけその3つの優位をなくしたもの。変えたセルはすべて、元の値・新しい値・理由とともに `scenarios.json` に書いてある |
+
+使い方は3つで、互いに混ざりません。
+
+| モード | モデル呼び出し | ストア | 方法 |
+|--------|----------------|--------|------|
+| **架空 CSV のみ** | なし | `tmp/sample/<scenario>.sqlite` | `python scripts/run_sample.py --scenario base --dry-run` で CSV（とシナリオの変更）を読み込み、期間と行数を表示して止まる |
+| **Live Sample** | あり（`LLM_PROVIDER`） | 専用 SQLite。`EVIDENCE_STORE` は無視 | `python scripts/run_sample.py --scenario base` で本物の Analyst と Critic を動かす。過去の判断は思い出さない。トレース: `tmp/evidence_runs/sample-<scenario>-<timestamp>.json` + `.sample.json` |
+| **Recorded Demo** | なし（API キー・ネットワーク・モデル不要） | コミット済みのトレース | `samples/recorded/` のトレース。Live Sample の実行を、チェック（sample の実行 ID、CSV が変わっていない、完了している、モデル名がある、Critic のレビューが1回以上ある）を通った場合だけ `scripts/record_sample_demo.py` でコピーしたもの |
+
+**コミット済みの Recorded Demo**（どちらもレビュー上限で終了。すべての指摘が解消済みではありません）:
+
+| 実行 | トレース上のモデル名 | 結果 | 所要時間 |
+|------|----------------------|------|----------|
+| `sample-base-20261024-214121` | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`、v3 に未解決の指摘1件 | 約15分 |
+| `sample-competitor-variant-20261024-220111` | `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` | `max_rounds`、v3 に未解決の指摘8件（うち2件は既知の誤判定） | 約24分 |
+
+2本とも、専用の `LLM_PROVIDER=meterless` を追加する前に Nightshift の OpenAI 互換エンドポイント経由で実行したため、トレースには `openai_compatible` と記録されています。各 `.sample.json` には、レビュー結果、既知の限界、比較上の注意（日本語と英語）が入っています。2つのシナリオの違いを、競合データの変更による因果効果として **読まないでください**。各シナリオ1回ずつの実行ではモデルのばらつきとデータの違いを切り分けられず、実行条件も同一ではありません。
+
+**Recorded Demo の再生方法**
+
+```bash
+# CLI: 記録済みの全実行と、base と competitor-variant の比較
+python scripts/show_sample_demo.py
+python scripts/show_sample_demo.py --run-id sample-base-20261024-214121
+```
+
+Web UI（`python api_server.py` と `npm run dev` が必要。モデルの認証情報は不要）では、ダッシュボード上部の **Recorded Demo** の入口ボタンを押します。実行の Product（mahjong）に切り替え、Grounding Critic の改訂履歴で `base` の Recorded Demo を選び、そこまでスクロールします。2本の Recorded Demo は実行の選択肢にも `[Recorded Demo: <scenario>]` として表示され、Live Sample の実行は `[Live Sample: <scenario>]` と表示されます。Recorded Demo はダッシュボード内のパネルに表示されます。**Recorded Demo の独立画面は未実装** です。
+
 ## ディレクトリ構成
 
 ```
 indie-growth-agent/
-├── agent.py                 # 共有分析エントリ（取得 → 入力整形 → Bedrock）
-├── api_server.py            # FastAPI: /api/products, /api/analyze, /api/draft
+├── agent.py                 # 共有分析エントリ（取得 → 入力整形 → モデル）
+├── api_server.py            # FastAPI: /api/products, /api/analyze, /api/draft（+ evidence / interventions ルーター）
+├── evidence_api.py          # /api/evidence: 根拠ループの実行の一覧・取得・開始
+├── interventions_api.py     # /api/interventions: 採用・登録・実施・評価・再計測・取りやめ
 ├── analysis_schema.py       # Agent / API の構造化レスポンスモデル
 ├── report_builder.py        # 観測 metrics + 分析結果 → UI 用 JSON
 ├── format_input.py          # Data Contract / FACTS テキスト生成
@@ -70,6 +211,7 @@ indie-growth-agent/
 ├── planner.py               # 任意の成長実験 Planner（MCP / playbooks）
 ├── draft_generator.py       # Action Draft 生成
 ├── known_events.py          # Planner 向け Known Events
+├── sample_mode.py           # 架空サンプルデータ、シナリオ、Recorded Demo のルール
 ├── config.py                # .env / プロセス環境変数（秘密情報はハードコードしない）
 ├── event_definitions.json   # GA4 App イベントの開発者宣言定義（例）
 ├── event_definitions_web.json
@@ -79,6 +221,17 @@ indie-growth-agent/
 │   ├── mahjong.json
 │   ├── shopping-memo.json
 │   └── nextuta.json
+├── evidence/                # 根拠スキーマ、ストア、SQL ガード、Analyst / Critic、改訂ループ
+├── interventions/           # 台帳、ライフサイクル、SQL 計測、メモリ連携
+├── memory/                  # 判断メモリのインターフェース（none / local）と想起
+├── llm/                     # モデルプロバイダーの選択とエラー処理
+├── integrations/
+│   ├── zetaris/             # Zetaris 根拠ストア（JDBC、CSV の配置）
+│   ├── meterless/           # Meterless Nightshift の設定とランタイム状態確認
+│   └── hmem/                # Meterless H-MEM アダプター + 同梱の参照実装（Node の別プロセス）
+├── samples/
+│   ├── mahjong/             # 架空サンプル CSV + scenarios.json
+│   └── recorded/            # コミット済み Recorded Demo トレース + .sample.json 注記
 ├── requirements.txt
 ├── Dockerfile               # バックエンド用コンテナイメージ
 ├── .dockerignore
@@ -88,17 +241,28 @@ indie-growth-agent/
 ├── ga4/                     # GA4 App + GA4 Web Data API 取得
 ├── admob/                   # AdMob Network Report 取得
 ├── web/                     # Next.js 16 静的エクスポート Web UI
-├── scripts/                 # 接続確認・OAuth 補助
+├── scripts/                 # 実行・記録・表示、接続確認、オフライン検証
+│   ├── run_evidence.py      # 実データでの根拠ループ
+│   ├── export_evidence.py   # 根拠テーブルを EVIDENCE_STORE へ読み込む
+│   ├── interventions.py     # 施策管理 CLI
+│   ├── run_sample.py        # Live Sample（または --dry-run）
+│   ├── record_sample_demo.py
+│   ├── show_sample_demo.py  # Recorded Demo ビューア
+│   ├── check_meterless.py   # Nightshift の状態確認
+│   ├── verify_offline.py    # オフラインチェック一式
 │   ├── verify_ga4.py
 │   ├── verify_admob.py
 │   ├── oauth_admob.py
 │   └── list_ga4_events.py
+├── docs/                    # アーキテクチャ、ハッカソン以前の作業
 └── secrets/                 # ローカル専用（gitignored）。.p8 / refresh token など
 ```
 
 ## Architecture
 
 詳細な Architecture Diagram（Mermaid）とリクエストフローは **[docs/architecture.md](docs/architecture.md)** を参照してください。
+
+### Live Analyze（AWS デプロイ）
 
 ```mermaid
 %%{init: {"theme": "neutral"}}%%
@@ -146,13 +310,62 @@ flowchart TB
 
 Mermaid 単体ファイル: [`docs/architecture.mmd`](docs/architecture.mmd)
 
+### 根拠ループと施策管理（ハッカソン、ローカル）
+
+```mermaid
+%%{init: {"theme": "neutral"}}%%
+flowchart TB
+  dev([Indie developer])
+
+  subgraph local ["Local machine"]
+    ui["Next.js Web UI<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo entry · Portfolio Overview"]
+    api["FastAPI<br/>/api/evidence · /api/interventions"]
+    loop["Evidence loop<br/>scripts/run_evidence.py"]
+    analyst["Analyst<br/>Strands Agent + SQL tool"]
+    critic["Grounding Critic<br/>fresh Strands Agent + own SQL<br/>no Analyst SQL, no past decisions"]
+    checks["Code checks<br/>structural rules · re-run cited SQL<br/>compare values"]
+    ledger["Intervention ledger<br/>JSONL"]
+    hmem["Meterless H-MEM<br/>decision memory (Node sidecar)"]
+    nightshift["Meterless Nightshift<br/>OpenAI-compatible runtime"]
+    zetaris["Zetaris platform<br/>evidence store · JDBC / Spark SQL"]
+  end
+
+  nvidia["NVIDIA Nemotron 3 Ultra"]
+  sources["ASC daily · Known Events<br/>iTunes Lookup competitor listings"]
+
+  sources -->|scripts/export_evidence.py| zetaris
+  dev --> ui
+  ui --> api
+  api -->|spawn| loop
+  hmem -->|recall past decisions<br/>context only| loop
+  loop --> analyst
+  loop --> critic
+  loop --> checks
+  analyst -->|read-only SQL| zetaris
+  critic -->|read-only SQL| zetaris
+  checks -->|re-run SQL| zetaris
+  analyst --> nightshift
+  critic --> nightshift
+  nightshift --> nvidia
+  loop -->|trace v1 → v2 → Critic → v3 → Critic| api
+  api -->|adopt / implement / evaluate| ledger
+  ledger -->|before / after SQL| zetaris
+  ledger -->|decision + outcome| hmem
+```
+
+Live Sample は同じループを Zetaris ではなく `tmp/sample/<scenario>.sqlite` で動かし、メモリからの想起はしません。Recorded Demo はモデルを使わず `samples/recorded/` から読みます。
+
 ## Web UI の挙動（現在）
 
 - **初期表示**: 選択 Product の前回成功した Live Analyze（`localStorage`）。なければ空シェルと Analyze 案内
 - **最新データを分析**: `POST /api/analyze` で更新し、UI とキャッシュを書き換える
 - **Loading / empty / error**: Analyze 中の経過秒、初回成功前の空状態、失敗時の再試行
 - **i18n / a11y**: 日本語 / English の UI クロム、focus-visible やラベルの i18n など
-- **言語切替**: UI クロムは即切替。**Analyze は再実行せず**、既存の Actions / Facts / Experiments 本文も書き換えない。本文の言語を変えるには、言語を選んだうえで再度 Analyze する
+- **言語切替**: UI クロムは即切替し、ページをまたいで保持する。**Analyze は再実行せず**、既存の Actions / Facts / Experiments 本文も書き換えない。本文の言語を変えるには、言語を選んだうえで再度 Analyze する
+- **Recorded Demo の入口**（ダッシュボード上部）: コミット済みの `base` の Recorded Demo を下の改訂履歴で開く（モデル呼び出しなし）
+- **Grounding Critic パネル**（Top 3 の下）: 実行の選択、「新しく検証を実行」（確認あり。API から起動できる実行は同時に1つ）、v1 / v2 / v3 の各段階、根拠と SQL 付きの主張、解消状況付きの Critic の指摘、完了した実データの実行ではアクションごとの採用ボタン。架空データの実行には、レビュー結果、未解決の件数、シナリオの変更、既知の限界、比較上の注意をまとめたバナーを表示する
+- **施策パネル**: 一覧、手動登録、実施日の記録、評価の記録、再計測、取りやめ。AI の予測、変更前後の数字、スキップした期間、人の評価を表示する
+- **Portfolio Overview**（`/portfolio`、Header のリンク）: 保存済みの Live Analyze から、アプリごとに1枚のカード（Multi-Product 参照）
 
 詳細: [`web/README.md`](web/README.md)
 
@@ -171,6 +384,8 @@ Mermaid 単体ファイル: [`docs/architecture.mmd`](docs/architecture.mmd)
 Frontend のビルド環境変数: `NEXT_PUBLIC_AGENT_API_URL=<ECS の HTTPS URL>`。Backend の CORS は `CORS_ALLOWED_ORIGINS` に Amplify オリジンを設定します（localhost 既定値はローカル用に残しています）。
 
 使わない構成: App Runner、Amplify SSR、Next.js API Route プロキシ。
+
+ハッカソンで追加したもの（根拠ループ、Zetaris、Meterless Nightshift、H-MEM）は **ローカル** で動かします。Dockerfile と AWS デプロイはこれらに合わせて更新していません（イメージに Java / Node がなく、Nightshift / Zetaris は開発者のマシンで動く）。
 
 ## セットアップ
 
@@ -195,17 +410,42 @@ cp .env.example .env
 最低限必要なもの:
 
 - **App Store Connect**: Issuer ID / Key ID、対象アプリ / テリトリー（多くは Product JSON）。ローカルは `APP_STORE_CONNECT_PRIVATE_KEY_PATH`（`.p8`）、コンテナは `APP_STORE_CONNECT_PRIVATE_KEY`（PEM 本文。タスク環境変数 / Secrets Manager 注入でも可）
-- **Amazon Bedrock（Strands 既定）**: ローカルでは Bedrock を呼べる認証（例: `AWS_REGION` とプロファイル / 環境変数）。ECS では **Task Role** を使い、アクセスキーをリポジトリに置かない
+- **モデルプロバイダー**: `LLM_PROVIDER` 未設定 / `bedrock` なら Amazon Bedrock（ローカルでは Bedrock を呼べる認証。例: `AWS_REGION` とプロファイル。ECS では **Task Role** を使い、アクセスキーをリポジトリに置かない）。`.env.example` はハッカソン構成として `LLM_PROVIDER=meterless` を設定している（下記参照）
 - **GA4 App / Web（任意）**: Property ID + OAuth（`GOOGLE_OAUTH_*` と refresh token）またはサービスアカウント。Web の hostname / key events / featurePaths は製品 JSON
 - **AdMob（任意）**: Account ID + 別スコープの refresh token（`scripts/oauth_admob.py`）+ 必要なら App ID
 
 詳細なキー名は `.env.example` を参照してください。Web UI は `web/.env.local` の `NEXT_PUBLIC_AGENT_API_URL` を設定します（`web/README.md` 参照）。
 
-### 3. 動作確認（任意）
+### 3. ハッカソン構成（任意。各部分は未設定ならローカルの既定値で動く）
+
+| 変数 | 既定値 | 用途 |
+|------|--------|------|
+| `LLM_PROVIDER` | `bedrock` | `bedrock` / `openai_compatible` / `meterless` |
+| `METERLESS_BASE_URL` | `http://127.0.0.1:8088/v1` | Nightshift ランタイム（どの形で貼っても `<host>/v1` に正規化） |
+| `METERLESS_RUNTIME_TOKEN` | なし（`meterless` では必須） | Nightshift が `<stateDir>/proxy-token` に書くトークン（`rt-local` は拒否） |
+| `METERLESS_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b` | Nightshift に送るモデル ID |
+| `METERLESS_APP` / `METERLESS_TIMEOUT_SECONDS` / `METERLESS_TTFB_MS` | `indie-growth-agent` / `600` / `240000` | アプリ ID ヘッダー、タイムアウト、最初のトークンまでの待ち時間 |
+| `OPENAI_COMPATIBLE_BASE_URL` / `_API_KEY` / `_MODEL` / `_HEADERS` / `_TIMEOUT_SECONDS` | なし | `LLM_PROVIDER=openai_compatible` 用 |
+| `EVIDENCE_STORE` | `sqlite` | `sqlite` / `zetaris` |
+| `EVIDENCE_SQLITE_PATH` | `tmp/evidence.sqlite` | SQLite の根拠ストア |
+| `ZETARIS_USER` / `ZETARIS_PASSWORD` | なし | Zetaris のログイン情報（`.env` のみ） |
+| `ZETARIS_JDBC_JAR` / `ZETARIS_JAVA_HOME` / `ZETARIS_JDBC_URL` / `ZETARIS_DATABASE` | なし / `JAVA_HOME` / `jdbc:zetaris:lightning@localhost:10000` / `INDIE_GROWTH` | JDBC ドライバー（JPype 経由で Java 17 以上） |
+| `ZETARIS_DOCKER_CONTAINER` / `ZETARIS_STAGING_DIR` / `ZETARIS_QUERY_TIMEOUT_SECONDS` | `zetaris-driver-1` / `/home/zetaris/customer-data/shared/indie_growth` / `60` | Zetaris コンテナ内で CSV を置く場所 |
+| `MEMORY_BACKEND` | `none` | `none` / `local` / `hmem` |
+| `MEMORY_LOCAL_DIR` | `tmp/memory` | JSONL メモリ |
+| `HMEM_DIR` / `HMEM_NODE` / `HMEM_RECALL_THRESHOLD` | `tmp/hmem` / `node` / `0.25` | H-MEM の別プロセス（Node.js 22.7 以上。npm パッケージ不要） |
+| `INTERVENTIONS_PATH` | `tmp/interventions/ledger.jsonl` | 施策の台帳 |
+
+有効にする場合の前提: Meterless Nightshift をローカルで起動していること。Zetaris はローカルの Zetaris platform を Docker で起動し、Java 17 以上と Zetaris の JDBC jar を用意すること。H-MEM は Node.js 22.7 以上。
+
+### 4. 動作確認（任意）
 
 ```bash
 python scripts/verify_ga4.py
 python scripts/verify_admob.py
+python scripts/check_meterless.py            # Nightshift の状態（GET /v1/models のみ。モデルは呼ばない）
+python scripts/check_meterless.py --chat     # 短いリクエストを1回送る（プロバイダーのクレジットを使う）
+EVIDENCE_STORE=zetaris python scripts/verify_zetaris_live.py   # Zetaris の実接続チェック（Docker）
 ```
 
 ## 実行方法
@@ -218,7 +458,39 @@ python agent.py
 python agent.py --product-id mahjong
 ```
 
-標準出力に Agent 入力（Data Contract + FACTS）と、Bedrock 経由の回答（Most important finding / Why it matters / Top 3 actions）が流れます。
+標準出力に Agent 入力（Data Contract + FACTS）と、モデルの回答（Most important finding / Why it matters / Top 3 actions）が流れます。
+
+実データでの根拠ループ:
+
+```bash
+python scripts/export_evidence.py --product-id mahjong      # 根拠テーブルを EVIDENCE_STORE に読み込む
+python scripts/run_evidence.py --product-id mahjong         # v1 → v2 → Critic → v3 → Critic（既定 2回）
+python scripts/run_evidence.py --product-id mahjong --language en --max-rounds 3
+```
+
+最初の数行に、実際に使ったモデルプロバイダー、根拠ストア（`asc_daily` の行数付き）、メモリのバックエンドが出ます。1回の実行は1段階あたり数分かかります（Recorded Demo は約15分と約24分）。
+
+施策管理:
+
+```bash
+python scripts/interventions.py adopt --run <run_id> --rank 1
+python scripts/interventions.py add --product mahjong --title "..." \
+    --metric page_view_to_download_pct --method "変更前後14日比較" --criterion "+5ポイント以上" --days 14
+python scripts/interventions.py implement <id> --on 2026-10-25
+python scripts/interventions.py evaluate <id> --verdict inconclusive --note "..."
+python scripts/interventions.py measure <id>      # 再計測（データの遅延、ストア停止時など）
+python scripts/interventions.py list --product mahjong
+python scripts/interventions.py sync-memory
+```
+
+サンプルデータ:
+
+```bash
+python scripts/run_sample.py --scenario base --dry-run           # 架空 CSV のみ。モデルなし
+python scripts/run_sample.py --scenario competitor-variant       # Live Sample（モデル呼び出しあり）
+python scripts/record_sample_demo.py <sample-run-id>             # Recorded Demo として保存
+python scripts/show_sample_demo.py                               # Recorded Demo。モデルなし
+```
 
 Web UI（ローカル）:
 
@@ -237,6 +509,22 @@ npm install && npm run dev
 - `GET /api/products`
 - `POST /api/analyze`（`{ language, productId }`）
 - `POST /api/draft`（任意の Action Draft）
+- `GET /api/evidence/runs`、`GET /api/evidence/runs/{runId}`、`POST /api/evidence/runs`（`scripts/run_evidence.py` を起動。同時に1つ）
+- `GET /api/interventions`、`POST /api/interventions`、`POST /api/interventions/adopt`、`POST /api/interventions/{id}/implement | evaluate | measure | drop`
+
+## テスト
+
+すべてオフライン（認証情報・ネットワーク・モデル呼び出し不要）:
+
+```bash
+python scripts/verify_offline.py   # 18 チェック: import スモーク + 下記の verify_* スクリプト
+cd web && npm test                 # Web の単体テスト（portfolio、サンプル文言、Recorded Demo の入口）
+cd web && npm run lint && npm run build
+```
+
+`verify_offline.py` は各チェックを別プロセスで実行します: Analyze キャッシュ、LLM プロバイダーの選択、OpenAI 互換と Meterless のプロバイダー（ローカルの偽サーバー）、構造化出力のリスト、根拠スキーマ、SQL ガードと SQLite ストア、根拠テーブル、Zetaris ストア（偽エンジン）、根拠ループと Critic のルール（スタブのモデル）、`/api/evidence`、判断メモリ、H-MEM の適合テスト + アダプター（Node.js がなければスキップ）、施策管理、`/api/interventions`、サンプルモード、メモリ → 根拠ループの結合。
+
+オフライン一式に含まないもの（実サービスが必要）: `verify_ga4.py`、`verify_admob.py`、`verify_zetaris_live.py`、`check_meterless.py`。
 
 ## Roadmap
 
@@ -262,6 +550,24 @@ npm install && npm run dev
 - Web UI 向け FastAPI（ローカル / コンテナ）
 - コンテナ + Amplify / ECS Express Mode デプロイ対応
 
+### Open Agent Hackathon 2026（実装済み）
+
+- すべての Strands Agent でモデルプロバイダーを切り替え可能（`bedrock` / `openai_compatible` / `meterless`）
+- 根拠テーブル、読み取り専用 SQL ガード、SQLite / Zetaris の根拠ストア
+- Analyst + 独立した Grounding Critic の改訂ループ（v1 → v2 → Critic → v3 → Critic）。値の照合はコード、トレースを保存
+- 施策管理: AI の提案の採用または手動登録、変更前後の SQL 計測、人の評価
+- 判断メモリ（`local`、Meterless H-MEM）と、過去の判断・結果を Analyst の文脈として想起
+- `/api/evidence`、`/api/interventions`、Web UI の Grounding Critic パネルと施策パネル
+- Portfolio Overview（各アプリの保存済み Live Analyze の表示）
+- 架空サンプルデータ、Live Sample、Recorded Demo（CLI ビューア、ダッシュボードの入口ボタン、改訂履歴でのラベル表示）
+- オフライン検証の一括実行
+
+### まだ完了していないもの
+
+- **Recorded Demo の独立画面**: 現在はダッシュボードの Grounding Critic パネル内で開く
+- **根拠ループの高速化**: Nightshift 経由の Nemotron 3 Ultra で1回約15〜24分かかる。高速化の作業はまだしていない
+- Recorded Demo で見えた Critic の誤判定の削減（件数をアプリごとの値と照合してしまう、指摘の種類が内容と合わない）
+
 ### Future Roadmap（未実装）
 
 #### Next
@@ -270,35 +576,44 @@ npm install && npm run dev
 - App Store レビュー
 - IAP / サブスクリプション
 - RevenueCat 連携
+- 根拠ループへの GA4 / AdMob テーブルの追加
 
 #### Later
 
-- 複数 Product 横断の **ポートフォリオ** 分析（既存の 1 Product セレクタとは別物）
+- 複数 Product 横断の **ポートフォリオ** 分析（既存の 1 Product セレクタや、表示のみの Portfolio Overview とは別物）
 - プロアクティブな成長アラート
-- 過去の提案と結果からの学習
+- 根拠ループ / Zetaris / Meterless / H-MEM の AWS デプロイ
 
 #### Long-term vision
 
 Indie Growth Agent は、選択した 1 Product の分析から、インディー開発者の限られた時間を「次にどの Product へ使うべきか」まで一緒に決める成長パートナーへ進化することを目指します。
 
 ```
-Acquisition → Usage → Feedback → Revenue → Prioritized action
+Acquisition → Usage → Feedback → Revenue → Prioritized action → Measured outcome
 ```
 
 現時点では次も未実装です:
 
 - Amazon Bedrock AgentCore（本プロジェクトは Amplify Hosting + ECS Express Mode を使用）
-- 生成後の機械的な grounding 検証（スキーマ検証・出典チェック等）
+- Live Analyze の Top 3 に対する生成後の機械的な grounding 検証（根拠ループには独自の検証がある）
 - AdMob メトリクス欠損の明示的ハンドリング（部分欠損を missing として区別する等）
 
 ## Known limitations（MVP）
 
 - **Source populations may differ** — カレンダーが揃っていても ASC Analytics / ASC Sales / GA4 App / GA4 Web / AdMob は同一母集団ではない
 - **AdMob partial metric missing handling is not implemented** — レスポンス欠落時に「未取得」と「ゼロ」を厳密には区別しない
-- **LLM output is grounded by prompt / data contract but not machine-validated after generation** — 出力の事後検証はない
-- **Public analyze API** — ECS の HTTPS endpoint はブラウザから直接呼べるため、本番では保護が必要（例: WAF / レート制限）。長時間の Analyze には ALB idle timeout を既定の 60 秒より長くする必要があります
+- **Live Analyze の出力は prompt / data contract で制約しているが、生成後の機械検証はない** — SQL の再実行と Critic があるのは根拠ループだけ
+- **Critic は誤ることがあり、未解決の指摘を残して終わる** — Recorded Demo は2本ともレビュー上限（`max_rounds`）で終わり、未解決の指摘が残っている。既知の `value_mismatch` の誤判定や、種類の合わない指摘も含む。「未解決」は検証できていないという意味で、誤りが証明されたという意味ではない
+- **根拠ループの実行が遅い** — 1段階あたり数分、Recorded Demo では1回約15〜24分
+- **シナリオごとに1回の実行** — Recorded Demo ではモデルのばらつきとシナリオの違いを切り分けられない
+- **根拠ループの範囲** — App Store Connect の日次データ、Known Events、公開掲載情報のみ。競合データは公開掲載情報だけで、スクリーンショットの中身やレビューは含まない
+- **変更前後の計測** は territory が `ALL` の `asc_daily` の行を読む（製品 JSON は `ALL`）。1日でも欠けた期間はスキップする。判定は人によるもので、統計的検定ではない
+- **Recorded Demo に独立画面はない** — ダッシュボードのパネル内で開き、Web UI での表示にはローカルの API が必要
+- **Live Sample のモデル名** — `LLM_PROVIDER=meterless` のとき、`scripts/run_sample.py` はモデル名を `meterless` とだけ記録する（モデル ID を含まない）
+- **ハッカソン構成はローカルのみ** — Zetaris、Nightshift、H-MEM は開発者のマシンで動き、AWS デプロイには含まれない
+- **Public analyze API** — ECS の HTTPS endpoint はブラウザから直接呼べるため、本番では保護が必要（例: WAF / レート制限）。長時間の Analyze には ALB idle timeout を既定の 60 秒より長くする必要があります。`/api/evidence` と `/api/interventions` にも認証はないため、ローカルで動かしてください
 - **Language switch does not regenerate analysis** — UI クロムは即切替。分析本文は次回の Live Analyze までそのまま
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE). 同梱の Meterless H-MEM 参照実装は、独自のライセンスを [`integrations/hmem/vendor/LICENSE`](integrations/hmem/vendor/LICENSE) に保持しています。
