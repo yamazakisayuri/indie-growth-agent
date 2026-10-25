@@ -7,10 +7,12 @@ Not a multi-dashboard mashup. The agent applies a Data Contract (periods, popula
 
 There are two flows:
 
-1. **Live Analyze** (pre-existing, deployed on AWS): connected channels → Data Contract → one model call → Top 3 Actions
+1. **Live Analyze** (pre-existing; deployed on AWS in September 2026, that environment retired in October 2026): connected channels → Data Contract → one model call → Top 3 Actions
 2. **Evidence loop and interventions** (Open Agent Hackathon 2026, runs locally): SQL-reproducible claims → independent Grounding Critic → revision → adopted interventions measured by SQL → outcomes recalled for the next run
 
-## Diagram — Live Analyze (AWS deployment)
+## Diagram — Live Analyze (past AWS deployment, retired)
+
+This is the deployment used for the Agents for Humans Hackathon (September 2026). The AWS environment was retired in October 2026; there is no public deployment now. Locally, the same API and Web UI run with `python api_server.py` and `npm run dev`.
 
 ```mermaid
 %%{init: {"theme": "neutral"}}%%
@@ -58,12 +60,14 @@ Source-only Mermaid file: [`architecture.mmd`](architecture.mmd)
 
 ## Request flow — Live Analyze
 
+As it worked in the past AWS deployment (locally, the browser calls `http://127.0.0.1:8000` instead of the ECS endpoint):
+
 1. User opens the Amplify-hosted static Web UI, selects a **Product**, and sees the **last successful Live Analyze** for that Product from `localStorage` (or an empty shell).
 2. Browser may call `GET /api/products` for the catalog. **Analyze** calls FastAPI `POST /api/analyze` on the ECS Express Mode HTTPS endpoint (CORS; body `{ language, productId }`).
 3. Backend reads **process environment variables** (`config.py`; locally from `.env`). In ECS deploy, those values may be injected into the task environment from **AWS Secrets Manager**—the application does not call Secrets Manager APIs itself.
 4. Backend loads the Product from `products/`, then fetches connected channels: App Store Connect Analytics, optional ASC Sales (Developer Proceeds), GA4 App, GA4 Web (`hostName` EXACT when configured), and AdMob.
 5. Observed metrics are shaped into a **Data Contract / Grounding** prompt (aligned windows, separate populations including GA4 Web ≠ GA4 App, missing ≠ zero, AdMob earnings ≠ ASC Proceeds and must not be summed).
-6. **Strands Agents SDK** invokes **Amazon Bedrock (Claude)** with the ECS **Task Role** (no long-lived AWS access keys in the container). Optional Planner may attach Growth Experiments. (Locally, `LLM_PROVIDER` can switch every Strands Agent to an OpenAI-compatible server or Meterless Nightshift; the AWS deployment uses the Bedrock default.)
+6. **Strands Agents SDK** invokes **Amazon Bedrock (Claude)** with the ECS **Task Role** (no long-lived AWS access keys in the container). Optional Planner may attach Growth Experiments. (Locally, `LLM_PROVIDER` can switch every Strands Agent to an OpenAI-compatible server or Meterless Nightshift; the past AWS deployment used the Bedrock default.)
 7. Structured **Facts / Speculation / Top 3 Actions** (and optional experiments) JSON returns to the browser, renders in the UI, and is cached as the last successful report for that Product.
 8. Optional **Action Draft**: browser `POST /api/draft` with experiment context (and optional screenshots); secrets still stay server-side.
 
@@ -131,4 +135,4 @@ All model calls go through Strands Agents with `LLM_PROVIDER=meterless`: Meterle
 
 ## Not in this architecture
 
-App Runner, Amplify SSR, Next.js API Route proxy, AgentCore, API Gateway, Cognito, application database, **Google Play**, RevenueCat, App Store reviews, cross-Product **portfolio** analysis (the single-Product selector and the display-only Portfolio Overview are in scope; comparing or prioritizing across Products is not). The evidence loop, Zetaris, Meterless Nightshift, and H-MEM are not part of the AWS deployment.
+App Runner, Amplify SSR, Next.js API Route proxy, AgentCore, API Gateway, Cognito, application database, **Google Play**, RevenueCat, App Store reviews, cross-Product **portfolio** analysis (the single-Product selector and the display-only Portfolio Overview are in scope; comparing or prioritizing across Products is not). The evidence loop, Zetaris, Meterless Nightshift, and H-MEM were never deployed to AWS.

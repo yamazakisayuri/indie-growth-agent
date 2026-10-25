@@ -4,6 +4,44 @@
 
 Indie app 向けの成長分析 Agent（ハッカソン MVP を **Open Agent Hackathon 2026 — Track 2「The Agent That Can Explain Why」** 向けに拡張）。
 
+## Quick Demo（30秒で分かる）
+
+**何ができるか。** インディーアプリの次の成長施策を AI が提案します。提案の裏にある数字には、その値を再現する SQL を必ず付けます。独立した **Critic** が自分で書いた SQL で数字を照合し、一致するかは **コード** が判定し、Analyst が改訂します（v1 → v2 → Critic → v3 → Critic）。人が採用した施策は変更前後を SQL で計測し、その結果が次回の分析に渡ります。
+
+**実際に見つけたこと。** Recorded Demo の `competitor-variant` で、v2 はページビュー→ダウンロード率を 5.0 → 6.67 と報告していました。改善したように読めます。しかし Analyst の SQL は分子と分母が逆で、その SQL を再実行しても同じ誤った数字が返ります。Critic が自分で書いた SQL で、実際の率は **20.0% から 15.0% に下がっていた** ことが分かりました。誤った数字は1位のアクションの成功基準にも入り込んでいました。v3 で両方が直り、2回目のレビューですべての値が一致しました（[詳細](#成功例critic-が見つけたものと-analyst-の直し方)）。
+
+**なぜ価値があるか。** モデルに自己採点させません。Critic は Analyst の SQL も推論も見ず、値の一致はコードが判定し、解消できなかった指摘は隠さず「未解決」として表示します。
+
+**再生方法（API キー・モデル呼び出し・`.env` 不要）:**
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+python scripts/show_sample_demo.py     # Recorded Demo 2本: v1/v2/v3 の Top 3、Critic の件数、レビュー注記
+```
+
+Critic の各指摘を SQL と値付きで見るには、Web UI を開きます。
+
+```bash
+python api_server.py                       # ターミナル 1
+cd web && npm install && npm run dev       # ターミナル 2。http://localhost:3000 を開く
+```
+
+ダッシュボード上部の **検証の流れを見る** を押すと、改訂履歴で `base` の Recorded Demo が開きます。上の例を見るには、実行の選択肢で `[Recorded Demo: competitor-variant]` を選び、v2、v3 の順に開きます。
+
+**どこを見れば分かるか**
+
+| 見たいもの | 見る場所 |
+|------------|----------|
+| ループとガード | [`evidence/loop.py`](evidence/loop.py)、[`evidence/critic.py`](evidence/critic.py)（コード側の検証）、[`evidence/agents.py`](evidence/agents.py)（独立した Critic） |
+| 上の例の生データ | [`samples/recorded/sample-competitor-variant-20261024-220111.json`](samples/recorded/sample-competitor-variant-20261024-220111.json): v2 の Critic の指摘 `r1-f3`、`r1-f7`、`r1-f13` と、v3 の `findingResponses` |
+| まだ検証できていないもの | 各 `samples/recorded/*.sample.json`（レビュー結果、既知の限界）と [Known limitations](#known-limitationsmvp) |
+| 計測とフィードバック | [`interventions/`](interventions/)、[`memory/recall.py`](memory/recall.py) |
+| スポンサー技術の連携 | [`integrations/zetaris/`](integrations/zetaris/)、[`integrations/meterless/`](integrations/meterless/)、[`integrations/hmem/`](integrations/hmem/) |
+
+**目次:** [Track 2](#open-agent-hackathon-2026--track-2-the-agent-that-can-explain-why) · [根拠ループ](#根拠の検証改訂ループv1--v2--critic--v3--critic) · [施策管理](#施策管理変更前後の計測人の評価次回へのフィードバック) · [スポンサー技術](#スポンサー技術とその役割) · [Portfolio Overview](#portfolio-overview表示とポートフォリオ分析未実装の違い) · [サンプルデータと Recorded Demo](#架空サンプルデータlive-samplerecorded-demo) · [Architecture](#architecture) · [セットアップ](#セットアップ) · [実行方法](#実行方法) · [テスト](#テスト) · [Roadmap](#roadmap) · [Known limitations](#known-limitationsmvp)
+
+## 概要
+
 **接続できた Product チャネル**（App Store Connect Analytics、任意の ASC Sales、GA4 App、GA4 Web、AdMob）の観測データを集め、数字の要約ではなく **優先すべき Top 3 Actions** を返します。実行ランタイムは **Strands Agents SDK** で、モデルプロバイダーは切り替え可能です（既定は **Amazon Bedrock**、ハッカソンの実行は **Meterless Nightshift → NVIDIA Nemotron**）。**Next.js の静的 Web UI**（日本語 / English）と **Multi-Product** カタログ（`products/`）を含みます。
 
 ハッカソンでは **根拠の検証・改訂ループ** を追加しました。Analyst が主張（claim）付きでアクションを提案し、主張に出てくる数字にはすべて、根拠ストア（実データは **Zetaris**）でその値を再現する SQL を付けます。独立した **Grounding Critic** が自分で書いた SQL で主張を照合し、Analyst が改訂します（v1 → v2 → Critic → v3 → Critic）。採用したアクションは **施策（intervention）** として管理し、変更前後の数字を SQL で計測して人が評価します。その結果は **Meterless H-MEM** の判断メモリを通じて次回の Analyst に渡ります。
@@ -103,7 +141,7 @@ AI の提案を採用 / 手動で登録 → planned
 | **NVIDIA Nemotron** | ハッカソンの実行で Analyst と Critic を動かすモデル: `nvidia/nemotron-3-ultra-550b-a55b`。Nightshift の NVIDIA プロバイダー経由で呼ぶ（このマシンでは `meterless/auto` が 404 を返すモデルに振り分けられたため固定） | `METERLESS_MODEL` |
 | **Meterless H-MEM** | 判断メモリのバックエンド（`MEMORY_BACKEND=hmem`）。公式の参照実装を同梱し、Node.js の別プロセスで動かす。判断と結果を Product ごとに保存し、根拠ループの前に思い出す | `integrations/hmem/` |
 | Strands Agents SDK | 構造化出力と SQL ツールを含む、すべてのモデル呼び出しの Agent ランタイム | `agent.py`、`evidence/agents.py` |
-| Amazon Bedrock | 既定のモデルプロバイダー（`LLM_PROVIDER` 未設定または `bedrock`）で、AWS デプロイのプロバイダー | `llm/factory.py` |
+| Amazon Bedrock | 既定のモデルプロバイダー（`LLM_PROVIDER` 未設定または `bedrock`）で、過去の AWS デプロイで使ったプロバイダー | `llm/factory.py` |
 
 Live Sample と Recorded Demo は Zetaris ではなく専用の SQLite ファイルを使うので、架空データが実データの根拠ストアに入ることはありません。
 
@@ -176,6 +214,20 @@ Revenue UI では AdMob 推定収益と App Store Developer Proceeds を **別�
 | **架空 CSV のみ** | なし | `tmp/sample/<scenario>.sqlite` | `python scripts/run_sample.py --scenario base --dry-run` で CSV（とシナリオの変更）を読み込み、期間と行数を表示して止まる |
 | **Live Sample** | あり（`LLM_PROVIDER`） | 専用 SQLite。`EVIDENCE_STORE` は無視 | `python scripts/run_sample.py --scenario base` で本物の Analyst と Critic を動かす。過去の判断は思い出さない。トレース: `tmp/evidence_runs/sample-<scenario>-<timestamp>.json` + `.sample.json` |
 | **Recorded Demo** | なし（API キー・ネットワーク・モデル不要） | コミット済みのトレース | `samples/recorded/` のトレース。Live Sample の実行を、チェック（sample の実行 ID、CSV が変わっていない、完了している、モデル名がある、Critic のレビューが1回以上ある）を通った場合だけ `scripts/record_sample_demo.py` でコピーしたもの |
+
+### 成功例：Critic が見つけたものと Analyst の直し方
+
+`sample-competitor-variant-20261024-220111` より（v2 → Critic 1回目 → v3 → Critic 2回目）。架空データ: 前7日はインプレッション 30,000 / ページビュー 1,800 / ダウンロード 360、直近7日は 42,000 / 2,100 / 315。
+
+| | v2（Analyst） | Critic 1回目 | v3（Analyst） | Critic 2回目 |
+|-|---------------|--------------|---------------|--------------|
+| 主張 C1（前7日） | インプレッション→ページビュー率 **16.67**、ページビュー→ダウンロード率 **5.0** | Critic の SQL `SUM(product_page_views) * 100.0 / SUM(impressions)` は **6.0** を返し、コードが `value_mismatch` を記録（記載値 16.67）。ダウンロード率も同様（**20.0** vs 5.0） | **6.0%** と **20.0%** | 一致 |
+| 主張 C2（直近7日） | **20.0** と **6.67** | Critic の SQL は **5.0** と **15.0** を返し、`value_mismatch` | **5.0%** と **15.0%** | 一致 |
+| 1位のアクションの成功基準（主張 C14） | 「ページビュー→ダウンロード率が **6.67 から 5.0 以下** に改善」（逆転した数字に基づく、方向が逆の目標） | Critic: 成功基準が誤った値を使っており、「改善」なのに数字を下げる方向になっている（`scope_mismatch`） | 「**15.0% から 20.0% 以上** に改善」 | 指摘なし |
+
+独立した照合が必要だった理由: v2 の SQL は `SUM(impressions) * 1.0 / SUM(product_page_views)`（と `SUM(product_page_views) * 1.0 / SUM(first_time_downloads)`）だったため、**Analyst 自身の SQL を再実行すると 16.67 と 5.0 が再現される** 状態でした。数字は SQL と食い違っていないものの、ラベルとは逆の意味でした。Analyst の SQL を見ない Critic が率を定義どおりに書き、コードが値を比べたことで見つかりました。Critic は指摘の中で、正しい前7日の率は 6.0%（1,800 / 30,000）と 20.0%（360 / 1,800）だと逆転の中身も説明しています。v3 で Analyst はこれらの指摘すべてに `fixed` と応答し、2回目のレビューで C1 / C2 の10個の値がすべて一致しました。これらの指摘は `resolved` です。
+
+同じ回で、v3 は PPO に search 経由だけのコンバージョン率を求めていた検証計画も直しました（PPO はトラフィックソース別に結果を分けないため。`resolved`）。すべてが直ったわけではありません。C5・C6・C12 の因果の飛躍の指摘は、応答はあったものの2回目でも再び指摘され、未解決のままです（下の表）。
 
 **コミット済みの Recorded Demo**（どちらもレビュー上限で終了。すべての指摘が解消済みではありません）:
 
@@ -262,7 +314,9 @@ indie-growth-agent/
 
 詳細な Architecture Diagram（Mermaid）とリクエストフローは **[docs/architecture.md](docs/architecture.md)** を参照してください。
 
-### Live Analyze（AWS デプロイ）
+### Live Analyze（過去の AWS デプロイ。現在は稼働していない）
+
+Agents for Humans Hackathon（2026年9月）で Live Analyze をデプロイしたときの構成です。この AWS 環境は2026年10月に廃止しており、**現在公開中の環境はありません**。この README の内容はすべてローカルで動かします（[実行方法](#実行方法) 参照）。
 
 ```mermaid
 %%{init: {"theme": "neutral"}}%%
@@ -369,10 +423,12 @@ Live Sample は同じループを Zetaris ではなく `tmp/sample/<scenario>.sq
 
 詳細: [`web/README.md`](web/README.md)
 
-## Deployment
+## Deployment（過去の AWS 構成。廃止済み）
 
-| 層 | 採用 |
-|----|------|
+**現在公開中の環境はありません。** 以下は Agents for Humans Hackathon（2026年9月）で使った構成で、2026年10月に廃止しました。Dockerfile とこの説明は、記録と再デプロイのためにリポジトリに残しています。当時の環境の URL は維持していません。試すときはローカルで動かしてください（[Quick Demo](#quick-demo30秒で分かる) と [実行方法](#実行方法) 参照）。
+
+| 層 | 採用（当時） |
+|----|--------------|
 | Frontend | Next.js 16 **static export** → **AWS Amplify Hosting** |
 | Backend | FastAPI コンテナ → **Amazon ECS Express Mode**（AWS Fargate） |
 | Image | **Amazon ECR** |
@@ -385,7 +441,7 @@ Frontend のビルド環境変数: `NEXT_PUBLIC_AGENT_API_URL=<ECS の HTTPS URL
 
 使わない構成: App Runner、Amplify SSR、Next.js API Route プロキシ。
 
-ハッカソンで追加したもの（根拠ループ、Zetaris、Meterless Nightshift、H-MEM）は **ローカル** で動かします。Dockerfile と AWS デプロイはこれらに合わせて更新していません（イメージに Java / Node がなく、Nightshift / Zetaris は開発者のマシンで動く）。
+ハッカソンで追加したもの（根拠ループ、Zetaris、Meterless Nightshift、H-MEM）は **ローカル** で動かし、AWS にデプロイしたことはありません。Dockerfile はこれらに合わせて更新していません（イメージに Java / Node がなく、Nightshift / Zetaris は開発者のマシンで動く）。
 
 ## セットアップ
 
@@ -546,9 +602,9 @@ cd web && npm run lint && npm run build
 - Missing data ≠ zero
 - 優先順位付き Top 3 Actions
 - 任意の Growth Experiments（Planner）+ Action Draft
-- Next.js 16 静的エクスポート Web UI（Amplify 向け）: 前回成功レポートのキャッシュ、loading / empty / error、ja / en クロム
+- Next.js 16 静的エクスポート Web UI: 前回成功レポートのキャッシュ、loading / empty / error、ja / en クロム
 - Web UI 向け FastAPI（ローカル / コンテナ）
-- コンテナ + Amplify / ECS Express Mode デプロイ対応
+- Dockerfile と AWS デプロイ構成（Amplify Hosting + ECS Express Mode。2026年9月にデプロイし、2026年10月に廃止）
 
 ### Open Agent Hackathon 2026（実装済み）
 
@@ -582,7 +638,7 @@ cd web && npm run lint && npm run build
 
 - 複数 Product 横断の **ポートフォリオ** 分析（既存の 1 Product セレクタや、表示のみの Portfolio Overview とは別物）
 - プロアクティブな成長アラート
-- 根拠ループ / Zetaris / Meterless / H-MEM の AWS デプロイ
+- 根拠ループ / Zetaris / Meterless / H-MEM を含めた公開環境の再構築
 
 #### Long-term vision
 
@@ -594,7 +650,7 @@ Acquisition → Usage → Feedback → Revenue → Prioritized action → Measur
 
 現時点では次も未実装です:
 
-- Amazon Bedrock AgentCore（本プロジェクトは Amplify Hosting + ECS Express Mode を使用）
+- Amazon Bedrock AgentCore（過去のデプロイでは代わりに Amplify Hosting + ECS Express Mode を使用）
 - Live Analyze の Top 3 に対する生成後の機械的な grounding 検証（根拠ループには独自の検証がある）
 - AdMob メトリクス欠損の明示的ハンドリング（部分欠損を missing として区別する等）
 
@@ -610,8 +666,8 @@ Acquisition → Usage → Feedback → Revenue → Prioritized action → Measur
 - **変更前後の計測** は territory が `ALL` の `asc_daily` の行を読む（製品 JSON は `ALL`）。1日でも欠けた期間はスキップする。判定は人によるもので、統計的検定ではない
 - **Recorded Demo に独立画面はない** — ダッシュボードのパネル内で開き、Web UI での表示にはローカルの API が必要
 - **Live Sample のモデル名** — `LLM_PROVIDER=meterless` のとき、`scripts/run_sample.py` はモデル名を `meterless` とだけ記録する（モデル ID を含まない）
-- **ハッカソン構成はローカルのみ** — Zetaris、Nightshift、H-MEM は開発者のマシンで動き、AWS デプロイには含まれない
-- **Public analyze API** — ECS の HTTPS endpoint はブラウザから直接呼べるため、本番では保護が必要（例: WAF / レート制限）。長時間の Analyze には ALB idle timeout を既定の 60 秒より長くする必要があります。`/api/evidence` と `/api/interventions` にも認証はないため、ローカルで動かしてください
+- **公開環境はない** — 過去の AWS 環境は廃止済み。Zetaris、Nightshift、H-MEM は開発者のマシンで動く
+- **API に認証がない** — `/api/analyze`、`/api/evidence`、`/api/interventions` には認証がないため、ローカルで動かしてください。公開する場合は保護（例: WAF / レート制限）が必要で、長時間の Analyze には ALB idle timeout を既定の 60 秒より長くする必要があります
 - **Language switch does not regenerate analysis** — UI クロムは即切替。分析本文は次回の Live Analyze までそのまま
 
 ## License

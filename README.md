@@ -4,6 +4,44 @@
 
 Growth-analysis agent for indie apps (Hackathon MVP, extended for **Open Agent Hackathon 2026 — Track 2 "The Agent That Can Explain Why"**).
 
+## Quick Demo (30 seconds)
+
+**What it does.** The agent proposes the next growth actions for an indie app. Every number behind a proposal must come with SQL that reproduces it. An independent **Critic** re-checks the numbers with SQL it writes itself, **code** decides whether they match, and the Analyst revises (v1 → v2 → Critic → v3 → Critic). Actions a person adopts are measured before/after by SQL, and the result feeds the next analysis.
+
+**What it caught.** In the `competitor-variant` Recorded Demo, v2 reported the page-view → download rate as 5.0 → 6.67, which reads as an improvement. The Analyst's SQL had numerator and denominator swapped, and re-running that SQL returns the same wrong numbers. The Critic's own SQL found the real rate: it **fell from 20.0% to 15.0%**. The wrong numbers had also reached the #1 action's success criterion. v3 fixed both, and the second review matched every value ([details](#example-what-the-critic-caught-and-how-the-analyst-fixed-it)).
+
+**Why this matters.** The model is not trusted to grade itself: the Critic never sees the Analyst's SQL or reasoning, value matches are decided by code, and findings that remain open are shown as unresolved instead of being hidden.
+
+**Replay it (no API key, no model call, no `.env`):**
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+python scripts/show_sample_demo.py     # both Recorded Demos: v1/v2/v3 Top 3, Critic counts, review notes
+```
+
+To see each Critic finding with its SQL and values, open the Web UI:
+
+```bash
+python api_server.py                       # terminal 1
+cd web && npm install && npm run dev       # terminal 2, then open http://localhost:3000
+```
+
+Press **Explore the verification process** at the top of the dashboard; it opens the `base` Recorded Demo in the revision history. For the example above, pick `[Recorded Demo: competitor-variant]` in the run selector and open v2, then v3.
+
+**Where to look**
+
+| To see | Look at |
+|--------|---------|
+| The loop and the guards | [`evidence/loop.py`](evidence/loop.py), [`evidence/critic.py`](evidence/critic.py) (code-side checks), [`evidence/agents.py`](evidence/agents.py) (independent Critic) |
+| The example above, raw | [`samples/recorded/sample-competitor-variant-20261024-220111.json`](samples/recorded/sample-competitor-variant-20261024-220111.json): v2 Critic findings `r1-f3`, `r1-f7`, `r1-f13`, and v3 `findingResponses` |
+| What is still not verified | Each `samples/recorded/*.sample.json` (review outcome, known limitations) and [Known limitations](#known-limitations-mvp) |
+| Measurement and feedback | [`interventions/`](interventions/), [`memory/recall.py`](memory/recall.py) |
+| Sponsor integrations | [`integrations/zetaris/`](integrations/zetaris/), [`integrations/meterless/`](integrations/meterless/), [`integrations/hmem/`](integrations/hmem/) |
+
+**Contents:** [Track 2](#open-agent-hackathon-2026--track-2-the-agent-that-can-explain-why) · [Evidence loop](#evidence-revision-loop-v1--v2--critic--v3--critic) · [Interventions](#interventions-measurement-human-evaluation-and-feedback) · [Sponsor technologies](#sponsor-technologies-and-their-roles) · [Portfolio Overview](#portfolio-overview-display-vs-portfolio-analysis-not-implemented) · [Sample data and Recorded Demo](#sample-data-live-sample-and-recorded-demo) · [Architecture](#architecture) · [Setup](#setup) · [Run](#run) · [Tests](#tests) · [Roadmap](#roadmap) · [Known limitations](#known-limitations-mvp)
+
+## Overview
+
 It pulls observed metrics from **connected Product channels** (App Store Connect Analytics, optional ASC Sales, GA4 App, GA4 Web, AdMob), then returns **prioritized Top 3 Actions**—not a bare metric summary. The runtime is **Strands Agents SDK** with a selectable model provider (**Amazon Bedrock** by default; **Meterless Nightshift → NVIDIA Nemotron** for the hackathon runs), with a **Next.js static Web UI** (Japanese / English) and a **Multi-Product** catalog (`products/`).
 
 For the hackathon it adds an **evidence revision loop**: an Analyst proposes actions with claims, every number in a claim must come with SQL that reproduces it on an evidence store (**Zetaris** for real data), an independent **Grounding Critic** checks the claims with its own SQL, and the Analyst revises (v1 → v2 → Critic → v3 → Critic). Adopted actions are tracked as **interventions** with before/after numbers measured by SQL and a human verdict, and those outcomes are fed back to the next Analyst through **Meterless H-MEM** decision memory.
@@ -103,7 +141,7 @@ Adopt AI action / register by hand → planned
 | **NVIDIA Nemotron** | The model behind the Analyst and Critic in the hackathon runs: `nvidia/nemotron-3-ultra-550b-a55b`, reached through Nightshift's NVIDIA provider (pinned because `meterless/auto` routed to a model that returned 404 on this machine) | `METERLESS_MODEL` |
 | **Meterless H-MEM** | Decision memory backend (`MEMORY_BACKEND=hmem`). The official reference implementation is vendored and run as a Node.js sidecar; decisions and outcomes are stored per product and recalled before each evidence run | `integrations/hmem/` |
 | Strands Agents SDK | Agent runtime for every model call, including structured output and the SQL tool | `agent.py`, `evidence/agents.py` |
-| Amazon Bedrock | Default model provider (`LLM_PROVIDER` unset or `bedrock`) and the provider of the AWS deployment | `llm/factory.py` |
+| Amazon Bedrock | Default model provider (`LLM_PROVIDER` unset or `bedrock`) and the provider used in the past AWS deployment | `llm/factory.py` |
 
 The Live Sample and Recorded Demo use a dedicated SQLite file, not Zetaris, so fictional data never enters the real evidence store.
 
@@ -176,6 +214,20 @@ Three ways to use it, kept apart:
 | **Fictional CSV only** | No | `tmp/sample/<scenario>.sqlite` | `python scripts/run_sample.py --scenario base --dry-run` loads the CSVs (plus scenario changes), prints the periods and row counts, and stops |
 | **Live Sample** | Yes (`LLM_PROVIDER`) | Dedicated SQLite, `EVIDENCE_STORE` ignored | `python scripts/run_sample.py --scenario base` runs the real Analyst and Critic. No past decisions are recalled. Trace: `tmp/evidence_runs/sample-<scenario>-<timestamp>.json` + `.sample.json` |
 | **Recorded Demo** | No (no API key, network, or model) | Committed trace | Traces in `samples/recorded/`, copied from Live Sample runs only after checks (`scripts/record_sample_demo.py`: sample run id, unchanged CSVs, finished, model recorded, at least one Critic review) |
+
+### Example: what the Critic caught and how the Analyst fixed it
+
+From `sample-competitor-variant-20261024-220111` (v2 → Critic round 1 → v3 → Critic round 2). Fictional data: prior 7 days 30,000 impressions / 1,800 page views / 360 downloads; latest 7 days 42,000 / 2,100 / 315.
+
+| | v2 (Analyst) | Critic round 1 | v3 (Analyst) | Critic round 2 |
+|-|--------------|----------------|--------------|----------------|
+| Claim C1 (prior 7 days) | impression → page-view rate **16.67**, page-view → download rate **5.0** | Critic SQL `SUM(product_page_views) * 100.0 / SUM(impressions)` returns **6.0**; code files `value_mismatch` (claimed 16.67). Same for the download rate (**20.0** vs 5.0) | **6.0%** and **20.0%** | Matched |
+| Claim C2 (latest 7 days) | **20.0** and **6.67** | Critic SQL returns **5.0** and **15.0**; `value_mismatch` | **5.0%** and **15.0%** | Matched |
+| Action #1 success criterion (claim C14) | "page-view → download rate improves from **6.67 to 5.0 or lower**" (a target in the wrong direction, built on the swapped numbers) | Critic: the criterion uses the wrong values, and "improve" points the number down (`scope_mismatch`) | "from **15.0% to 20.0% or higher**" | No finding |
+
+Why this needed an independent check: v2's SQL was `SUM(impressions) * 1.0 / SUM(product_page_views)` (and `SUM(product_page_views) * 1.0 / SUM(first_time_downloads)`), so **re-running the Analyst's own SQL reproduces 16.67 and 5.0**. The numbers were self-consistent but meant the opposite of their labels. The Critic, which never sees the Analyst's SQL, wrote the rates from their definitions, and code compared the values. The Critic also explained the swap in its finding: the correct prior rates are 6.0% (1,800 / 30,000) and 20.0% (360 / 1,800). In v3 the Analyst answered each of these findings as `fixed`, and the second review matched all ten C1 / C2 values; these findings are marked `resolved`.
+
+In the same round, v3 also fixed a test plan that asked PPO for a search-only conversion rate (PPO does not split results by traffic source; `resolved`). Not everything was fixed: the causal-leap findings on C5, C6, and C12 were answered but raised again in round 2 and remain unresolved (see the table below).
 
 **Committed Recorded Demos** (both ended at the review limit; not every finding is resolved):
 
@@ -262,7 +314,9 @@ indie-growth-agent/
 
 See **[docs/architecture.md](docs/architecture.md)** for the full architecture diagrams (Mermaid) and request flows.
 
-### Live Analyze (AWS deployment)
+### Live Analyze (past AWS deployment, no longer running)
+
+This is how Live Analyze was deployed for the Agents for Humans Hackathon (September 2026). That AWS environment was retired in October 2026; **there is no public deployment now**. Everything in this README runs locally (see [Run](#run)).
 
 ```mermaid
 %%{init: {"theme": "neutral"}}%%
@@ -369,10 +423,12 @@ The Live Sample uses the same loop on `tmp/sample/<scenario>.sqlite` instead of 
 
 Details: [`web/README.md`](web/README.md)
 
-## Deployment
+## Deployment (past AWS setup, retired)
 
-| Layer | Choice |
-|-------|--------|
+**There is no publicly running deployment.** The setup below was used for the Agents for Humans Hackathon (September 2026) and was retired in October 2026. The Dockerfile and these notes stay in the repository as a record and for redeploying; no URL from that environment is maintained. To try the project, run it locally (see [Quick Demo](#quick-demo-30-seconds) and [Run](#run)).
+
+| Layer | Choice (at the time) |
+|-------|----------------------|
 | Frontend | Next.js 16 **static export** on **AWS Amplify Hosting** |
 | Backend | FastAPI container on **Amazon ECS Express Mode** (AWS Fargate) |
 | Image | **Amazon ECR** |
@@ -385,7 +441,7 @@ Frontend build env: `NEXT_PUBLIC_AGENT_API_URL=<ECS HTTPS URL>`. Backend CORS: s
 
 Not used: App Runner, Amplify SSR, Next.js API Route proxy.
 
-The hackathon additions (evidence loop, Zetaris, Meterless Nightshift, H-MEM) run **locally**. The Dockerfile and the AWS deployment were not updated for them (no Java / Node in the image, and Nightshift / Zetaris run on the developer's machine).
+The hackathon additions (evidence loop, Zetaris, Meterless Nightshift, H-MEM) run **locally** and were never deployed to AWS. The Dockerfile was not updated for them (no Java / Node in the image, and Nightshift / Zetaris run on the developer's machine).
 
 ## Setup
 
@@ -546,9 +602,9 @@ Already in this repository:
 - Missing data ≠ zero
 - Prioritized Top 3 Actions
 - Optional Growth Experiments (Planner) + Action Draft
-- Next.js 16 static-export Web UI (Amplify-ready): last successful report cache, loading / empty / error, ja / en chrome
+- Next.js 16 static-export Web UI: last successful report cache, loading / empty / error, ja / en chrome
 - FastAPI for the Web UI (local / container)
-- Container + Amplify / ECS Express Mode deployment support
+- Dockerfile and AWS deployment setup (Amplify Hosting + ECS Express Mode; deployed in September 2026, retired in October 2026)
 
 ### Open Agent Hackathon 2026 (implemented)
 
@@ -582,7 +638,7 @@ Already in this repository:
 
 - Cross-Product **portfolio** analysis (compare / prioritize across Products—not the same as the existing single-Product selector or the display-only Portfolio Overview)
 - Proactive growth alerts
-- Evidence loop / Zetaris / Meterless / H-MEM in the AWS deployment
+- A public deployment again, including the evidence loop / Zetaris / Meterless / H-MEM
 
 #### Long-term vision
 
@@ -594,7 +650,7 @@ Acquisition → Usage → Feedback → Revenue → Prioritized action → Measur
 
 Also still out of scope for now:
 
-- Amazon Bedrock AgentCore (this project uses Amplify Hosting + ECS Express Mode instead)
+- Amazon Bedrock AgentCore (the past deployment used Amplify Hosting + ECS Express Mode instead)
 - Post-generation machine grounding checks for the Live Analyze Top 3 (the evidence loop has its own checks)
 - Explicit AdMob partial-metric missing handling (distinguish missing vs zero)
 
@@ -610,8 +666,8 @@ Also still out of scope for now:
 - **Before / after measurement** reads `asc_daily` rows with territory `ALL` (the Product JSONs use `ALL`); a window with any missing day is skipped. The verdict is the person's, not a statistical test
 - **Recorded Demo has no standalone screen** — it is opened inside the dashboard panel, and the Web UI needs the local API to show it
 - **Live Sample model label** — with `LLM_PROVIDER=meterless`, `scripts/run_sample.py` records only `meterless` as the model (without the model id)
-- **Hackathon stack is local only** — Zetaris, Nightshift, and H-MEM run on the developer's machine and are not in the AWS deployment
-- **Public analyze API** — the ECS HTTPS endpoint is callable from the browser; protect it in production (e.g. WAF / rate limits). Long-running Analyze also needs an ALB idle timeout above the default 60s. `/api/evidence` and `/api/interventions` have no authentication either; run them locally
+- **No public deployment** — the past AWS environment was retired; Zetaris, Nightshift, and H-MEM run on the developer's machine
+- **No API authentication** — `/api/analyze`, `/api/evidence`, and `/api/interventions` have no authentication; run them locally. A public deployment would need protection (e.g. WAF / rate limits) and, for long-running Analyze, an ALB idle timeout above the default 60s
 - **Language switch does not regenerate analysis** — UI chrome switches immediately; analysis body stays until the next Live Analyze
 
 ## License
