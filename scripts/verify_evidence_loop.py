@@ -34,7 +34,12 @@ from evidence.critic import (  # noqa: E402
     values_match,
 )
 from evidence.loop import comparison_periods, run_evidence_loop  # noqa: E402
-from evidence.prompts import ANALYST_SYSTEM, CRITIC_SYSTEM, past_decisions_text  # noqa: E402
+from evidence.prompts import (  # noqa: E402
+    ANALYST_SYSTEM,
+    CRITIC_SYSTEM,
+    past_decisions_text,
+    version_json,
+)
 from evidence.schema import DecisionOutcome  # noqa: E402
 from evidence.sources import (  # noqa: E402
     ASC_DAILY,
@@ -43,7 +48,7 @@ from evidence.sources import (  # noqa: E402
     INTERNAL_TABLE_NAMES,
     KNOWN_EVENTS,
 )
-from evidence.sql_tool import make_sql_tool  # noqa: E402
+from evidence.sql_tool import LAST_QUERY_NOTE, make_sql_tool  # noqa: E402
 
 DOWNLOADS_SQL = (
     "SELECT SUM(first_time_downloads) FROM asc_daily "
@@ -409,7 +414,19 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
     assert "competitor_listing" not in analyst.prompts[0], "v1 must see internal tables only"
     assert "competitor_listing" in analyst.prompts[1]
     assert "r1-f" in analyst.prompts[2] and "因果は未確認" in analyst.prompts[2]
-    assert all(DOWNLOADS_SQL not in p for p in critic.prompts), "Critic must not see Analyst SQL"
+    assert "Start with run_sql" in analyst.prompts[0]
+    assert "call run_sql before you write any claim" in ANALYST_SYSTEM
+
+    def embedded_version(prompt: str, header: str) -> AnalystOutput:
+        start = prompt.index(header) + len(header)
+        data, _ = json.JSONDecoder().raw_decode(prompt, start)
+        return AnalystOutput.model_validate(data)
+
+    assert embedded_version(analyst.prompts[1], "Previous version (v1):\n") == V1
+    assert embedded_version(analyst.prompts[2], "Your last version:\n") == V2
+    assert version_json(V2) in analyst.prompts[2] and V2.model_dump_json(indent=2) not in analyst.prompts[2]
+    assert len(version_json(V2)) < len(V2.model_dump_json(indent=2))
+    print("OK v2 / v3 get the previous version as compact JSON that parses back to the same version")
     assert json.loads(saved[-1])["status"] == "converged" and len(saved) >= 6
     assert run.rejected_attempts == [] and len(analyst.prompts) == 3
     assert all(s.attempts == 1 for s in run.steps) and "RETRY" not in "".join(analyst.prompts)
@@ -601,13 +618,24 @@ def check_sql_tool(store: SQLiteEvidenceStore) -> None:
     log: list[SqlCall] = []
     run_sql = make_sql_tool(store, role="critic", log=log, max_calls=2)
     ok = json.loads(run_sql(sql="SELECT COUNT(*) AS n FROM asc_daily"))
-    assert ok == {"columns": ["n"], "rows": [[14]], "truncated": False}, ok
+    assert ok == {"columns": ["n"], "rows": [[14]], "truncated": False, "queries_left": 1}, ok
     denied = json.loads(run_sql(sql="DELETE FROM asc_daily"))
-    assert "error" in denied
+    assert "error" in denied and denied["queries_left"] == 0
+    assert denied["note"] == LAST_QUERY_NOTE
     budget = json.loads(run_sql(sql="SELECT 1"))
     assert "budget" in budget["error"]
     assert [c.ok for c in log] == [True, False] and log[0].role == "critic"
+    assert [c.model_dump(by_alias=True).keys() for c in log] == [
+        SqlCall(role="critic", sql="", ok=True).model_dump(by_alias=True).keys()
+    ] * 2, "trace SqlCall shape unchanged"
     print("OK run_sql tool: JSON rows, write rejected and logged, query budget enforced")
+
+    last = json.loads(make_sql_tool(store, role="analyst", log=[], max_calls=1)(sql="SELECT 1 AS x"))
+    assert last["rows"] == [[1]] and last["queries_left"] == 0 and last["note"] == LAST_QUERY_NOTE
+    for system in (ANALYST_SYSTEM, CRITIC_SYSTEM):
+        assert "queries_left" in system and "do not call run_sql again" in system
+    print("OK every result shows queries_left; the last allowed query says to answer now, "
+          "so the model need not spend a round trip on a refused call")
 
 
 def main() -> None:

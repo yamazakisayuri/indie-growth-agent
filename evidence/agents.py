@@ -6,7 +6,9 @@ with the Analyst, and sees only the prompt built from claims and actions.
 A model request that fails for a reason a retry can fix (lost connection, timeout,
 5xx, an error streamed mid-answer) is retried once with a fresh Agent; the failure
 is logged with the provider's error details. Errors that are not about the
-provider are raised unchanged.
+provider are raised unchanged. The openai client's own retries are off, so that
+one retry is the only one: a silent SDK retry after a timeout would add a full
+timeout each time, unlogged.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from .store import EvidenceStore
 
 DEFAULT_MAX_QUERIES = 8
 MODEL_ATTEMPTS = 2
+SDK_RETRIES = 0
 logger = logging.getLogger(__name__)
 
 
@@ -77,7 +80,7 @@ class StrandsAnalyst:
     def __call__(self, prompt: str) -> tuple[AnalystOutput, list[SqlCall]]:
         def make_agent(log: list[SqlCall]) -> Agent:
             return Agent(
-                model=build_model(),
+                model=build_model(sdk_retries=SDK_RETRIES),
                 system_prompt=ANALYST_SYSTEM,
                 tools=[
                     make_sql_tool(self._store, role="analyst", log=log, max_calls=self._max_queries)
@@ -99,7 +102,7 @@ class StrandsCritic:
     def __call__(self, prompt: str) -> tuple[CriticReport, list[SqlCall]]:
         def make_agent(log: list[SqlCall]) -> Agent:
             return Agent(
-                model=build_model(),
+                model=build_model(sdk_retries=SDK_RETRIES),
                 system_prompt=CRITIC_SYSTEM,
                 tools=[
                     make_sql_tool(self._store, role="critic", log=log, max_calls=self._max_queries)

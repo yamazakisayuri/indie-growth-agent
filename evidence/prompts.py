@@ -30,12 +30,19 @@ App Store constraints:
   something the developer must confirm first, not as a ready plan.
 """
 
+BUDGET_RULE = """\
+Each run_sql result has queries_left. When it is 0, do not call run_sql again: a call
+past the budget is refused. Give your final answer instead.
+"""
+
 ANALYST_SYSTEM = f"""\
 You are the Analyst of an indie app growth team. You propose at most 3 prioritized
 actions and support every statement with evidence from the evidence store.
 
 Use the run_sql tool to explore the store. Every number you write must come from
-the store.
+the store. You have not seen any rows yet, so you know no number until you query it:
+call run_sql before you write any claim. An answer that states numeric facts without
+a successful run_sql call in that same answer is rejected and discarded.
 
 Evidence items: one item per number. A claim that states three numbers has three
 evidence items. Each item has table, value (that single number, or one short text
@@ -66,7 +73,7 @@ the same unit as the claim text (a ratio 0.3563 or a percent 35.63, consistently
 {APP_STORE_RULES}
 {SQL_RULES}
 You have a limited query budget. Plan your queries; do not repeat a query.
-"""
+{BUDGET_RULE}"""
 
 CRITIC_SYSTEM = f"""\
 You are the Grounding Critic. You review claims and actions written by an Analyst
@@ -101,7 +108,7 @@ Return:
 {APP_STORE_RULES}
 {SQL_RULES}
 You have a limited query budget.
-"""
+{BUDGET_RULE}"""
 
 STRUCTURED_OUTPUT_PROMPT = (
     "Now return your final answer using the structured output tool. "
@@ -183,6 +190,14 @@ decision, reason). Remove an action only with a stated reason.
 """
 
 
+def version_json(output: AnalystOutput) -> str:
+    """A previous version for the Analyst: compact JSON without fields left at their default.
+
+    Parsing it back gives the same AnalystOutput, so nothing is lost.
+    """
+    return output.model_dump_json(exclude_defaults=True)
+
+
 def _periods_text(current: tuple[str, str], previous: tuple[str, str]) -> str:
     return (
         f"Current period: {current[0]} to {current[1]} (inclusive).\n"
@@ -208,7 +223,8 @@ App: {product_name}
 Evidence store:
 {schema_text}
 
-Find the most important change between the periods and propose up to 3 actions.
+Start with run_sql: query the metrics of both periods before you write any claim.
+Then find the most important change between the periods and propose up to 3 actions.
 {_language_rule(language)}
 """
 
@@ -235,7 +251,7 @@ Evidence store:
 {schema_text}
 
 Previous version (v1):
-{previous_version.model_dump_json(indent=2)}
+{version_json(previous_version)}
 
 {_language_rule(language)}
 """
@@ -293,7 +309,7 @@ Evidence store:
 {schema_text}
 
 Your last version:
-{previous_version.model_dump_json(indent=2)}
+{version_json(previous_version)}
 
 Findings:
 {json.dumps(listed, ensure_ascii=False, indent=2)}

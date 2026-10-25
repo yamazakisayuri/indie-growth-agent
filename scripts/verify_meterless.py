@@ -85,6 +85,14 @@ class _FakeNightshift(BaseHTTPRequestHandler):
             }
             return f"data: {json.dumps(payload)}\n\n".encode()
 
+        if "status500" in json.dumps(body.get("messages")):
+            payload = json.dumps({"error": {"message": "runtime down"}}).encode()
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
@@ -231,8 +239,56 @@ def check_model_round_trip() -> str:
         raise AssertionError("a streamed error must raise")
     print("OK a streamed runtime error keeps its body (type, code, lane) and request URL, "
           "and counts as retryable")
+    check_sdk_retries()
     server.shutdown()
     return base
+
+
+def check_sdk_retries() -> None:
+    """Evidence agents turn the openai client's retries off; other agents keep the default."""
+
+    def sent_500s() -> int:
+        return sum("status500" in json.dumps(r["body"].get("messages")) for r in _FakeNightshift.requests)
+
+    default = build_model()
+    assert "max_retries" not in default.client_args, default.client_args
+    before = sent_500s()
+    try:
+        Agent(model=default, callback_handler=None)("status500 default")
+    except Exception:  # noqa: BLE001
+        pass
+    assert sent_500s() - before == 3, "SDK default: one request plus two silent retries"
+
+    seen: list[dict] = []
+
+    class CaptureAgent:
+        def __init__(self, **kwargs) -> None:
+            seen.append(kwargs)
+
+        def __call__(self, prompt, **kwargs):
+            return _Result(GOOD)
+
+    original = agents.Agent
+    agents.Agent = CaptureAgent
+    store = SQLiteEvidenceStore()
+    try:
+        agents.StrandsAnalyst(store)("p")
+        agents.StrandsCritic(store)("p")
+    finally:
+        agents.Agent = original
+        store.close()
+    assert [kw["model"].client_args["max_retries"] for kw in seen] == [0, 0], seen
+
+    before = sent_500s()
+    try:
+        Agent(model=seen[0]["model"], callback_handler=None)("status500 evidence")
+    except Exception as exc:  # noqa: BLE001
+        assert is_retryable(exc), exc
+    else:
+        raise AssertionError("HTTP 500 must raise")
+    assert sent_500s() - before == 1, "Evidence agents: no silent SDK retry"
+    print("OK Analyst / Critic models send one request per attempt (SDK max_retries=0; the app "
+          "retries once); other agents keep the SDK default of 2 retries")
 
 
 def _api_error(message: str = "Meterless provider request failed.") -> Exception:
