@@ -227,11 +227,19 @@ async function evidenceFetch<T>(
   return payload;
 }
 
+/** `productId` null lists every product's runs (newest first, up to `limit`). */
 export function listEvidenceRuns(
-  productId: string,
+  productId: string | null,
   signal?: AbortSignal,
+  limit?: number,
 ): Promise<EvidenceRunList> {
-  const query = new URLSearchParams({ productId });
+  const query = new URLSearchParams();
+  if (productId) {
+    query.set("productId", productId);
+  }
+  if (limit) {
+    query.set("limit", String(limit));
+  }
   return evidenceFetch<EvidenceRunList>(
     `/runs?${query.toString()}`,
     { method: "GET", signal },

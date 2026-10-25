@@ -1131,6 +1131,43 @@ export const uiCopy = {
     ja: "比較上の注意",
     en: "Comparison note",
   },
+  // --- Recorded Demo entry ---
+  demoEntryTitle: {
+    ja: "根拠で裏づけた、成長の意思決定。",
+    en: "Growth decisions, backed by evidence.",
+  },
+  demoEntryLead: {
+    ja: "AI がアプリの成長を分析し、その主張を SQL で独立に検証し、根拠と食い違えば推奨を改訂します。",
+    en: "AI analyzes app growth, independently checks its claims with SQL, and revises recommendations when the evidence disagrees.",
+  },
+  demoEntryTagRecorded: {
+    ja: "Recorded Demo",
+    en: "Recorded Demo",
+  },
+  demoEntryTagSynthetic: {
+    ja: "架空データ",
+    en: "Synthetic Data",
+  },
+  demoEntryTagRealModel: {
+    ja: "実モデルで実行",
+    en: "Real Model Execution",
+  },
+  demoEntryCta: {
+    ja: "検証の流れを見る",
+    en: "Explore the verification process",
+  },
+  demoEntryFlow: {
+    ja: "Analyst → 独立した Critic → 改訂後のアクション",
+    en: "Analyst → Independent Critic → Revised Actions",
+  },
+  demoEntryNote: {
+    ja: "API キーもモデル呼び出しも使わずに、保存済みの実行を開きます。",
+    en: "Open the saved run without API keys or model calls.",
+  },
+  demoEntryNotFound: {
+    ja: "保存済みの Recorded Demo が見つかりませんでした。",
+    en: "No saved Recorded Demo was found.",
+  },
 } as const;
 
 export type CopyKey = keyof typeof uiCopy;

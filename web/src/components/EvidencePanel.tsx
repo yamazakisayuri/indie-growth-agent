@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CopyKey } from "@/lib/i18n";
 import {
   EvidenceRequestError,
@@ -583,13 +583,24 @@ function StepView({
 }
 
 /** Revision history of the evidence loop (v1 → v2 → Critic → v3) for one product. */
-export function EvidencePanel({ productId }: { productId: string }) {
+export function EvidencePanel({
+  productId,
+  initialRunId,
+}: {
+  productId: string;
+  /** Run to select first and scroll to once loaded (the Recorded Demo entry). */
+  initialRunId?: string;
+}) {
   const { copy, language } = useLanguage();
+  const sectionRef = useRef<HTMLElement>(null);
+  const scrolledRef = useRef(false);
   const [runs, setRuns] = useState<EvidenceRunSummary[] | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [listNonce, setListNonce] = useState(0);
   const [listError, setListError] = useState<CopyKey | null>(null);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(
+    initialRunId ?? null,
+  );
   const [run, setRun] = useState<EvidenceRun | null>(null);
   const [runError, setRunError] = useState<CopyKey | null>(null);
   const [pinnedVersion, setPinnedVersion] = useState<string | null>(null);
@@ -684,6 +695,14 @@ export function EvidencePanel({ productId }: { productId: string }) {
   }
 
   const shownRun = run && run.runId === selectedRunId ? run : null;
+
+  useEffect(() => {
+    if (initialRunId && shownRun?.runId === initialRunId && !scrolledRef.current) {
+      scrolledRef.current = true;
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [initialRunId, shownRun?.runId]);
+
   const steps = shownRun?.steps ?? [];
   const selectedIndex = (() => {
     const pinned = steps.findIndex((s) => s.version === pinnedVersion);
@@ -707,7 +726,7 @@ export function EvidencePanel({ productId }: { productId: string }) {
   const duration = shownRun ? minutesBetween(shownRun.startedAt, shownRun.finishedAt) : null;
 
   return (
-    <section className="evidence" aria-labelledby="evidence-heading">
+    <section ref={sectionRef} className="evidence" aria-labelledby="evidence-heading">
       <header className="evidence__header">
         <p className="evidence__eyebrow">{copy("evidenceEyebrow")}</p>
         <h2 id="evidence-heading" className="evidence__heading">
