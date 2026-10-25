@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 from agent import run_analysis
 from analysis_schema import AnalyzeResponse
 from analyze_cache import analyze_cache_key, get_or_run_analyze
+from config import get_llm_provider
+from llm import summarize_model_error
 from draft_generator import run_draft_generator
 from evidence_api import router as evidence_router
 from interventions_api import router as interventions_router
@@ -130,6 +132,52 @@ def _public_error_message(language: str) -> str:
     return "Could not complete the analysis. Please check your data connections."
 
 
+_AWS_CREDENTIAL_REASONS = frozenset(
+    {
+        "LoginRefreshRequired",
+        "NoCredentialsError",
+        "PartialCredentialsError",
+        "TokenRetrievalError",
+        "SSOTokenLoadError",
+        "UnauthorizedSSOTokenError",
+        "CredentialRetrievalError",
+        "ExpiredTokenException",
+        "UnrecognizedClientException",
+    }
+)
+
+# Hints by safe reason code; anything else gets the generic hint.
+_MODEL_HINTS: dict[str, tuple[str, str]] = {
+    "nvidia_key_missing": (
+        "Nightshift に NVIDIA の API キーが読み込まれていません。Nightshift でキーを設定し直してください。",
+        "Nightshift has no NVIDIA API key loaded. Set the key again in Nightshift.",
+    ),
+    "AccessDeniedException": (
+        "Bedrock のモデルを使う権限がありません。モデルアクセスと IAM 権限を確認してください。",
+        "No permission for the Bedrock model. Check model access and IAM permissions.",
+    ),
+}
+_AWS_CREDENTIAL_HINT = (
+    "AWS の認証が切れているか見つかりません。再認証してください（例: aws login）。",
+    "AWS credentials are expired or missing. Re-authenticate (for example, aws login).",
+)
+_GENERIC_MODEL_HINT = (
+    "API サーバーのログ（Analyze model error）と LLM_PROVIDER の設定を確認してください。",
+    "Check the API server log (Analyze model error) and the LLM_PROVIDER settings.",
+)
+
+
+def _public_model_error_message(language: str, provider: str, reason: str) -> str:
+    """Safe for the browser: the provider name and a hint chosen by reason code, nothing else."""
+    if reason in _AWS_CREDENTIAL_REASONS:
+        hint = _AWS_CREDENTIAL_HINT
+    else:
+        hint = _MODEL_HINTS.get(reason, _GENERIC_MODEL_HINT)
+    if language == "ja":
+        return f"モデル（{provider}）を呼び出せませんでした。{hint[0]}"
+    return f"The model ({provider}) could not be called. {hint[1]}"
+
+
 def _public_draft_error_message(language: str) -> str:
     if language == "ja":
         return "草案を生成できませんでした。しばらくしてから再度お試しください。"
@@ -241,6 +289,23 @@ def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
             ).model_dump(),
         ) from None
     except Exception as exc:  # noqa: BLE001 — map all failures to a safe client message
+        model_error = summarize_model_error(exc)
+        if model_error is not None:
+            provider = get_llm_provider()
+            # Reason code and status only: no response body, prompt, or credential.
+            logger.error(
+                "Analyze model error provider=%s reason=%s status=%s",
+                provider,
+                model_error.reason,
+                model_error.status,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=ErrorBody(
+                    error=_public_model_error_message(body.language, provider, model_error.reason),
+                    code="model_unavailable",
+                ).model_dump(),
+            ) from None
         _log_failure(exc)
         raise HTTPException(
             status_code=502,

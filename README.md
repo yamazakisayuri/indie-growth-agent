@@ -488,7 +488,7 @@ Put real values in `.env` and secrets under `secrets/` (both are gitignored). Pr
 Minimum requirements:
 
 - **App Store Connect**: Issuer ID / Key ID, target app / territory (often from Product JSON); local `.p8` via `APP_STORE_CONNECT_PRIVATE_KEY_PATH`, or PEM body via `APP_STORE_CONNECT_PRIVATE_KEY` (containers; may be supplied via task env / Secrets Manager injection)
-- **Model provider**: `LLM_PROVIDER` unset / `bedrock` uses Amazon Bedrock (locally, credentials that can call Bedrock, e.g. `AWS_REGION` + profile; if redeployed to ECS, the **Task Role**—do not commit access keys). `.env.example` sets `LLM_PROVIDER=meterless` for the hackathon setup (see below)
+- **Model provider**: `LLM_PROVIDER` unset / `bedrock` uses Amazon Bedrock (locally, credentials that can call Bedrock, e.g. `AWS_REGION` + profile; if redeployed to ECS, the **Task Role**—do not commit access keys). `.env.example` sets `LLM_PROVIDER=meterless` for the hackathon setup (see [Switching the model provider](#switching-the-model-provider-bedrock--meterless))
 - **GA4 App / Web (optional)**: Property IDs + OAuth (`GOOGLE_OAUTH_*` and refresh token) or a service account; Web hostname / key events / featurePaths come from Product JSON when enabled
 - **AdMob (optional)**: Account ID + a separate-scope refresh token (`scripts/oauth_admob.py`) + app IDs when needed
 
@@ -515,6 +515,24 @@ See `.env.example` for key names. For the Web UI, set `NEXT_PUBLIC_AGENT_API_URL
 | `INTERVENTIONS_PATH` | `tmp/interventions/ledger.jsonl` | Intervention ledger |
 
 Prerequisites when enabled: Meterless Nightshift running locally; the local Zetaris platform running in Docker plus Java 17+ and the Zetaris JDBC jar; Node.js 22.7+ for H-MEM.
+
+#### Switching the model provider (Bedrock / Meterless)
+
+`LLM_PROVIDER` picks the model for every Strands Agent: My Workspace's Analyze (and its Planner / Draft) and the evidence loop's Analyst and Critic. There is no separate setting per feature.
+
+| | `LLM_PROVIDER=bedrock` (default) | `LLM_PROVIDER=meterless` |
+|---|---|---|
+| Model | Strands' default `BedrockModel` (`global.anthropic.claude-sonnet-4-6` in the installed Strands); the app has no Bedrock model-id variable | `METERLESS_MODEL` (default `nvidia/nemotron-3-ultra-550b-a55b`) |
+| Where it goes | Amazon Bedrock in the AWS session's region (environment or profile, e.g. `AWS_REGION`), else `us-west-2` | Nightshift at `METERLESS_BASE_URL`, which forwards to the provider of the model id (NVIDIA for Nemotron) |
+| Credentials | AWS credentials outside the repo: `AWS_PROFILE` / `aws login` / SSO / an IAM role. Prefer an IAM user or role allowed only to invoke Bedrock models, not the root user | `METERLESS_RUNTIME_TOKEN` in `.env`; the provider key (e.g. NVIDIA) is held by Nightshift, not by this app |
+| Check | `aws sts get-caller-identity` | `python scripts/check_meterless.py` (no model request), `--chat` (one short request) |
+
+Notes:
+
+- `.env` does not override variables already set in the shell, so `LLM_PROVIDER=bedrock python api_server.py` switches for one run without editing `.env`. The API builds the Analyze model at startup: **restart `api_server.py` after switching**. Each evidence run is a new process and reads the setting when it starts
+- A pinned provider model (Nemotron) may not appear in Nightshift's `GET /v1/models`; that alone does not mean it is unavailable. `check_meterless.py --chat` shows whether it answers. A `meterless_detail` of `nvidia_key_missing` means Nightshift has no NVIDIA API key loaded: set the key again in Nightshift. Do not switch `METERLESS_MODEL` to `meterless/auto`: on this machine it routes to an NVIDIA model that answers 404
+- When the model cannot be called, Analyze answers `model_unavailable` with the provider and a hint (for example, AWS credentials expired, or no NVIDIA key in Nightshift); other failures stay `analyze_failed`. The API log records only `provider`, a reason code, and the HTTP status (`Analyze model error ...`), never the response body or credentials
+- Recorded Demos are saved traces and do not depend on the current provider
 
 ### 4. Optional connection checks
 

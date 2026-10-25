@@ -73,6 +73,21 @@ export async function requestProducts(
 }
 
 /**
+ * The safe message of a failed Analyze: FastAPI sends { detail: { error, code } }
+ * (older responses may put error at the top level). Null if there is none.
+ */
+export function analyzeErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const body = payload as { error?: unknown; detail?: unknown };
+  const detail =
+    body.detail && typeof body.detail === "object" ? (body.detail as { error?: unknown }) : null;
+  const message = detail?.error ?? body.error;
+  return typeof message === "string" && message.trim() ? message.trim() : null;
+}
+
+/**
  * Call the Python Agent API directly (Browser → FastAPI).
  * Never send secrets from the browser; only language + productId are posted.
  */
@@ -88,20 +103,10 @@ export async function requestAnalyze(
     signal,
   });
 
-  const payload = (await response.json().catch(() => null)) as
-    | AnalyzeApiResponse
-    | { error?: string }
-    | null;
+  const payload = (await response.json().catch(() => null)) as AnalyzeApiResponse | null;
 
   if (!response.ok) {
-    const message =
-      payload &&
-      typeof payload === "object" &&
-      "error" in payload &&
-      typeof payload.error === "string"
-        ? payload.error
-        : undefined;
-    throw new AnalyzeRequestError(message || "analyze_failed");
+    throw new AnalyzeRequestError(analyzeErrorMessage(payload) || "analyze_failed");
   }
 
   if (!payload || typeof payload !== "object" || !("analysis" in payload)) {

@@ -50,6 +50,11 @@ def main() -> None:
         pinned = "listed" if settings.model_id in status.model_ids else "not listed"
         print(f"models: {', '.join(status.model_ids)}")
         print(f"METERLESS_MODEL {settings.model_id}: {pinned} by the runtime")
+        if pinned == "not listed" and not settings.model_id.startswith("meterless/"):
+            print(
+                "note: a provider model can be missing from /v1/models (for example, when the "
+                "runtime has no key for that provider); --chat shows whether it answers"
+            )
     if status.state == "unauthorized":
         print("hint: METERLESS_RUNTIME_TOKEN does not match <stateDir>/proxy-token")
 
@@ -68,6 +73,8 @@ def main() -> None:
             print(f"routing: {json.dumps(reply.routing, ensure_ascii=False)[:600]}")
         if reply.error is not None:
             print(f"error: {json.dumps(reply.error, ensure_ascii=False, default=str)[:600]}")
+            if isinstance(reply.error, dict) and reply.error.get("meterless_detail") == "nvidia_key_missing":
+                print("hint: Nightshift has no NVIDIA API key loaded; set the key again in Nightshift")
             ok = False
         else:
             print(f"reply: {reply.text[:200]!r}")

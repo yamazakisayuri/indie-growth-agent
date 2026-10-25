@@ -16,7 +16,6 @@ import {
   parseBySource,
   parseCsv,
   parseDaily,
-  pickRecordedForLanguage,
   ratio,
   summarizeKpis,
   summarizeRecorded,
@@ -181,13 +180,6 @@ describe("Recorded Demo summary for Sample Workspace", () => {
     assert.equal(summary.unresolved, 1);
     assert.equal(summary.knownMisjudgments, 1);
     assert.equal(summary.status, "max_rounds");
-  });
-
-  it("prefers a run in the UI language and falls back otherwise", () => {
-    const en = { ...summary, runId: "en-run", language: "en" };
-    assert.equal(pickRecordedForLanguage([summary, en], "en").runId, "en-run");
-    assert.equal(pickRecordedForLanguage([summary], "en").runId, summary.runId);
-    assert.equal(pickRecordedForLanguage([], "ja"), null);
   });
 });
 

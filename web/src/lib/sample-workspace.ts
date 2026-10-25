@@ -472,11 +472,3 @@ export function summarizeRecorded(
 export function pickRepresentativeRecorded(recorded: RecordedSummary[]): RecordedSummary | null {
   return recorded.find((run) => run.representative) ?? recorded[0] ?? null;
 }
-
-/** The Recorded Demo in the UI language if one exists, else the first. */
-export function pickRecordedForLanguage(
-  recorded: RecordedSummary[],
-  language: string,
-): RecordedSummary | null {
-  return recorded.find((run) => run.language === language) ?? recorded[0] ?? null;
-}

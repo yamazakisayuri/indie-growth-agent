@@ -5,6 +5,7 @@ Run: python scripts/verify_analyze_cache.py
 
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 import time
@@ -147,6 +148,50 @@ def main() -> None:
         shopping_calls = [c for c in call_log if c[0] == "shopping-memo" or c[0] == "fail-product"]
         assert len(shopping_calls) >= 2, call_log
         print("OK failure not cached; subsequent success runs")
+
+        # --- 4b) A model provider failure says which provider and why, safely ---
+        import httpx
+        import openai
+
+        def model_down(**_kwargs):
+            request = httpx.Request("POST", "http://127.0.0.1:8088/v1/chat/completions")
+            raise openai.APIError(
+                "Meterless provider request failed.",
+                request,
+                body={"message": "body text that must not leak", "meterless_detail": "nvidia_key_missing"},
+            )
+
+        api_server.run_analysis = model_down  # type: ignore[assignment]
+        analyze_cache.clear_analyze_cache()
+        records: list[logging.LogRecord] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                records.append(record)
+
+        capture = _Capture()
+        api_server.logger.addHandler(capture)
+        try:
+            down = client.post("/api/analyze", json={"language": "ja", "productId": "mahjong"})
+        finally:
+            api_server.logger.removeHandler(capture)
+        assert down.status_code == 502, down.text
+        detail = down.json()["detail"]
+        assert detail["code"] == "model_unavailable", detail
+        assert "NVIDIA" in detail["error"] and "body text" not in detail["error"], detail
+        logged = " ".join(r.getMessage() for r in records)
+        assert "reason=nvidia_key_missing" in logged and "body text" not in logged, logged
+
+        def data_down(**_kwargs):
+            raise RuntimeError("ASC report download failed")
+
+        api_server.run_analysis = data_down  # type: ignore[assignment]
+        other = client.post("/api/analyze", json={"language": "en", "productId": "mahjong"})
+        assert other.json()["detail"]["code"] == "analyze_failed", other.text
+        api_server.run_analysis = fake_run_analysis  # type: ignore[assignment]
+        analyze_cache.clear_analyze_cache()
+        print("OK a model failure returns model_unavailable with the provider and a hint; "
+              "the log keeps the reason code, not the body")
 
         # --- 5) Single-flight: concurrent same key → one runner ---
         analyze_cache.clear_analyze_cache()

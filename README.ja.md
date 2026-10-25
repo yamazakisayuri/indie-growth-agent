@@ -488,7 +488,7 @@ cp .env.example .env
 最低限必要なもの:
 
 - **App Store Connect**: Issuer ID / Key ID、対象アプリ / テリトリー（多くは Product JSON）。ローカルは `APP_STORE_CONNECT_PRIVATE_KEY_PATH`（`.p8`）、コンテナは `APP_STORE_CONNECT_PRIVATE_KEY`（PEM 本文。タスク環境変数 / Secrets Manager 注入でも可）
-- **モデルプロバイダー**: `LLM_PROVIDER` 未設定 / `bedrock` なら Amazon Bedrock（ローカルでは Bedrock を呼べる認証。例: `AWS_REGION` とプロファイル。ECS に再デプロイする場合は **Task Role** を使い、アクセスキーをリポジトリに置かない）。`.env.example` はハッカソン構成として `LLM_PROVIDER=meterless` を設定している（下記参照）
+- **モデルプロバイダー**: `LLM_PROVIDER` 未設定 / `bedrock` なら Amazon Bedrock（ローカルでは Bedrock を呼べる認証。例: `AWS_REGION` とプロファイル。ECS に再デプロイする場合は **Task Role** を使い、アクセスキーをリポジトリに置かない）。`.env.example` はハッカソン構成として `LLM_PROVIDER=meterless` を設定している（下記「モデルプロバイダーの切り替え」参照）
 - **GA4 App / Web（任意）**: Property ID + OAuth（`GOOGLE_OAUTH_*` と refresh token）またはサービスアカウント。Web の hostname / key events / featurePaths は製品 JSON
 - **AdMob（任意）**: Account ID + 別スコープの refresh token（`scripts/oauth_admob.py`）+ 必要なら App ID
 
@@ -515,6 +515,24 @@ cp .env.example .env
 | `INTERVENTIONS_PATH` | `tmp/interventions/ledger.jsonl` | 施策の台帳 |
 
 有効にする場合の前提: Meterless Nightshift をローカルで起動していること。Zetaris はローカルの Zetaris platform を Docker で起動し、Java 17 以上と Zetaris の JDBC jar を用意すること。H-MEM は Node.js 22.7 以上。
+
+#### モデルプロバイダーの切り替え（Bedrock / Meterless）
+
+`LLM_PROVIDER` は、すべての Strands Agent のモデルを決めます。My Workspace の Analyze（Planner / Draft を含む）も、根拠ループの Analyst と Critic も同じ設定を使い、機能ごとの別設定はありません。
+
+| | `LLM_PROVIDER=bedrock`（既定） | `LLM_PROVIDER=meterless` |
+|---|---|---|
+| モデル | Strands の既定の `BedrockModel`（導入済みの Strands では `global.anthropic.claude-sonnet-4-6`）。アプリに Bedrock のモデル ID を指定する変数はない | `METERLESS_MODEL`（既定 `nvidia/nemotron-3-ultra-550b-a55b`） |
+| 送り先 | AWS セッションのリージョン（環境変数またはプロファイル。例: `AWS_REGION`）の Amazon Bedrock。どれもなければ `us-west-2` | `METERLESS_BASE_URL` の Nightshift。モデル ID のプロバイダー（Nemotron なら NVIDIA）へ転送される |
+| 認証 | リポジトリ外の AWS 認証（`AWS_PROFILE` / `aws login` / SSO / IAM ロール）。root ユーザーではなく、Bedrock のモデル呼び出しだけを許可した IAM ユーザーまたはロールを推奨 | `.env` の `METERLESS_RUNTIME_TOKEN`。プロバイダーのキー（NVIDIA など）は Nightshift 側が持ち、このアプリは持たない |
+| 確認 | `aws sts get-caller-identity` | `python scripts/check_meterless.py`（モデルは呼ばない）、`--chat`（短いリクエスト1回） |
+
+注意:
+
+- `.env` はシェルで設定済みの変数を上書きしないため、`LLM_PROVIDER=bedrock python api_server.py` のように `.env` を編集せずに1回だけ切り替えられる。API は起動時に Analyze のモデルを作るので、**切り替えたら `api_server.py` を再起動する**。根拠ループの実行は毎回別プロセスで、開始時に設定を読む
+- 固定したプロバイダーのモデル（Nemotron）は、Nightshift の `GET /v1/models` に出ないことがある。一覧にないことだけでは使えないとは限らず、`check_meterless.py --chat` で応答するかを確かめる。`meterless_detail` が `nvidia_key_missing` なら Nightshift に NVIDIA の API キーが読み込まれていないので、Nightshift でキーを設定し直す。`METERLESS_MODEL` を `meterless/auto` にしない（この環境では 404 を返す NVIDIA のモデルに振り分けられる）
+- モデルを呼び出せないとき、Analyze はプロバイダー名と案内（例: AWS の認証切れ、Nightshift に NVIDIA のキーがない）を付けて `model_unavailable` を返す。それ以外の失敗は `analyze_failed` のまま。API のログには `provider`、理由のコード、HTTP ステータスだけを記録し（`Analyze model error ...`）、応答本文や認証情報は残さない
+- Recorded Demo は保存済みのトレースなので、現在のプロバイダーに左右されない
 
 ### 4. 動作確認（任意）
 

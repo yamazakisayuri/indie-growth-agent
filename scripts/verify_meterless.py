@@ -399,6 +399,43 @@ def check_retry() -> None:
         store.close()
 
 
+def check_error_summary() -> None:
+    from botocore.exceptions import ClientError, NoCredentialsError
+
+    from llm import summarize_model_error
+
+    request = httpx.Request("POST", "http://127.0.0.1:8088/v1/chat/completions")
+    key_missing = openai.APIError(
+        "Meterless provider request failed.",
+        request,
+        body={"message": "secret-ish free text", "type": "api_error", "code": "provider_error",
+              "meterless_detail": "nvidia_key_missing"},
+    )
+    wrapped = EventLoopException(key_missing, {})
+    wrapped.__cause__ = key_missing
+    summary = summarize_model_error(wrapped)
+    assert summary is not None and summary.reason == "nvidia_key_missing", summary
+    free_text = openai.APIError("x", request, body={"code": "not a code; free text", "type": "api_error"})
+    assert summarize_model_error(free_text).reason == "api_error"
+    assert summarize_model_error(openai.APIError("x", request, body=None)).reason == "APIError"
+    assert summarize_model_error(_auth_error()).status == 401
+
+    denied = ClientError(
+        {"Error": {"Code": "AccessDeniedException", "Message": "account 123 has no access"},
+         "ResponseMetadata": {"HTTPStatusCode": 403}},
+        "ConverseStream",
+    )
+    try:
+        raise RuntimeError("wrapped") from denied
+    except RuntimeError as exc:
+        summary = summarize_model_error(exc)
+    assert summary is not None and (summary.reason, summary.status) == ("AccessDeniedException", 403)
+    assert summarize_model_error(NoCredentialsError()).reason == "NoCredentialsError"
+    assert summarize_model_error(ValueError("not a model error")) is None
+    print("OK model errors are summarized as a code-like reason and status only (Meterless "
+          "meterless_detail, Bedrock error code or credential error), never body text")
+
+
 def main() -> None:
     original = {name: os.environ.get(name) for name in ENV_NAMES}
     try:
@@ -407,6 +444,7 @@ def main() -> None:
         check_status()
         check_model_round_trip()
         check_retry()
+        check_error_summary()
         print("\nAll Meterless checks passed.")
     finally:
         for name, value in original.items():
