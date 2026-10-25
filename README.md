@@ -19,14 +19,14 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -r requirement
 python scripts/show_sample_demo.py     # both Recorded Demos: v1/v2/v3 Top 3, Critic counts, review notes
 ```
 
-To see each Critic finding with its SQL and values, open the Web UI:
+To see the proposals, the Critic's findings, and the SQL behind them, open the Recorded Demo page in the Web UI. It makes no model call, but the page reads the saved runs from the local API server, so start both:
 
 ```bash
 python api_server.py                       # terminal 1
-cd web && npm install && npm run dev       # terminal 2, then open http://localhost:3000
+cd web && npm install && npm run dev       # terminal 2, then open http://localhost:3000/demo
 ```
 
-Press **Explore the verification process** at the top of the dashboard; it opens the `base` Recorded Demo in the revision history. For the example above, pick `[Recorded Demo: competitor-variant]` in the run selector and open v2, then v3.
+Or click **Recorded Demo** in the dashboard header. `/demo` opens the `base` run; for the example above, switch to **competitor-variant**. The page shows how the v1 / v2 / v3 proposals changed, what the Critic questioned and how the Analyst answered (`r1-f3`, `r1-f7`, `r1-f13` in Critic round 1), and the outcome with the unresolved count. **SQL evidence** and the **Full log** (each version's claims, the Critic's SQL and values) are collapsed below.
 
 **Where to look**
 
@@ -65,7 +65,7 @@ The track asks for an agent that can show **why** it recommends something, not j
 | Interventions | Adopt an AI action or register one by hand; implement → evaluate lifecycle; before/after measured by SQL; human verdict (`interventions/`, `scripts/interventions.py`) |
 | Decision memory | `none` / `local` (JSONL) / `hmem` (Meterless H-MEM reference, Node sidecar). Past decisions and outcomes are recalled before each evidence run (`memory/`, `integrations/hmem/`) |
 | API | `/api/evidence` (list / read / start runs), `/api/interventions` (adopt, add, implement, evaluate, measure, drop) |
-| Web UI | Grounding Critic revision-history panel, Interventions panel, Portfolio Overview (`/portfolio`), Recorded Demo entry button on the dashboard |
+| Web UI | Grounding Critic revision-history panel, Interventions panel, Portfolio Overview (`/portfolio`), Recorded Demo page (`/demo`) |
 | Sample mode | Fictional mahjong sample CSVs with two scenarios, Live Sample runs on a dedicated SQLite file, two committed Recorded Demo traces with review notes |
 | Tests | `scripts/verify_offline.py` runs 18 offline checks (no credentials, network, or model) |
 
@@ -246,7 +246,16 @@ python scripts/show_sample_demo.py
 python scripts/show_sample_demo.py --run-id sample-base-20261024-214121
 ```
 
-In the Web UI (needs `python api_server.py` and `npm run dev`, no model credentials): press the **Recorded Demo** entry button at the top of the dashboard. It switches to the run's Product (mahjong), selects the `base` Recorded Demo in the Grounding Critic revision history, and scrolls to it. Both Recorded Demos are also in the run selector, labeled `[Recorded Demo: <scenario>]`; Live Sample runs are labeled `[Live Sample: <scenario>]`. The Recorded Demo is shown inside the dashboard panel; a **standalone Recorded Demo screen is not implemented**.
+In the Web UI, open **`/demo`** (the **Recorded Demo** link in the dashboard header). Replaying needs no model call or model credentials, but the page reads the runs from `/api/evidence`, so `python api_server.py` and `npm run dev` must both be running. The page:
+
+- opens the `base` run, with a switch to `competitor-variant`
+- states that the run is a saved Recorded Demo on fictional data, executed by a real model
+- compares the v1 / v2 / v3 proposals, with the reason for each change
+- lists what the Critic questioned in each round, with the Analyst's answer in the next version, the recorded resolution, and known misjudgments marked
+- shows the outcome (review status, unresolved count, known limitations)
+- keeps **SQL evidence** (each final claim with its SQL) and the **Full log** (each version's claims, the Critic's checks with SQL and values, the comparison note) collapsed
+
+The dashboard (`/`) shows real analysis results. Its Grounding Critic panel still lists both Recorded Demos in the run selector, labeled `[Recorded Demo: <scenario>]`; Live Sample runs are labeled `[Live Sample: <scenario>]`.
 
 ## Repository layout
 
@@ -372,7 +381,7 @@ flowchart TB
   dev([Indie developer])
 
   subgraph local ["Local machine"]
-    ui["Next.js Web UI<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo entry · Portfolio Overview"]
+    ui["Next.js Web UI<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo page /demo · Portfolio Overview"]
     api["FastAPI<br/>/api/evidence · /api/interventions"]
     loop["Evidence loop<br/>scripts/run_evidence.py"]
     analyst["Analyst<br/>Strands Agent + SQL tool"]
@@ -416,7 +425,8 @@ The Live Sample uses the same loop on `tmp/sample/<scenario>.sqlite` instead of 
 - **Loading / empty / error**: Analyze progress (elapsed seconds), empty states before first success, retry on Analyze failure
 - **i18n / a11y**: Japanese / English UI chrome; focus-visible and localized labels where applicable
 - **Language switch**: changes UI chrome immediately and is kept across pages. It does **not** re-run Analyze or rewrite existing analysis prose; Actions / Facts / Experiments stay in the language of the last successful Analyze until the user runs Analyze again
-- **Recorded Demo entry** (top of the dashboard): opens the committed `base` Recorded Demo in the revision history below (no model call)
+- **Dashboard (`/`)**: real analysis results for the selected Product. The header links to Portfolio and Recorded Demo
+- **Recorded Demo (`/demo`)**: separate page for the committed Recorded Demos (`base` / `competitor-variant`); see [Sample data, Live Sample, and Recorded Demo](#sample-data-live-sample-and-recorded-demo). No model call; needs the local API
 - **Grounding Critic panel** (under Top 3): run selector, "Run a new verification" (confirmation; one run started from the API at a time), v1 / v2 / v3 steps, claims with evidence and SQL, Critic findings with resolution, and an adopt button per action on finished real-data runs. Fictional-data runs show a banner with the review outcome, unresolved count, scenario changes, known limitations, and comparison note
 - **Interventions panel**: list, add by hand, mark implemented, record verdict, re-measure, drop; shows the AI prediction, before / after numbers, skipped windows, and your verdict
 - **Portfolio Overview** (`/portfolio`, header link): one card per app from saved Live Analyze results (see Multi-Product)
@@ -437,7 +447,7 @@ Details: [`web/README.md`](web/README.md)
 | Bedrock | **ECS Task Role** (no long-lived AWS access keys in the app) |
 | ECR pull at startup | **ECS Task Execution Role** |
 
-Frontend build env: `NEXT_PUBLIC_AGENT_API_URL=<ECS HTTPS URL>`. Backend CORS: set `CORS_ALLOWED_ORIGINS` to the Amplify origin (localhost defaults remain for local use).
+When redeploying: frontend build env `NEXT_PUBLIC_AGENT_API_URL=<ECS HTTPS URL>`, and backend `CORS_ALLOWED_ORIGINS` set to the Amplify origin (localhost defaults remain for local use).
 
 Not used: App Runner, Amplify SSR, Next.js API Route proxy.
 
@@ -466,7 +476,7 @@ Put real values in `.env` and secrets under `secrets/` (both are gitignored). Pr
 Minimum requirements:
 
 - **App Store Connect**: Issuer ID / Key ID, target app / territory (often from Product JSON); local `.p8` via `APP_STORE_CONNECT_PRIVATE_KEY_PATH`, or PEM body via `APP_STORE_CONNECT_PRIVATE_KEY` (containers; may be supplied via task env / Secrets Manager injection)
-- **Model provider**: `LLM_PROVIDER` unset / `bedrock` uses Amazon Bedrock (locally, credentials that can call Bedrock, e.g. `AWS_REGION` + profile; on ECS, the **Task Role**—do not commit access keys). `.env.example` sets `LLM_PROVIDER=meterless` for the hackathon setup (see below)
+- **Model provider**: `LLM_PROVIDER` unset / `bedrock` uses Amazon Bedrock (locally, credentials that can call Bedrock, e.g. `AWS_REGION` + profile; if redeployed to ECS, the **Task Role**—do not commit access keys). `.env.example` sets `LLM_PROVIDER=meterless` for the hackathon setup (see below)
 - **GA4 App / Web (optional)**: Property IDs + OAuth (`GOOGLE_OAUTH_*` and refresh token) or a service account; Web hostname / key events / featurePaths come from Product JSON when enabled
 - **AdMob (optional)**: Account ID + a separate-scope refresh token (`scripts/oauth_admob.py`) + app IDs when needed
 
@@ -574,7 +584,7 @@ All offline (no credentials, network, or model calls):
 
 ```bash
 python scripts/verify_offline.py   # 18 checks: import smoke + every verify_* script below
-cd web && npm test                 # Web unit tests (portfolio, sample text, Recorded Demo entry)
+cd web && npm test                 # Web unit tests (portfolio, sample text, Recorded Demo story)
 cd web && npm run lint && npm run build
 ```
 
@@ -615,13 +625,12 @@ Already in this repository:
 - Decision memory (`local`, Meterless H-MEM) and recall of past decisions and outcomes as Analyst context
 - `/api/evidence`, `/api/interventions`, Grounding Critic and Interventions panels in the Web UI
 - Portfolio Overview (display of each app's saved Live Analyze)
-- Fictional sample data, Live Sample, Recorded Demo (CLI viewer, dashboard entry button, labeled runs in the revision history)
+- Fictional sample data, Live Sample, Recorded Demo (CLI viewer, `/demo` page, labeled runs in the revision history)
 - Offline verification runner
 
 ### Not finished yet
 
-- **Standalone Recorded Demo screen**: today the Recorded Demo opens inside the dashboard's Grounding Critic panel
-- **Faster evidence runs**: one run takes about 15–24 minutes with Nemotron 3 Ultra through Nightshift; no speed-up work has been done
+- **Faster evidence runs**: one run took about 15–24 minutes with Nemotron 3 Ultra through Nightshift. Work has started (`f83beed`: fewer wasted model round trips, no silent SDK retries for the Analyst / Critic, shorter revision prompts), but no run has measured the effect yet
 - Reducing Critic false judgments seen in the Recorded Demos (counts compared with per-app values; finding kind not matching the content)
 
 ### Future Roadmap (not implemented)
@@ -664,7 +673,7 @@ Also still out of scope for now:
 - **One run per scenario** — the Recorded Demos cannot separate model variance from the scenario difference
 - **Evidence loop scope** — App Store Connect daily data, Known Events, and public listings only; competitor data is the public listing (no screenshots' content, no reviews)
 - **Before / after measurement** reads `asc_daily` rows with territory `ALL` (the Product JSONs use `ALL`); a window with any missing day is skipped. The verdict is the person's, not a statistical test
-- **Recorded Demo has no standalone screen** — it is opened inside the dashboard panel, and the Web UI needs the local API to show it
+- **The Recorded Demo page needs the local API** — `/demo` makes no model call, but it reads the saved runs from `/api/evidence`; without `python api_server.py` it cannot show them (the CLI viewer works without it)
 - **Live Sample model label** — with `LLM_PROVIDER=meterless`, `scripts/run_sample.py` records only `meterless` as the model (without the model id)
 - **No public deployment** — the past AWS environment was retired; Zetaris, Nightshift, and H-MEM run on the developer's machine
 - **No API authentication** — `/api/analyze`, `/api/evidence`, and `/api/interventions` have no authentication; run them locally. A public deployment would need protection (e.g. WAF / rate limits) and, for long-running Analyze, an ALB idle timeout above the default 60s

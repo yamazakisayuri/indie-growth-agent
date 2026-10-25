@@ -19,14 +19,14 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -r requirement
 python scripts/show_sample_demo.py     # Recorded Demo 2本: v1/v2/v3 の Top 3、Critic の件数、レビュー注記
 ```
 
-Critic の各指摘を SQL と値付きで見るには、Web UI を開きます。
+提案、Critic の指摘、その裏の SQL を見るには、Web UI の Recorded Demo 画面を開きます。モデルは呼びませんが、画面は保存済みの実行をローカルの API サーバーから読むため、両方を起動します。
 
 ```bash
 python api_server.py                       # ターミナル 1
-cd web && npm install && npm run dev       # ターミナル 2。http://localhost:3000 を開く
+cd web && npm install && npm run dev       # ターミナル 2。http://localhost:3000/demo を開く
 ```
 
-ダッシュボード上部の **検証の流れを見る** を押すと、改訂履歴で `base` の Recorded Demo が開きます。上の例を見るには、実行の選択肢で `[Recorded Demo: competitor-variant]` を選び、v2、v3 の順に開きます。
+ダッシュボードのヘッダーにある **Recorded Demo** からも開けます。`/demo` は `base` の実行を開くので、上の例を見るには **competitor-variant** に切り替えます。画面には、v1 / v2 / v3 の提案がどう変わったか、Critic が疑ったことと Analyst の回答（Critic 1回目の `r1-f3`、`r1-f7`、`r1-f13`）、未解決の件数を含む結果が表示されます。**SQL の根拠** と **詳細ログ**（版ごとの主張、Critic の SQL と値）はその下に折りたたまれています。
 
 **どこを見れば分かるか**
 
@@ -65,7 +65,7 @@ cd web && npm install && npm run dev       # ターミナル 2。http://localhos
 | 施策管理 | AI の提案を採用、または手動で登録。実施 → 評価のライフサイクル、変更前後の SQL 計測、人の評価（`interventions/`、`scripts/interventions.py`） |
 | 判断メモリ | `none` / `local`（JSONL）/ `hmem`（Meterless H-MEM の参照実装を Node の別プロセスで実行）。根拠ループの実行前に過去の判断と結果を思い出す（`memory/`、`integrations/hmem/`） |
 | API | `/api/evidence`（実行の一覧・取得・開始）、`/api/interventions`（採用・登録・実施・評価・再計測・取りやめ） |
-| Web UI | Grounding Critic の改訂履歴パネル、施策パネル、Portfolio Overview（`/portfolio`）、ダッシュボードの Recorded Demo 入口ボタン |
+| Web UI | Grounding Critic の改訂履歴パネル、施策パネル、Portfolio Overview（`/portfolio`）、Recorded Demo 画面（`/demo`） |
 | サンプルモード | 架空の麻雀サンプル CSV と2つのシナリオ、専用 SQLite での Live Sample、レビュー注記付きの Recorded Demo トレース2本 |
 | テスト | `scripts/verify_offline.py` で 18 のオフラインチェックを実行（認証情報・ネットワーク・モデル不要） |
 
@@ -246,7 +246,16 @@ python scripts/show_sample_demo.py
 python scripts/show_sample_demo.py --run-id sample-base-20261024-214121
 ```
 
-Web UI（`python api_server.py` と `npm run dev` が必要。モデルの認証情報は不要）では、ダッシュボード上部の **Recorded Demo** の入口ボタンを押します。実行の Product（mahjong）に切り替え、Grounding Critic の改訂履歴で `base` の Recorded Demo を選び、そこまでスクロールします。2本の Recorded Demo は実行の選択肢にも `[Recorded Demo: <scenario>]` として表示され、Live Sample の実行は `[Live Sample: <scenario>]` と表示されます。Recorded Demo はダッシュボード内のパネルに表示されます。**Recorded Demo の独立画面は未実装** です。
+Web UI では **`/demo`**（ダッシュボードのヘッダーの **Recorded Demo** リンク）を開きます。再生にモデル呼び出しやモデルの認証情報は不要ですが、画面は `/api/evidence` から実行を読むため、`python api_server.py` と `npm run dev` の両方を起動しておく必要があります。この画面は次のとおりです。
+
+- `base` の実行を開き、`competitor-variant` に切り替えられる
+- 架空データの保存済み Recorded Demo で、実モデルで実行したものだと明示する
+- v1 / v2 / v3 の提案を、変更理由付きで比較する
+- 各回で Critic が疑ったことを、次の版での Analyst の回答、記録された解消状況とともに一覧にし、既知の誤判定には印を付ける
+- 結果（レビューの状態、未解決の件数、既知の限界）を示す
+- **SQL の根拠**（最終版の各主張とその SQL）と **詳細ログ**（版ごとの主張、Critic の照合 SQL と値、比較上の注意）は折りたたんで表示する
+
+ダッシュボード（`/`）は実際の分析結果を表示する画面です。その Grounding Critic パネルの実行の選択肢にも、2本の Recorded Demo が `[Recorded Demo: <scenario>]` として表示され、Live Sample の実行は `[Live Sample: <scenario>]` と表示されます。
 
 ## ディレクトリ構成
 
@@ -372,7 +381,7 @@ flowchart TB
   dev([Indie developer])
 
   subgraph local ["Local machine"]
-    ui["Next.js Web UI<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo entry · Portfolio Overview"]
+    ui["Next.js Web UI<br/>Grounding Critic panel · Interventions panel<br/>Recorded Demo page /demo · Portfolio Overview"]
     api["FastAPI<br/>/api/evidence · /api/interventions"]
     loop["Evidence loop<br/>scripts/run_evidence.py"]
     analyst["Analyst<br/>Strands Agent + SQL tool"]
@@ -416,7 +425,8 @@ Live Sample は同じループを Zetaris ではなく `tmp/sample/<scenario>.sq
 - **Loading / empty / error**: Analyze 中の経過秒、初回成功前の空状態、失敗時の再試行
 - **i18n / a11y**: 日本語 / English の UI クロム、focus-visible やラベルの i18n など
 - **言語切替**: UI クロムは即切替し、ページをまたいで保持する。**Analyze は再実行せず**、既存の Actions / Facts / Experiments 本文も書き換えない。本文の言語を変えるには、言語を選んだうえで再度 Analyze する
-- **Recorded Demo の入口**（ダッシュボード上部）: コミット済みの `base` の Recorded Demo を下の改訂履歴で開く（モデル呼び出しなし）
+- **ダッシュボード（`/`）**: 選択中の Product の実際の分析結果。ヘッダーから Portfolio と Recorded Demo へ移動できる
+- **Recorded Demo（`/demo`）**: コミット済みの Recorded Demo（`base` / `competitor-variant`）の独立画面。[架空サンプルデータ・Live Sample・Recorded Demo](#架空サンプルデータlive-samplerecorded-demo) 参照。モデル呼び出しなし、ローカルの API が必要
 - **Grounding Critic パネル**（Top 3 の下）: 実行の選択、「新しく検証を実行」（確認あり。API から起動できる実行は同時に1つ）、v1 / v2 / v3 の各段階、根拠と SQL 付きの主張、解消状況付きの Critic の指摘、完了した実データの実行ではアクションごとの採用ボタン。架空データの実行には、レビュー結果、未解決の件数、シナリオの変更、既知の限界、比較上の注意をまとめたバナーを表示する
 - **施策パネル**: 一覧、手動登録、実施日の記録、評価の記録、再計測、取りやめ。AI の予測、変更前後の数字、スキップした期間、人の評価を表示する
 - **Portfolio Overview**（`/portfolio`、Header のリンク）: 保存済みの Live Analyze から、アプリごとに1枚のカード（Multi-Product 参照）
@@ -437,7 +447,7 @@ Live Sample は同じループを Zetaris ではなく `tmp/sample/<scenario>.sq
 | Bedrock | **ECS Task Role**（アプリに長期 AWS アクセスキーを置かない） |
 | ECR pull（起動時） | **ECS Task Execution Role** |
 
-Frontend のビルド環境変数: `NEXT_PUBLIC_AGENT_API_URL=<ECS の HTTPS URL>`。Backend の CORS は `CORS_ALLOWED_ORIGINS` に Amplify オリジンを設定します（localhost 既定値はローカル用に残しています）。
+再デプロイする場合: Frontend のビルド環境変数 `NEXT_PUBLIC_AGENT_API_URL=<ECS の HTTPS URL>` を設定し、Backend の `CORS_ALLOWED_ORIGINS` に Amplify オリジンを設定します（localhost 既定値はローカル用に残しています）。
 
 使わない構成: App Runner、Amplify SSR、Next.js API Route プロキシ。
 
@@ -466,7 +476,7 @@ cp .env.example .env
 最低限必要なもの:
 
 - **App Store Connect**: Issuer ID / Key ID、対象アプリ / テリトリー（多くは Product JSON）。ローカルは `APP_STORE_CONNECT_PRIVATE_KEY_PATH`（`.p8`）、コンテナは `APP_STORE_CONNECT_PRIVATE_KEY`（PEM 本文。タスク環境変数 / Secrets Manager 注入でも可）
-- **モデルプロバイダー**: `LLM_PROVIDER` 未設定 / `bedrock` なら Amazon Bedrock（ローカルでは Bedrock を呼べる認証。例: `AWS_REGION` とプロファイル。ECS では **Task Role** を使い、アクセスキーをリポジトリに置かない）。`.env.example` はハッカソン構成として `LLM_PROVIDER=meterless` を設定している（下記参照）
+- **モデルプロバイダー**: `LLM_PROVIDER` 未設定 / `bedrock` なら Amazon Bedrock（ローカルでは Bedrock を呼べる認証。例: `AWS_REGION` とプロファイル。ECS に再デプロイする場合は **Task Role** を使い、アクセスキーをリポジトリに置かない）。`.env.example` はハッカソン構成として `LLM_PROVIDER=meterless` を設定している（下記参照）
 - **GA4 App / Web（任意）**: Property ID + OAuth（`GOOGLE_OAUTH_*` と refresh token）またはサービスアカウント。Web の hostname / key events / featurePaths は製品 JSON
 - **AdMob（任意）**: Account ID + 別スコープの refresh token（`scripts/oauth_admob.py`）+ 必要なら App ID
 
@@ -574,7 +584,7 @@ npm install && npm run dev
 
 ```bash
 python scripts/verify_offline.py   # 18 チェック: import スモーク + 下記の verify_* スクリプト
-cd web && npm test                 # Web の単体テスト（portfolio、サンプル文言、Recorded Demo の入口）
+cd web && npm test                 # Web の単体テスト（portfolio、サンプル文言、Recorded Demo の画面構成）
 cd web && npm run lint && npm run build
 ```
 
@@ -615,13 +625,12 @@ cd web && npm run lint && npm run build
 - 判断メモリ（`local`、Meterless H-MEM）と、過去の判断・結果を Analyst の文脈として想起
 - `/api/evidence`、`/api/interventions`、Web UI の Grounding Critic パネルと施策パネル
 - Portfolio Overview（各アプリの保存済み Live Analyze の表示）
-- 架空サンプルデータ、Live Sample、Recorded Demo（CLI ビューア、ダッシュボードの入口ボタン、改訂履歴でのラベル表示）
+- 架空サンプルデータ、Live Sample、Recorded Demo（CLI ビューア、`/demo` 画面、改訂履歴でのラベル表示）
 - オフライン検証の一括実行
 
 ### まだ完了していないもの
 
-- **Recorded Demo の独立画面**: 現在はダッシュボードの Grounding Critic パネル内で開く
-- **根拠ループの高速化**: Nightshift 経由の Nemotron 3 Ultra で1回約15〜24分かかる。高速化の作業はまだしていない
+- **根拠ループの高速化**: Nightshift 経由の Nemotron 3 Ultra で1回約15〜24分かかった。改善には着手した（`f83beed`: 無駄なモデル往復の削減、Analyst / Critic での SDK の暗黙のリトライ停止、改訂プロンプトの短縮）が、効果を計測した実行はまだない
 - Recorded Demo で見えた Critic の誤判定の削減（件数をアプリごとの値と照合してしまう、指摘の種類が内容と合わない）
 
 ### Future Roadmap（未実装）
@@ -664,7 +673,7 @@ Acquisition → Usage → Feedback → Revenue → Prioritized action → Measur
 - **シナリオごとに1回の実行** — Recorded Demo ではモデルのばらつきとシナリオの違いを切り分けられない
 - **根拠ループの範囲** — App Store Connect の日次データ、Known Events、公開掲載情報のみ。競合データは公開掲載情報だけで、スクリーンショットの中身やレビューは含まない
 - **変更前後の計測** は territory が `ALL` の `asc_daily` の行を読む（製品 JSON は `ALL`）。1日でも欠けた期間はスキップする。判定は人によるもので、統計的検定ではない
-- **Recorded Demo に独立画面はない** — ダッシュボードのパネル内で開き、Web UI での表示にはローカルの API が必要
+- **Recorded Demo 画面にはローカルの API が必要** — `/demo` はモデルを呼ばないが、保存済みの実行を `/api/evidence` から読むため、`python api_server.py` なしでは表示できない（CLI ビューアは API なしで動く）
 - **Live Sample のモデル名** — `LLM_PROVIDER=meterless` のとき、`scripts/run_sample.py` はモデル名を `meterless` とだけ記録する（モデル ID を含まない）
 - **公開環境はない** — 過去の AWS 環境は廃止済み。Zetaris、Nightshift、H-MEM は開発者のマシンで動く
 - **API に認証がない** — `/api/analyze`、`/api/evidence`、`/api/interventions` には認証がないため、ローカルで動かしてください。公開する場合は保護（例: WAF / レート制限）が必要で、長時間の Analyze には ALB idle timeout を既定の 60 秒より長くする必要があります
