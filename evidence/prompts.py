@@ -40,9 +40,7 @@ You are the Analyst of an indie app growth team. You propose at most 3 prioritiz
 actions and support every statement with evidence from the evidence store.
 
 Use the run_sql tool to explore the store. Every number you write must come from
-the store. You have not seen any rows yet, so you know no number until you query it:
-call run_sql before you write any claim. An answer that states numeric facts without
-a successful run_sql call in that same answer is rejected and discarded.
+the store.
 
 Evidence items: one item per number. A claim that states three numbers has three
 evidence items. Each item has table, value (that single number, or one short text
@@ -64,6 +62,8 @@ Actions:
 - rank 1-3, each with claim_ids pointing to the claims that support it.
 - An action must rest on at least one fact or on a hypothesis with a test plan.
   "Competitors do X" alone never proves X will work for us.
+- An action's title and reason use only numbers and competitor facts stated in the
+  claims it cites.
 - The developer has a zero marketing budget and about 3 hours per week. Only App
   Store metadata, screenshots, and similar manual changes are possible.
 
@@ -104,6 +104,9 @@ Return:
     infeasible_action, and not causal_leap when the action only checks an effect
     ("check whether X contributes"); mention it in the summary instead.
   Do not raise issues about wording or style. If a version is sound, return no issues.
+- summary: your judgment only. Never say that numbers are verified, match, or are
+  correct: code compares your checks after you answer, and you do not see that result.
+  Mention anything you could not check, e.g. a value that packs several numbers.
 
 {APP_STORE_RULES}
 {SQL_RULES}
@@ -198,6 +201,11 @@ def version_json(output: AnalystOutput) -> str:
     return output.model_dump_json(exclude_defaults=True)
 
 
+GROUNDING_RULE = """\
+An answer that states numeric facts without a successful run_sql call in this same
+answer is rejected and discarded."""
+
+
 def _periods_text(current: tuple[str, str], previous: tuple[str, str]) -> str:
     return (
         f"Current period: {current[0]} to {current[1]} (inclusive).\n"
@@ -223,7 +231,9 @@ App: {product_name}
 Evidence store:
 {schema_text}
 
-Start with run_sql: query the metrics of both periods before you write any claim.
+You have not seen any rows yet, so you know no number until you query it. Start with
+run_sql: query the metrics of both periods before you write any claim.
+{GROUNDING_RULE}
 Then find the most important change between the periods and propose up to 3 actions.
 {_language_rule(language)}
 """
@@ -243,6 +253,8 @@ Stage v2 (competitive): revise the previous version using public data about
 competitor apps as well. Keep what still holds; make proposals more concrete where
 the competitor observations help. External data stays "observation"; any belief
 that copying a competitor will work is a "hypothesis" with a test_plan.
+Query the store with run_sql in this answer (e.g. the competitor tables) before you
+write claims. {GROUNDING_RULE}
 
 App: {product_name}
 {_periods_text(current, previous)}
@@ -289,14 +301,34 @@ def analyst_revision_prompt(
 Revision: the Grounding Critic and code checks found problems in your last version.
 Produce the next version that fixes them.
 
-- value_mismatch / unverifiable: re-query and correct the value and SQL, or remove the claim.
+Reuse evidence that code confirmed. Code re-ran the sql of each evidence item that has
+a sql and a single value, and compared the result with that value. Such an item, in a
+claim with no value_mismatch or unverifiable finding, is confirmed: keep it and its sql
+without re-querying. No finding alone does not make evidence verified: an item without
+a sql, for example, was never checked. Never describe unchecked evidence as verified.
+A finding's critic_value is what the store returned; use it to correct a value.
+Writing or fixing an evidence sql does not use the query budget (code runs it); only
+run_sql calls do. Spend run_sql on the findings first, then on any extra check you
+need.
+
+- value_mismatch: correct the value (see critic_value) and, if needed, its sql.
+- unverifiable: fix the evidence, e.g. split a packed value into one evidence item
+  per number, each with a sql that returns exactly that value.
 - causal_leap / kind_mislabel: downgrade the claim to a hypothesis with a test_plan,
   or remove it. Do not argue that an untested effect is proven.
 - scope_mismatch: compare like with like, or state the populations separately.
 - infeasible_action: use a method the App Store allows (e.g. a dated before/after
   instead of PPO), state it as something to confirm first, or remove the action.
+Never remove a claim only because the query budget ran out. A claim whose evidence
+you cannot fix must not stay as it is either: downgrade it to a hypothesis with a
+test_plan whose text says which evidence is missing and states no unverified number,
+or remove it when its evidence is wrong.
 Fill finding_responses with one entry per finding id (fixed, downgraded, removed,
 or disputed with a note). Keep claims that had no problems.
+When you modify, downgrade, or remove a claim, update every action that cites it:
+its claim_ids, title, reason, and the success criteria of the test plans it relies
+on. Do not leave in an action a number or competitor fact from a claim you removed
+or downgraded.
 Return the complete next version including its actions (up to 3). Fill
 action_changes with one entry per action of your last version: kept, modified, or
 removed, with the reason. Withdrawing an action for lack of evidence is fine, but

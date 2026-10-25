@@ -414,8 +414,31 @@ def check_loop(store: SQLiteEvidenceStore) -> None:
     assert "competitor_listing" not in analyst.prompts[0], "v1 must see internal tables only"
     assert "competitor_listing" in analyst.prompts[1]
     assert "r1-f" in analyst.prompts[2] and "因果は未確認" in analyst.prompts[2]
-    assert "Start with run_sql" in analyst.prompts[0]
-    assert "call run_sql before you write any claim" in ANALYST_SYSTEM
+    assert "Start with" in analyst.prompts[0] and "run_sql" in analyst.prompts[0]
+    rejected = "is rejected and discarded"
+    assert rejected in analyst.prompts[0] and rejected in analyst.prompts[1]
+    assert rejected not in analyst.prompts[2] and rejected not in ANALYST_SYSTEM
+    print("OK the 'rejected without SQL' rule is stated in v1 / v2 only, where the guard applies")
+
+    revision = analyst.prompts[2]
+    assert "Reuse evidence that code confirmed" in revision and "critic_value" in revision
+    assert "has\na sql and a single value" in revision
+    assert "No finding alone does not make evidence verified" in revision
+    assert "Never describe unchecked evidence as verified" in revision
+    assert "passed, so keep" not in revision, "no finding must not read as verified"
+    assert "does not use the query budget" in revision
+    assert "Spend run_sql on the findings first" in revision
+    assert "Never remove a claim only because the query budget ran out" in revision
+    assert "must not stay as it is either" in revision and "downgrade it to a hypothesis" in revision
+    assert "update every action that cites it" in revision
+    assert "use only numbers and competitor facts stated in the\n  claims it cites" in ANALYST_SYSTEM
+    print("OK v3 reuses verified evidence, spends queries on findings, never drops a claim only "
+          "for the budget, and keeps actions consistent with changed claims")
+
+    summary_rule = CRITIC_SYSTEM.split("- summary:", 1)[1].split("\n\n", 1)[0]
+    assert "Never say that numbers are verified" in summary_rule
+    assert "code compares your checks after you answer" in summary_rule
+    print("OK the Critic summary must not claim numbers are verified; code decides matches")
 
     def embedded_version(prompt: str, header: str) -> AnalystOutput:
         start = prompt.index(header) + len(header)
