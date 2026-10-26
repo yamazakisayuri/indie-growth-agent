@@ -683,7 +683,7 @@ cd web && npm run lint && npm run build
 
 ### まだ完了していないもの
 
-- **根拠ループの高速化**: Nightshift 経由の Nemotron 3 Ultra で1回約15〜24分かかった。改善には着手した（`f83beed`: 無駄なモデル往復の削減、Analyst / Critic での SDK の暗黙のリトライ停止、改訂プロンプトの短縮）が、効果を計測した実行はまだない
+- **根拠ループの高速化**: Nightshift 経由の Nemotron 3 Ultra で1回約15〜24分かかった。改善には着手した（`7beed42`: 無駄なモデル往復の削減、Analyst / Critic での SDK の暗黙のリトライ停止、改訂プロンプトの短縮）が、効果を計測した実行はまだない
 - Recorded Demo で見えた Critic の誤判定の削減（件数をアプリごとの値と照合してしまう、指摘の種類が内容と合わない）
 
 ### Future Roadmap（未実装）

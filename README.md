@@ -683,7 +683,7 @@ Already in this repository:
 
 ### Not finished yet
 
-- **Faster evidence runs**: one run took about 15–24 minutes with Nemotron 3 Ultra through Nightshift. Work has started (`f83beed`: fewer wasted model round trips, no silent SDK retries for the Analyst / Critic, shorter revision prompts), but no run has measured the effect yet
+- **Faster evidence runs**: one run took about 15–24 minutes with Nemotron 3 Ultra through Nightshift. Work has started (`7beed42`: fewer wasted model round trips, no silent SDK retries for the Analyst / Critic, shorter revision prompts), but no run has measured the effect yet
 - Reducing Critic false judgments seen in the Recorded Demos (counts compared with per-app values; finding kind not matching the content)
 
 ### Future Roadmap (not implemented)
