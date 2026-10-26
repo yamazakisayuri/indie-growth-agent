@@ -4,6 +4,8 @@
 
 Indie app 向けの成長分析 Agent（ハッカソン MVP を **Open Agent Hackathon 2026 — Track 2「The Agent That Can Explain Why」** 向けに拡張）。
 
+**デモ動画（英語）:** [youtu.be/yA2SuF5RMV0](https://youtu.be/yA2SuF5RMV0)
+
 ## Quick Demo（30秒で分かる）
 
 **何ができるか。** インディーアプリの次の成長施策を AI が提案します。提案の裏にある根拠項目（evidence）の値には、その値を再現する SQL を必ず付けます。独立した **Critic** が自分で書いた SQL でその値を照合し、一致するかは **コード** が判定し、Analyst が改訂します（v1 → v2 → Critic → v3 → Critic）。主張の本文や提案の理由にだけ書かれた数字は照合しません（[照合の範囲](#照合の範囲と収束解消の意味)）。人が採用した施策は変更前後を SQL で計測し、その結果が次回の分析に渡ります。
@@ -165,9 +167,9 @@ Live Sample と Recorded Demo は Zetaris ではなく専用の SQLite ファイ
 | コードの経路 | `LLM_PROVIDER=meterless` → `llm/factory.py`、`integrations/meterless/` | `EVIDENCE_STORE=zetaris` → `evidence/factory.py`、`integrations/zetaris/` |
 | オフラインテスト（`verify_offline.py` に含む） | `verify_meterless.py`: プロバイダーの設定、状態確認、モデルのエラー処理を、Nightshift ではなくローカルの偽サーバーで確認 | `verify_zetaris_store.py`: CSV の配置、テーブル登録、テーブル名の修飾、読み取り専用ガードを、Zetaris ではなく偽エンジンで確認 |
 | 実接続の確認（オフライン一式には含まない） | `check_meterless.py`（`--chat` は1回リクエストを送る） | `verify_zetaris_live.py`（ローカルの Zetaris platform、Java 17 以上、JDBC jar が必要） |
-| コミット済みの実行結果 | `LLM_PROVIDER=meterless` で記録したものはない。Recorded Demo の3本のトレースはモデルを `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` と記録している。トレースには接続先 URL が残らないため、Nightshift の OpenAI 互換エンドポイント経由だったことは開発者の説明であり、ファイルからは確かめられない | ない。Recorded Demo は SQLite を使う。実アプリのデータでの Zetaris 上の根拠ループはローカルで実行したが、そのトレースは実データを含むためコミットしておらず、リポジトリからは結果を確かめられない |
+| コミット済みの実行結果 | `LLM_PROVIDER=meterless` で記録したものはない。Recorded Demo の3本のトレースはモデルを `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b` と記録している。トレースには接続先 URL が残らないため、Nightshift の OpenAI 互換エンドポイント経由だったことは開発者の説明であり、ファイルからは確かめられない | `verify_zetaris_live.py` を1回実行した出力（接続、確認用テーブルの書き込みと読み戻し、テーブル定義。データの行は含まない）を [`docs/zetaris-live-check.md`](docs/zetaris-live-check.md) に残している。Recorded Demo は SQLite を使う。実アプリのデータでの Zetaris 上の根拠ループはローカルで実行したが、そのトレースは実データを含むためコミットしておらず、リポジトリからは結果を確かめられない |
 
-つまりこのリポジトリが示すのは、各連携の組み込み方と偽の相手に対するテストまでで、どちらについても実接続での成功をそれだけで証明するものではありません。
+つまりこのリポジトリが示すのは、各連携の組み込み方と偽の相手に対するテスト、それに記録した Zetaris の接続確認1回までで、どちらについても実接続での根拠ループの成功は示していません。
 
 ## Multi-Product
 
@@ -636,7 +638,7 @@ npm install && npm run dev
 すべてオフライン（認証情報・ネットワーク・モデル呼び出し不要）:
 
 ```bash
-python scripts/verify_offline.py   # 18 チェック: import スモーク + 下記の verify_* スクリプト
+python scripts/verify_offline.py   # 19 チェック: import スモーク + 下記の verify_* スクリプト
 cd web && npm test                 # Web の単体テスト（portfolio、サンプル文言、Recorded Demo の画面構成と選択、Critic の照合、Sample Workspace、訳の補足、グラフ）
 cd web && npm run lint && npm run build
 ```

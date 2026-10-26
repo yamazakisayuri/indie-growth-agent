@@ -4,6 +4,8 @@
 
 Growth-analysis agent for indie apps (Hackathon MVP, extended for **Open Agent Hackathon 2026 — Track 2 "The Agent That Can Explain Why"**).
 
+**Demo video:** [youtu.be/yA2SuF5RMV0](https://youtu.be/yA2SuF5RMV0)
+
 ## Quick Demo (30 seconds)
 
 **What it does.** The agent proposes the next growth actions for an indie app. Every evidence value behind a proposal must come with SQL that reproduces it. An independent **Critic** re-checks those values with SQL it writes itself, **code** decides whether they match, and the Analyst revises (v1 → v2 → Critic → v3 → Critic). Numbers written only in claim text or action reasons are not checked ([SQL check scope](#what-the-checks-cover-and-what-converged--resolved-mean)). Actions a person adopts are measured before/after by SQL, and the result feeds the next analysis.
@@ -165,9 +167,9 @@ The Live Sample and Recorded Demo use a dedicated SQLite file, not Zetaris, so f
 | Code path | `LLM_PROVIDER=meterless` → `llm/factory.py`, `integrations/meterless/` | `EVIDENCE_STORE=zetaris` → `evidence/factory.py`, `integrations/zetaris/` |
 | Offline test (in `verify_offline.py`) | `verify_meterless.py`: provider settings, the status check, and model error handling against a local fake server, not Nightshift | `verify_zetaris_store.py`: CSV staging, table registration, name qualification, and the read-only guard against a fake engine, not Zetaris |
 | Live check (not in the offline suite) | `check_meterless.py` (`--chat` sends one request) | `verify_zetaris_live.py` (needs the local Zetaris platform, Java 17+, and the JDBC jar) |
-| Committed run results | None recorded with `LLM_PROVIDER=meterless`. The three Recorded Demo traces record the model as `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b`; the trace does not record the endpoint URL, so that they went through Nightshift's OpenAI-compatible endpoint is the developer's account, not something the files show | None. The Recorded Demos use SQLite. Evidence runs on real app data with Zetaris were run locally, but their traces hold real data and are not committed, so the repository cannot show their results |
+| Committed run results | None recorded with `LLM_PROVIDER=meterless`. The three Recorded Demo traces record the model as `openai_compatible:nvidia/nemotron-3-ultra-550b-a55b`; the trace does not record the endpoint URL, so that they went through Nightshift's OpenAI-compatible endpoint is the developer's account, not something the files show | The output of one `verify_zetaris_live.py` run (connection, probe table round trip, table schemas; no data rows) is in [`docs/zetaris-live-check.md`](docs/zetaris-live-check.md). The Recorded Demos use SQLite. Evidence runs on real app data with Zetaris were run locally, but their traces hold real data and are not committed, so the repository cannot show their results |
 
-The repository therefore shows how each integration is wired and tested against fakes; it does not by itself prove a successful live run of either.
+The repository therefore shows how each integration is wired and tested against fakes, plus one recorded Zetaris connection check; it does not show a successful evidence run on either.
 
 ## Multi-Product
 
@@ -636,7 +638,7 @@ The browser calls FastAPI directly (no Next.js API Route proxy):
 All offline (no credentials, network, or model calls):
 
 ```bash
-python scripts/verify_offline.py   # 18 checks: import smoke + every verify_* script below
+python scripts/verify_offline.py   # 19 checks: import smoke + every verify_* script below
 cd web && npm test                 # Web unit tests (portfolio, sample text, Recorded Demo story and choice, Critic checks, Sample Workspace, glosses, snapshot)
 cd web && npm run lint && npm run build
 ```
